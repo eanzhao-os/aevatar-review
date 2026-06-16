@@ -36,17 +36,10 @@
 
 ### 00 · 序章
 
-<<<<<<< HEAD
-- ⬜ 00/01-what-is-aevatar.md — Aevatar 是什么、解决什么问题、与 LangGraph/AutoGen 等的区别定位
+- ✅ `00/01-what-is-aevatar.md` — Aevatar 是什么、解决什么问题、与 LangGraph/AutoGen 等的区别定位
 - ✅ `00/02-repo-map.md` — 仓库地图:`aevatar.slnx` + 当前 9 个 `aevatar.*.slnf` 怎么切、`src/` 下 98 个 `.csproj` 的分层归属(对照 `docs/canon/module-placement-map.md`)
 - ⬜ 00/03-quick-start.md — 从零跑起来:配 Key → 起 Mainnet → `simple_qa` → 看 SSE + 看 `artifacts/` 报告
 - ✅ 00/00-readme-and-plan.md — 即本 README + PLAN(已完成；不是独立章节文件)
-=======
-- ✅ `00/01-what-is-aevatar.md` — Aevatar 是什么、解决什么问题、与 LangGraph/AutoGen 等的区别定位
-- ⬜ `00/02-repo-map.md` — 仓库地图:`aevatar.slnx` + 10 个 `*.slnf` 怎么切的、`src/` ~80 个项目的分层归属(对照 `docs/canon/module-placement-map.md`)
-- ⬜ `00/03-quick-start.md` — 从零跑起来:配 Key → 起 Mainnet → `simple_qa` → 看 SSE + 看 `artifacts/` 报告
-- ✅ `00/00-readme-and-plan.md` — 即本 README + PLAN(已完成)
->>>>>>> origin/integration
 
 ### 01 · 宿主与入口
 
