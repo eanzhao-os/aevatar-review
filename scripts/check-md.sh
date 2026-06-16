@@ -90,6 +90,8 @@ while IFS= read -r rel; do
       *Code/aevatar/*) p="${p##*Code/aevatar/}";;
       ~/Code/aevatar/*) p="${p#~/Code/aevatar/}";;
     esac
+    # strip trailing :line anchor (e.g. WorkflowRunGAgent.cs:36)
+    p="${p%:[0-9]*}"
     case "$p" in
       docs/*|src/*|workflows/*|demos/*|apps/*|tools/*)
         if [ ! -e "$AEVATAR_SRC/$p" ]; then
