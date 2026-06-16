@@ -2,12 +2,12 @@
 
 ## 关键代码(事实源,以 ~/Code/aevatar 为准)
 
-- `aevatar.slnx`：当前完整解决方案，`/src/` 文件夹下登记 98 个生产 `.csproj`，另含 agents、docs、test 等工作区。
-- `aevatar.foundation.slnf`、`aevatar.cqrs.slnf`、`aevatar.workflow.slnf`、`aevatar.ai.slnf`、`aevatar.capabilities.slnf`、`aevatar.distributed.slnf`、`aevatar.agents.slnf`、`aevatar.channels.slnf`、`aevatar.platforms.slnf`：当前 9 个 solution filter。
-- `docs/canon/module-placement-map.md`：第 23-29 行给出 placement 判定顺序；第 30-39 行给出 tier 速查；第 40-59 行给出 feature-family 落点表。
-- `docs/canon/overview.md`：第 11-18 行定义架构基线；第 20-31 行把 `aevatar.slnx` 展开到 `src/`、workflow、CQRS、Foundation；第 67-79 行说明 Domain/Application/Infrastructure/Host 分层。
-- `docs/canon/architecture.md`：第 11-19 行列出 Foundation 项目分层；第 57-71 行说明 Command、Actor、Event Sourcing、Projection 的主链路；第 161-202 行说明 CQRS/Projection 与 Workflow 的落点。
-- `docs/canon/architecture-vocabulary.md`：第 20-31 行把 Module、Interface、Adapter、Locality 等评审词汇对齐到 aevatar 的项目和 Actor 语义。
+- `aevatar.slnx` 第 1-199 行：当前完整解决方案;`<Project Path=.../>` 列表(第 3-199 行)登记全部 `.csproj`,其中 `src/` 下 98 个生产项目,另含 `agents/`、`docs/`、`test/` 工作区。
+- `aevatar.foundation.slnf` 第 1-23 行、`aevatar.cqrs.slnf` 第 1-15 行、`aevatar.workflow.slnf` 第 1-22 行、`aevatar.ai.slnf` 第 1-17 行、`aevatar.capabilities.slnf` 第 1-22 行、`aevatar.distributed.slnf` 第 1-16 行、`aevatar.agents.slnf` 第 1-10 行、`aevatar.channels.slnf` 第 1-12 行、`aevatar.platforms.slnf` 第 1-12 行:当前 9 个 solution filter,各自 `"projects"` 数组(从第 4 行起)声明该工作面包含的项目。
+- `docs/canon/module-placement-map.md` 第 23-29 行给出 placement 判定顺序；第 30-39 行给出 tier 速查；第 40-59 行给出 feature-family 落点表。
+- `docs/canon/overview.md` 第 11-18 行定义架构基线；第 20-31 行把 `aevatar.slnx` 展开到 `src/`、workflow、CQRS、Foundation；第 67-79 行说明 Domain/Application/Infrastructure/Host 分层。
+- `docs/canon/architecture.md` 第 11-19 行列出 Foundation 项目分层；第 57-71 行说明 Command、Actor、Event Sourcing、Projection 的主链路；第 161-202 行说明 CQRS/Projection 与 Workflow 的落点。
+- `docs/canon/architecture-vocabulary.md` 第 20-31 行把 Module、Interface、Adapter、Locality 等评审词汇对齐到 aevatar 的项目和 Actor 语义。
 
 > 当前事实快照：`find ~/Code/aevatar -maxdepth 1 -name 'aevatar.*.slnf' | wc -l` 为 9；`find ~/Code/aevatar/src -name '*.csproj' | wc -l` 为 98。
 
