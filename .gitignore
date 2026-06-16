@@ -5,3 +5,8 @@
 .idea/
 .vscode/
 *.swp
+
+# consensus-loop skill-private runtime home (cache/logs/state/prompts/runs/worktrees)
+.refactor-loop/
+.worktrees/
+.config/consensus-rnd/host.env
