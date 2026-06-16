@@ -71,3 +71,16 @@
 - 每个 chapter issue 是一个独立工作单元,产物为单个 Markdown 文件(或一组同目录文件)。
 - 实现者(写章节)的 `scope_paths` 限定在该章节对应的目录/文件;不越界改其它章节。
 - 若发现需要扩展新章节(PLAN.md 未列),先 print `SCOPE_EXTEND` 并补 issue,再写。
+
+
+<!-- consensus-rnd:foundational-invariants:start version=1 sha256=f5c24b0c3515993a7b86c4ed78ce7386add665f8c8b84cc7275aedebd6c3e6af -->
+## 共识研发不动点（由 consensus-rnd 管理）
+
+- FI-001 AI 产物默认不可信；进入主线前必须经过独立检查，至少包含共识、review 或自动验证中的适用组合。
+- FI-002 Host 事实必须由 host 配置或 host 规则注入；通用 skill / engine 不硬编码具体项目、组织、路径、分支或人员事实；skill-private runtime directories such as `.refactor-loop/` must not become host production configuration or ledger SSOT.
+- FI-003 稳定核心保持小而可审计；高频变化留在 host 规则、prompt、脚本或扩展层，不下沉为核心不变量。
+- FI-004 跨进程、跨 turn 或跨节点的事实必须有权威记录；进程内记忆、cache、临时变量不能冒充事实源。
+- FI-005 边界优先于便利；职责、层级、协议和状态所有权必须清楚，禁止用中间层快捷方式绕过主链路。
+- FI-006 变更必须可验证且基于 evidence；失败、缺口和越界承诺要显式暴露，禁止用静默假设或禁用测试换取通过。
+- FI-007 删除优先；废弃路径直接移除，除非 host 规则明确要求迁移期兼容。
+<!-- consensus-rnd:foundational-invariants:end -->
