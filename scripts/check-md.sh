@@ -2,8 +2,9 @@
 # check-md.sh — aevatar-review 的 BUILD/TEST 校验脚本
 #
 # 校验目标(文档仓库无编译产物):
-#   1. 若存在章节 Markdown 文件(XX/NN-*.md),每篇非空且含「关键代码」清单。
+#   1. 若存在章节 Markdown 文件(XX/NN-*.md),每篇非空且含「事实源/设计抽象」入口。
 #   2. 引用的 aevatar 源码路径(docs/ src/ workflows/ demos/ apps/ tools/)真实存在。
+#   3. 02 编排层章节保持证据入口轻量,正文不退回源码文件/Name/行号表骨架。
 #
 # 作用域:增量友好。优先校验 git diff 中新增/修改的章节文件;若无 diff(干净 main),
 # 则回退到校验仓库里已存在的全部章节文件。这样每篇章节 PR 只校验自己,不被其它未写
@@ -16,7 +17,19 @@
 # 退出码: 0 = 全部通过; 1 = 有失败项。POSIX/Bash 3.2 兼容(无 mapfile/数组)。
 set -uo pipefail
 
-REPO_ROOT="${REPO_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
+SCRIPT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ENV_REPO_ROOT="${REPO_ROOT:-}"
+if [ -n "$ENV_REPO_ROOT" ]; then
+  script_top="$(git -C "$SCRIPT_ROOT" rev-parse --show-toplevel 2>/dev/null || printf '%s' "$SCRIPT_ROOT")"
+  env_top="$(git -C "$ENV_REPO_ROOT" rev-parse --show-toplevel 2>/dev/null || printf '%s' "$ENV_REPO_ROOT")"
+  if [ "$script_top" = "$env_top" ]; then
+    REPO_ROOT="$ENV_REPO_ROOT"
+  else
+    REPO_ROOT="$SCRIPT_ROOT"
+  fi
+else
+  REPO_ROOT="$SCRIPT_ROOT"
+fi
 AEVATAR_SRC="${AEVATAR_SRC:-$HOME/Code/aevatar}"
 
 cd "$REPO_ROOT" || { echo "FATAL: cannot cd $REPO_ROOT" >&2; exit 1; }
@@ -77,9 +90,9 @@ while IFS= read -r rel; do
     fail=1
     continue
   fi
-  # 每篇应含「关键代码」清单(中英任一写法均可)
-  if ! grep -qiE '关键代码|关键文件|事实源|Key (code|files)' "$f"; then
-    add_error "$rel: missing 关键代码/事实源 section"
+  # 每篇应含事实源入口;旧章节的「关键代码」标题仍作为兼容写法通过。
+  if ! grep -qiE '事实源|设计抽象|关键代码|关键文件|Key (code|files)|Evidence' "$f"; then
+    add_error "$rel: missing 事实源/设计抽象 section"
     fail=1
   fi
   # 抽取引用的 aevatar 源码路径并校验存在(docs/ src/ workflows/ demos/ apps/ tools/)
@@ -101,6 +114,27 @@ while IFS= read -r rel; do
         ;;
     esac
   done < <(grep -oE '`[^`]*(docs|src|workflows|demos|apps)/[^`]+`' "$f")
+
+  case "$rel" in
+    02/0[1-7]-*.md)
+      if grep -qE '文件 / Name 行|常量行号|\| 行号 \|' "$f"; then
+        add_error "$rel: contains legacy file/name/line table wording"
+        fail=1
+      fi
+
+      diagram_count=$(( $(grep -c '^```mermaid' "$f" || true) + $(grep -c '!\[' "$f" || true) ))
+      if [ "$diagram_count" -lt 2 ]; then
+        add_error "$rel: expected at least 2 mermaid/image diagrams, found $diagram_count"
+        fail=1
+      fi
+
+      source_ref_count=$(grep -oE '`((~/Code/aevatar/)?(docs|src|workflows|demos|apps|tools)/[^`]+)`' "$f" | wc -l | tr -d ' ')
+      if [ "$source_ref_count" -gt 3 ]; then
+        add_error "$rel: expected at most 3 source fact anchors in 02 chapter, found $source_ref_count"
+        fail=1
+      fi
+      ;;
+  esac
 done <"$work_file"
 
 if [ "$fail" -ne 0 ]; then

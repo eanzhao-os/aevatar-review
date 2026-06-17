@@ -1,127 +1,131 @@
-# Connector(HTTP/CLI/MCP)配置与 connector_call 执行、role allowlist
+# Connector：Workflow 调外部系统的受控出口
 
-## 关键代码(事实源,以 ~/Code/aevatar 为准)
+## 事实源/设计抽象(以 ~/Code/aevatar 为准)
 
-- `docs/canon/connector.md` 第 18-28 行:connector 契约 + 配置链;第 34-69 行:配置 shape + 解析规则;第 73-93 行:`ConnectorConfigEntry` + 类型子字段;第 104-108 行:builder 校验;第 141-181 行:`connector_call` 执行;第 186-260 行:各类型执行细节;第 264-281 行:`connector_call` vs `tool_call`。
-- `docs/canon/connector.md` 第 248-260 行:host 责任边界(`host-not-controller`/`published-surfaces-only`/`no-new-aevatar-endpoints`)。
-- `src/Aevatar.Configuration/README.md` 第 19 行:`AevatarConnectorConfig`;第 44-50 行:Role 与 Connector 分配(中心化配置 + 按角色授权);第 54-80 行:YAML 示例。
-- `src/Aevatar.Bootstrap/Connectors/IConnectorBuilder.cs` 第 7-12 行:`IConnectorBuilder` 接口。
-- `src/Aevatar.Bootstrap/Connectors/HttpConnectorBuilder.cs` 第 33 行;`HttpConnector.cs` 第 66 行。
-- `src/Aevatar.Bootstrap/Connectors/CliConnectorBuilder.cs` 第 9 行;`CliConnector.cs` 第 48 行。
-- `src/Aevatar.Bootstrap/Connectors/HostCallbackConnectorBuilder.cs` 第 19 行;`HostCallbackConnector.cs` 第 39 行。
-- `src/Aevatar.Bootstrap/Connectors/TelegramUserConnectorBuilder.cs` 第 13 行;`TelegramUserConnector.cs` 第 82 行。
-- `src/Aevatar.Bootstrap.Extensions.AI/Connectors/MCPConnectorBuilder.cs` 第 22 行(需 `mcp.command` 或 `mcp.url`,第 27-30 行)。
-- `src/Aevatar.Bootstrap/ServiceCollectionExtensions.cs` 第 30-35 行:`RegisterConnectorBuilders`(http/cli/host_callback/telegram_user)。
-- `src/Aevatar.Bootstrap.Extensions.AI/ServiceCollectionExtensions.cs` 第 126 行:`MCPConnectorBuilder` 注册(gated by AI features/MCP option)。
-- `src/workflow/Aevatar.Workflow.Core/Modules/ConnectorCallModule.cs` 第 31 行:`Name => "connector_call"`;第 89-90 行:canonical 化 + `secure_connector_call` 区分。
-- `src/workflow/Aevatar.Workflow.Core/ServiceCollectionExtensions.cs` 第 29 行:`IConnectorRegistry` → `ConfiguredConnectorRegistry`。
+- `docs/canon/connector.md:18-281`: connector 契约、配置形状、执行流程、host 边界和 `connector_call` / `tool_call` 区分。
+- `src/Aevatar.Configuration/README.md:44-80`: role 与 connector 的集中配置和 allowlist 分配方式。
+- `src/workflow/Aevatar.Workflow.Core/Modules/ConnectorCallModule.cs:31-181`: `connector_call` 模块的参数读取、registry 解析、allowlist 和容错执行。
 
 ---
 
-## Connector 是什么
+## 一句话模型
 
-Connector 是 workflow 调用外部系统的抽象(`docs/canon/connector.md` 第 18-21 行):
+Connector 是 workflow 调外部系统的受控出口：连接定义集中在 host 配置，workflow step 只声明“我要用哪个 connector 做什么操作”，role 的 `connectors` 决定谁有权用。
 
-- 契约:`IConnector` / `IConnectorRegistry`(在 `Aevatar.Foundation.Abstractions`)
-- 配置:集中式,`~/.aevatar/connectors.json`
-- workflow 用 `connector_call` step + `parameters.connector` 调用
-- role 的 `connectors` 是**授权 allowlist**,不是连接定义
-
-> **关键区分**(`connector.md` 第 264-281 行):`connector_call`(经 `ConnectorCallModule`,workflow 步骤侧)vs `tool_call`(经 `ToolCallModule`,agent 工具系统)。当前 role-connector 授权只在 **workflow roles + connector_call** 真正生效(第 278-281 行)。
-
----
-
-## 四种 connector 类型
-
-| 类型 | builder / 文件 | connector 实现 | 校验要求 |
-|---|---|---|---|
-| `http` | `HttpConnectorBuilder.cs:33` | `HttpConnector.cs:66` | `http.baseUrl`(`connector.md:104`) |
-| `cli` | `CliConnectorBuilder.cs:9` | `CliConnector.cs:48` | `cli.command`(不含 `://`) |
-| `mcp` | `MCPConnectorBuilder.cs:22`(AI 扩展项目) | — | `mcp.command` 或 `mcp.url`(第 27-30 行) |
-| `host_callback` | `HostCallbackConnectorBuilder.cs:19` | `HostCallbackConnector.cs:39` | handler |
-| `telegram_user` | `TelegramUserConnectorBuilder.cs:13` | `TelegramUserConnector.cs:82` | — |
-
-**DI 注册时机**(`connector.md` 第 94-113 行):
-- `http`/`cli`/`host_callback`/`telegram_user`:由 `AddAevatarBootstrap()` 注册(`ServiceCollectionExtensions.cs` 第 30-35 行)
-- `mcp`:仅当 `AddAevatarAIFeatures(..., options => options.EnableMCPTools = true)` 时注册(`ServiceCollectionExtensions.cs:126`,`connector.md:113`)
-
----
-
-## 配置(`connectors.json`)
-
-`~/.aevatar/connectors.json`(`connector.md` 第 34-39 行),可用 `AEVATAR_HOME` 覆盖路径。支持三种 JSON shape(array/object/`definitions`),解析规则(`connector.md` 第 43-69 行):`enabled=false` 过滤、缺 `name`/`type` 过滤、`timeoutMs` clamp 100..300000、`retry` clamp 0..5。
-
-`ConnectorConfigEntry` 公共字段(第 73-79 行):`name`/`type`/`enabled`/`timeoutMs=30000`/`retry=0`。类型子字段(http/cli/mcp/host_callback,第 83-93 行)。
-
-HTTP 示例(`src/Aevatar.Configuration/README.md` 第 104-195 行有完整示例):
-```json
-{
-  "name": "github_router",
-  "type": "http",
-  "enabled": true,
-  "timeoutMs": 30000,
-  "http": {
-    "baseUrl": "https://api.github.com",
-    "allowedMethods": ["GET", "POST"],
-    "allowedPaths": ["/repos/*"],
-    "auth": { "type": "secret_ref_header", "header": "Authorization", "secretRef": "GITHUB_TOKEN" }
-  }
-}
+```mermaid
+flowchart LR
+    Config["connectors.json<br/>集中连接定义"] --> Registry["IConnectorRegistry"]
+    Role["workflow role<br/>connectors allowlist"] --> Step["connector_call step"]
+    Step --> Module["ConnectorCallModule"]
+    Registry --> Module
+    Module --> Connector["IConnector"]
+    Connector --> External["HTTP / CLI / MCP / host callback"]
 ```
 
----
+```mermaid
+sequenceDiagram
+    participant K as Kernel
+    participant M as ConnectorCallModule
+    participant R as ConnectorRegistry
+    participant C as Connector
+    participant X as External system
 
-## connector_call 执行
+    K->>M: StepRequestEvent
+    M->>M: read connector / operation / role
+    M->>R: resolve connector
+    R-->>M: connector instance or missing
+    M->>M: check role allowlist
+    M->>C: ExecuteAsync(request)
+    C->>X: call published surface
+    X-->>C: response
+    C-->>M: ConnectorResult
+    M-->>K: StepCompletedEvent
+```
 
-`ConnectorCallModule`(`ConnectorCallModule.cs` 第 31 行)执行流程(`connector.md` 第 141-181 行):
+## 配置和授权分开
 
-1. 读 `connector`/`operation`/`retry`/`timeout_ms`/`optional`/`on_missing`/`on_error`
-2. 经 `IConnectorRegistry` 解析 connector
-3. 校验 role 的 `connectors` allowlist 包含该 connector
-4. 构造 `ConnectorRequest`,调 `IConnector.ExecuteAsync()`
+`connectors.json` 解决“连接是什么”，role 的 `connectors` 解决“谁可以用”。这两个问题分开后，YAML 不需要携带密钥、base URL 或命令细节。
 
-**容错语义**(第 166-174 行):
-- connector 缺失 → `optional`/`on_missing: skip` 成功(返回 input)
-- 失败 → `on_error: continue` 继续
-- `attempts = retry + 1`,retry 上限 5
-
-最小 YAML:
 ```yaml
+roles:
+  - id: coordinator
+    name: Coordinator
+    connectors: [github_router]
+
 steps:
-  - id: list_repos
+  - id: classify_host_signal
     type: connector_call
-    role: coordinator        # role 的 connectors 须含 github_router
+    role: coordinator
     connector: github_router
-    operation: list_repos
+    operation: classify
 ```
 
----
+如果 step 写了 `role` 或 `target_role`，运行时会按 role allowlist 检查 connector 名称。省略 role 是兼容路径，不应作为新 workflow 的默认写法。
 
-## role connector allowlist
+## connector 类型按运行边界理解
 
-`src/Aevatar.Configuration/README.md` 第 44-50 行(方案 A:中心化配置 + 按角色授权):
+| 类型 | 运行边界 | 常见用途 |
+|---|---|---|
+| `http` | 受限 HTTP surface | REST API、内部已发布服务 |
+| `cli` | host 配置允许的命令 | 本机工具、受控脚本 |
+| `mcp` | AI 扩展启用后的 MCP server | 工具协议集成 |
+| `host_callback` | host 已发布回调面 | 让 workflow 触达宿主公开能力 |
+| `telegram_user` | bootstrap 提供的用户通道 | Telegram 用户交互 |
 
-- connector 定义集中在 `connectors.json`
-- "谁能用"按 role 配置:`connectors: [name…]`(`RoleDefinition.connectors`,`WorkflowDefinition.cs:186`)
-- `connector_call` step 必须设 `role`/`target_role`
-- 运行时检查 role 的 `connectors` 是否包含该 connector(第 49 行)
-- 省略 `role` 跳过 allowlist(向后兼容,第 50 行)
+重点不是记 builder 名称，而是确认边界：workflow 只调用已配置、已注册、已授权的 connector。
 
----
+## connector_call 与 tool_call
 
-## host 责任边界(`connector.md` 第 248-260 行)
+这两个名字容易混：
 
-- `host-not-controller`:host 提供回调端点,不控制 workflow 执行
-- `published-surfaces-only`:host 只暴露已发布面
-- `no-new-aevatar-endpoints`:不为 connector 新增 aevatar 内部端点
+```mermaid
+flowchart TD
+    Workflow["Workflow step"] --> ConnectorCall["connector_call"]
+    ConnectorCall --> Connector["IConnectorRegistry / IConnector"]
+    Connector --> External["外部系统"]
 
----
+    RoleAgent["Role agent"] --> ToolCall["tool_call"]
+    ToolCall --> ToolSystem["agent tool/function/MCP tool system"]
+    ToolSystem --> ToolResult["tool result"]
+```
+
+`connector_call` 是 workflow 步骤侧的外部出口，role connector allowlist 在这里真正生效。`tool_call` 是 agent 工具系统的一部分，适合表达“让角色调用工具完成任务”。
+
+## 容错语义
+
+Connector 缺失、外部调用失败和权限不匹配不能混成一个错误。读 YAML 时要区分：
+
+- connector 缺失是否允许跳过。
+- 外部调用失败是否允许继续。
+- role 是否真的授权使用该 connector。
+- retry 次数是否属于 connector call 自己的参数，还是 step 级 retry。
+
+```mermaid
+flowchart TD
+    Start["connector_call"] --> Resolve{"registry 能解析 connector?"}
+    Resolve -->|否| Missing{"optional / on_missing=skip?"}
+    Missing -->|是| Skip["成功返回原输入"]
+    Missing -->|否| FailMissing["step failed: connector missing"]
+    Resolve -->|是| Allow{"role allowlist 允许?"}
+    Allow -->|否| Deny["step failed: unauthorized connector"]
+    Allow -->|是| Execute["ExecuteAsync"]
+    Execute --> OK{"调用成功?"}
+    OK -->|是| Done["step success"]
+    OK -->|否| Continue{"on_error=continue?"}
+    Continue -->|是| Soft["step success with fallback/input"]
+    Continue -->|否| Hard["step failed"]
+```
+
+## host 责任边界
+
+host 可以提供 connector 配置、builder 注册和 callback surface，但不应变成 workflow controller。也就是说，host 提供“可调用的面”，workflow 自己通过 step 图表达何时调用、如何分支、失败后怎么办。
+
+这条边界能防止 connector 变成绕过编排层的后门：外部系统调用仍然要经过 YAML、role allowlist、kernel 主循环和 run actor 状态。
 
 ## 验收
 
-1. connector 配置在哪?(`~/.aevatar/connectors.json`,中心化)
-2. role 的 `connectors` 是什么?(授权 allowlist,不是连接定义)
-3. `connector_call` 和 `tool_call` 区别?(前者 workflow 步骤侧调外部系统;后者 agent 工具系统,`connector.md` 第 264-281 行)
-4. MCP connector 什么时候注册?(仅当 `EnableMCPTools=true`,`connector.md` 第 113 行)
+1. connector 定义和授权分别在哪里？定义在 host 配置，授权在 workflow role 的 `connectors` allowlist。
+2. `connector_call` 和 `tool_call` 的区别是什么？前者是 workflow 外部出口，后者是 agent 工具系统。
+3. host callback 的边界是什么？host 暴露已发布面，不接管 workflow 执行。
 
 ⟦AI:AUTO-LOOP⟧

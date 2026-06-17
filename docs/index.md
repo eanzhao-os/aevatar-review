@@ -2,7 +2,7 @@
 
 > 自顶向下读懂 Aevatar —— 一次请求的生命周期、Workflow YAML、Actor+Event 内核、CQRS 双投影、分布式目标态。
 
-本书是 [aevatar](https://github.com/aelf/aevatarAI) 的中文技术解读,**43 篇章节全部锚定 `~/Code/aevatar` 源码事实源**(文件路径 + 行号锚点),不脑补、不泛泛而谈。
+本书是 [aevatar](https://github.com/aelf/aevatarAI) 的中文技术解读,**43 篇章节全部锚定 `~/Code/aevatar` 事实源**。每篇用少量高价值路径作为入口,正文用流程图、状态图、示例和边界论证讲清模型,不脑补、不泛泛而谈。
 
 ## 这本书讲什么
 
@@ -40,9 +40,9 @@ Aevatar 不是一个普通的 Agent 框架。它用 **Actor + Event Sourcing + C
 
 !!! tip "进度:43/43 全部完成 ✅"
 
-## 源码事实源约定
+## 事实源入口约定
 
-每篇章节开头都有「关键代码(事实源,以 ~/Code/aevatar 为准)」清单,引用真实的 `.cs` / `.yaml` / `docs/canon/*` / `docs/adr/*` 文件 + 行号。所有论断锚定源码,不脑补。
+每篇章节开头都有「事实源/设计抽象(以 ~/Code/aevatar 为准)」清单,默认只列不超过 3 条高价值 `.cs` / `.yaml` / `docs/canon/*` / `docs/adr/*` 路径 + 行号锚点。所有论断都能回指事实源,但正文不以源码文件和行号索引代替解释。
 
 !!! warning "外部仓库边界"
     `~/Code/aevatar`(上游 `aelf:aevatarAI/aevatar`)为**只读**事实源,本仓库不得修改其任何文件。

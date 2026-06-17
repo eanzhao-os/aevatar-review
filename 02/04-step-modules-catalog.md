@@ -1,114 +1,165 @@
-# ★ 步骤模块全图:30+ Module 逐个讲(配最小 YAML)
+# 步骤模块全图：按能力读 30+ primitive
 
-## 关键代码(事实源,以 ~/Code/aevatar 为准)
+## 事实源/设计抽象(以 ~/Code/aevatar 为准)
 
-- `src/workflow/Aevatar.Workflow.Core/WorkflowCoreModulePack.cs` 第 9-41 行:31 个模块注册(canonical step type → module 注册表)。
-- `src/workflow/Aevatar.Workflow.Core/Modules/*.cs`:每个模块的实现(下表逐个给出文件 + `Name` 行号)。
-- `src/workflow/Aevatar.Workflow.Core/Primitives/WorkflowPrimitiveCatalog.cs` 第 12-57 行:别名归一化表 + canonical 类型集。
-- `src/workflow/Aevatar.Workflow.Core/WorkflowModuleFactory.cs` 第 1-57 行:`IEventModuleFactory` 构建 name→module map,拒绝重复名。
-- `src/workflow/Aevatar.Workflow.Core/Composition/WorkflowStepTypeModuleDependencyExpander.cs` 第 1-49 行:依赖展开(有 `target_role` 自动加 `llm_call`)。
-- `docs/canon/workflow-primitives.md` 第 104-784 行:primitive 分组(Data/Control/AI/Composition/Integration/Human/Engine-internal)。
-- 扩展包:`src/workflow/extensions/Aevatar.Workflow.Extensions.Schedules/WorkflowScheduleModulePack.cs` 第 9-12 行(`self_reschedule`);`src/workflow/extensions/Aevatar.Workflow.Extensions.Maker/MakerModulePack.cs` 第 12-16 行(`maker_vote`/`maker_recursive`)。
+- `src/workflow/Aevatar.Workflow.Core/WorkflowCoreModulePack.cs:9-48`: Core 模块注册表与 dependency expander 注册。
+- `src/workflow/Aevatar.Workflow.Core/Primitives/WorkflowPrimitiveCatalog.cs:12-113`: step type 别名归一化、内建 primitive 集合与副作用 primitive 判断。
+- `src/workflow/Aevatar.Workflow.Core/Composition/WorkflowStepTypeModuleDependencyExpander.cs:1-49`: 编译期从 steps 和参数中展开隐式模块依赖。
 
 ---
 
-## 模块注册机制
+## 一句话模型
 
-`WorkflowCoreModulePack`(`WorkflowCoreModulePack.cs` 第 9-41 行)注册 31 个 `IWorkflowModule`。`WorkflowModuleFactory`(`WorkflowModuleFactory.cs` 第 29-52 行)从所有注册的 `IWorkflowModulePack` 构建 case-insensitive name→module map,拒绝重复名(第 40 行)。`WorkflowStepTypeModuleDependencyExpander`(`第 1-49 行`)在编译期展开依赖:有 `target_role` 的 step 自动加 `llm_call`(第 26-27 行)。
+`steps[].type` 不是 handler 名称索引，而是能力声明。编译后的 workflow 会被 module pack 和 dependency expander 转成一组需要安装的模块；运行时 bridge 再把 `StepRequestEvent` 交给对应模块。
 
-canonical 类型集来自 `WorkflowPrimitiveCatalog`(`第 50-57 行` 的 `CapabilityPrimitives`)+ `IdentityPrimitives`(`第 43-48 行`)。
+```mermaid
+flowchart LR
+    Steps["steps[].type"] --> Canon["WorkflowPrimitiveCatalog<br/>别名归一化"]
+    Canon --> Expand["Dependency expanders<br/>补齐隐式依赖"]
+    Expand --> Pack["IWorkflowModulePack<br/>模块注册"]
+    Pack --> Factory["WorkflowModuleFactory<br/>name -> module"]
+    Factory --> Bridge["WorkflowExecutionBridgeModule"]
+```
 
----
+```mermaid
+mindmap
+  root((Workflow primitives))
+    Control
+      conditional
+      switch
+      while
+      foreach
+      parallel
+      race
+      map_reduce
+      workflow_call
+      dynamic_workflow
+      delay
+      wait_signal
+      checkpoint
+      lease
+      guard
+    Data
+      transform
+      assign
+      retrieve_facts
+      cache
+    AI
+      llm_call
+      tool_call
+      evaluate
+      reflect
+    Integration
+      connector_call
+      secure_connector_call
+      emit
+      notify
+      actor_send
+    Human
+      human_input
+      human_approval
+      secure_input
+    Engine
+      workflow_loop
+      workflow_yaml_validate
+```
 
-## 全图(31 + 扩展)
+## 按能力选模块
 
-### Control / 流程控制
+不要先问“这个类型在哪个文件里”，先问“我需要哪类能力”。
 
-| 类型 | 文件 / Name 行 | 最小 YAML | 说明 |
-|---|---|---|---|
-| `conditional` | `ConditionalModule.cs:16` | `type: conditional`<br>`condition: "{{steps.x.output == 'ok'}}"` | 二分支,emit `true`/`false` branch key |
-| `switch` | `SwitchModule.cs:17` | `type: switch`<br>`on: "{{steps.x.output}}"`<br>`branch.a: step_a`<br>`branch.b: step_b` | 多路分支,按 `on` + `branch.*` |
-| `while` (alias `loop`) | `WhileModule.cs:21` | `type: while`<br>`condition: "..."`<br>`max_iterations: "10"`<br>`step: {id: ..., type: ...}` | 循环子步直到条件 false / max |
-| `foreach` (alias `for_each`) | `ForEachModule.cs:30` | `type: foreach`<br>`input: "{{steps.x.output}}"`<br>`delimiter: "\n"`<br>`sub_step_type: llm_call` | 按分隔符拆分,fan out 子步 |
-| `parallel` (alias `parallel_fanout`) | `ParallelFanOutModule.cs:27` | `type: parallel`<br>`workers: 3`<br>`vote_step_type: vote` | fan out N 个 worker,converge,可选 vote |
-| `race` (alias `select`) | `RaceModule.cs:18` | `type: race`<br>`candidates: [...]` | fan out,首个完成者胜 |
-| `map_reduce` (alias `mapreduce`) | `MapReduceModule.cs:19` | `type: map_reduce`<br>`map: {...}`<br>`reduce: {...}` | 并行 map 分片,再 reduce |
-| `workflow_call` (alias `sub_workflow`) | `WorkflowCallModule.cs:17` | `type: workflow_call`<br>`workflow: sub_wf_name` | 调用子 workflow |
-| `dynamic_workflow` | `DynamicWorkflowModule.cs:23` | `type: dynamic_workflow` | 从前序输出提取 YAML 块,重配 run actor |
-| `delay` (alias `sleep`) | `DelayModule.cs:18` | `type: delay`<br>`duration_ms: 5000` | 暂停 |
-| `wait_signal` (alias `wait`) | `WaitSignalModule.cs:23` | `type: wait_signal`<br>`signal_name: user_reply` | 挂起等外部 `SignalReceivedEvent`(≤90 min) |
-| `checkpoint` | `CheckpointModule.cs:16` | `type: checkpoint`<br>`name: after_extract` | 写命名 checkpoint,resume/audit |
-| `lease` (alias `mutex`) | `LeaseModule.cs:21` | `type: lease`<br>`action: acquire`<br>`key: resource_x` | 跨 run 单例资源协调(acquire/renew/release) |
-| `guard` (alias `assert`) | `GuardModule.cs:17` | `type: guard`<br>`condition: "..."`<br>`on_fail: fail` | 输入校验门(fail/skip/branch) |
-
-### Data / 数据
-
-| 类型 | 文件 / Name 行 | 最小 YAML | 说明 |
-|---|---|---|---|
-| `transform` | `TransformModule.cs:29` | `type: transform`<br>`operation: uppercase`<br>`input: "{{steps.x.output}}"` | 确定性文本/json/数值变换(trim/uppercase/json_extract/group_by/sum/…) |
-| `assign` | `AssignModule.cs:16` | `type: assign`<br>`target: result`<br>`value: "done"` | 写 workflow 变量 |
-| `retrieve_facts` | `RetrieveFactsModule.cs:18` | `type: retrieve_facts`<br>`query: "..."`<br>`top_k: 5` | 关键词检索 top-k 片段 |
-| `cache` | `CacheModule.cs:18` | `type: cache`<br>`key: "..."`<br>`ttl_ms: 60000` | 按 key+TTL 缓存子步结果 |
-
-### AI / 人工智能
-
-| 类型 | 文件 / Name 行 | 最小 YAML | 说明 |
-|---|---|---|---|
-| `llm_call` | `LLMCallModule.cs:32` | `type: llm_call`<br>`role: assistant`<br>`prompt_prefix: "..."` | 调目标 role 的 LLM |
-| `tool_call` | `ToolCallModule.cs:31` | `type: tool_call`<br>`tool: search_web`<br>`operation: search` | 调注册的 tool/function/MCP tool(approval-aware) |
-| `evaluate` (alias `judge`) | `EvaluateModule.cs:25` | `type: evaluate`<br>`role: judge`<br>`threshold: 0.8` | LLM 打分 + 阈值分支 |
-| `reflect` | `ReflectModule.cs:25` | `type: reflect`<br>`role: critic`<br>`max_rounds: 3` | 自反思改进循环 |
-
-### Integration / 集成
-
-| 类型 | 文件 / Name 行 | 最小 YAML | 说明 |
-|---|---|---|---|
-| `connector_call` (alias `bridge_call`/`cli_call`/`mcp_call`/`http_*`) | `ConnectorCallModule.cs:31` | `type: connector_call`<br>`connector: github_router`<br>`operation: list_repos` | 调 HTTP/CLI/MCP/host_callback connector |
-| `emit` (alias `publish`) | `EmitModule.cs:15` | `type: emit`<br>`event_type: job_done`<br>`payload: "..."` | 发布事件 |
-| `notify` | `NotifyModule.cs:12` | `type: notify`<br>`target: lark`<br>`card: "..."` | 渲染交互卡片/通知 |
-| `actor_send` | `ActorSendModule.cs:13` | `type: actor_send`<br>`target_actor: "..."`<br>`message: "..."` | 给目标 actor 发 typed message |
-
-### Human / 人工
-
-| 类型 | 文件 / Name 行 | 最小 YAML | 说明 |
-|---|---|---|---|
-| `human_input` | `HumanInputModule.cs:23` | `type: human_input`<br>`prompt: "请补充信息"` | 挂起等自由文本人工输入 |
-| `human_approval` | `HumanApprovalModule.cs:23` | `type: human_approval`<br>`prompt: "是否批准?"`<br>`on_reject: fail` | 挂起等 approve/reject |
-| `secure_input` (alias `secret_input`) | `SecureInputModule.cs:18` | `type: secure_input`<br>`credential: "..."` | 凭据绑定的安全输入采集 |
-
-### Engine-internal / 引擎内部
-
-| 类型 | 文件 | 说明 |
+| 能力 | 适合的 primitive | 典型问题 |
 |---|---|---|
-| `workflow_loop` | `Execution/WorkflowExecutionKernel.cs:36` | 主循环调度器,**自动注入**,用户不写(见 `02/03-execution-kernel.md`) |
-| `workflow_yaml_validate` | `WorkflowYamlValidateModule.cs:12` | 校验 YAML body 是否符合 workflow grammar |
+| 路由和循环 | `conditional`、`switch`、`while`、`foreach` | 下一步去哪、是否重复、是否 fan-out |
+| 并发和归并 | `parallel`、`race`、`map_reduce`、`vote` | 等全部、取首个、map 后 reduce、投票收敛 |
+| 状态和数据 | `assign`、`transform`、`cache`、`retrieve_facts` | 写变量、变换文本/JSON、缓存、取事实 |
+| AI 行为 | `llm_call`、`tool_call`、`evaluate`、`reflect` | 让角色回答、调工具、评分、自我改进 |
+| 外部集成 | `connector_call`、`secure_connector_call`、`emit`、`notify`、`actor_send` | 调 host/HTTP/CLI/MCP、发事件、通知或发 actor 消息 |
+| 人工介入 | `human_input`、`human_approval`、`secure_input` | 等人输入、审批、采集安全信息 |
+| 引擎内部 | `workflow_loop`、`workflow_yaml_validate` | 主循环和 YAML 校验 |
 
-### 扩展包(非 Core)
+## 别名是输入兼容层
 
-| 类型 | 包 / 文件 | 说明 |
-|---|---|---|
-| `self_reschedule` (alias `schedule_workflow`) | `Aevatar.Workflow.Extensions.Schedules` / `WorkflowSelfRescheduleModule.cs` | 自我重调度 |
-| `maker_vote` | `Aevatar.Workflow.Extensions.Maker` / `MakerVoteModule.cs:15` | first-to-ahead-by-k 投票 |
-| `maker_recursive` | `Aevatar.Workflow.Extensions.Maker` / `MakerRecursiveModule.cs:21` | 递归 MAKER 求解(见 `02/06-maker-plugin.md`) |
+别名让 YAML 更贴近日常表达，例如 `loop` 归一化成 `while`，`sub_workflow` 归一化成 `workflow_call`，`http_get` / `http_post` 这类写法归一化成 `connector_call`。归一化之后，执行层只看 canonical type。
 
----
+```yaml
+steps:
+  - id: get_repo
+    type: http_get
+    connector: github_router
+    operation: list_repo
+```
 
-## 依赖展开(`WorkflowStepTypeModuleDependencyExpander.cs`)
+这类写法的运行语义仍然落到 connector 模块，连接定义和权限见 `02/07-connectors.md`。
 
-编译期自动展开依赖(第 1-49 行):
-- 有 `target_role` 的 step 自动加 `llm_call`(第 26-27 行)
-- 解析 `*_step_type` 参数键(第 29-37 行)
-- `foreach` 无 `sub_step_type` 时自动加 `parallel`(第 39-43 行)
+## ⚠️ 隐式依赖展开
 
-这让你写更简洁的 YAML,编译期补全隐含依赖。
+`WorkflowStepTypeModuleDependencyExpander` 会从 step type 和参数里推导出需要安装的模块。这个推导是编译期便利，不是 YAML 里显式可见的节点：
 
----
+- step 自己的 `type` 会加入模块集合。
+- 有 `target_role` 的 step 会额外加入 `llm_call`。
+- 参数键如果表示 step type，例如 `sub_step_type`、`vote_step_type` 或 `step`，对应值会按 canonical type 加入。
+- `foreach` 没写 `sub_step_type` 时，会额外加入 `parallel`。
+- 子 step 会递归扫描。
+
+```mermaid
+flowchart TD
+    Step["step definition"] --> Type["add canonical step.type"]
+    Step --> Role{"target_role 非空?"}
+    Role -->|是| LLM["add llm_call"]
+    Step --> Params{"参数里有 *_step_type 或 step?"}
+    Params -->|是| ParamType["add canonical parameter type"]
+    Step --> Foreach{"type = foreach 且无 sub_step_type?"}
+    Foreach -->|是| Parallel["add parallel"]
+    Step --> Children{"有 children?"}
+    Children -->|是| Recurse["递归扫描 child steps"]
+```
+
+⚠️ 这意味着“模块被安装”不等于“YAML 里有一个同名 step”。读执行计划时要区分显式步骤图和隐式能力依赖。
+
+## Core、扩展和插件的边界
+
+Core pack 提供通用 workflow 能力。Maker、Schedules 这类扩展通过自己的 `IWorkflowModulePack` 加入，不要求 Core 反向引用插件实现。
+
+```mermaid
+flowchart TD
+    Core["Workflow.Core<br/>core module pack"] --> Factory["WorkflowModuleFactory"]
+    Maker["Maker extension pack"] --> Factory
+    Schedules["Schedules extension pack"] --> Factory
+    Factory --> Run["WorkflowRunGAgent module installation"]
+    Run --> Kernel["kernel + bridge + selected modules"]
+```
+
+这个方向和 `02/06-maker-plugin.md` 的插件边界一致：稳定核心负责模块机制，变化更快的能力放在扩展包里。
+
+## 最小选型例子
+
+```yaml
+steps:
+  - id: classify
+    type: switch
+    on: "{{input.kind}}"
+    branches:
+      invoice: extract_invoice
+      resume: screen_resume
+
+  - id: extract_invoice
+    type: llm_call
+    role: invoice_extractor
+
+  - id: submit
+    type: connector_call
+    role: approval_builder
+    connector: lark_approval
+    operation: create
+```
+
+这段 YAML 需要的是路由、LLM 和 connector 三类能力；读者不需要先记住具体模块文件名。
 
 ## 验收
 
-1. `workflow_loop` 是用户写的吗?(不是,自动注入的 `WorkflowExecutionKernel`)
-2. `http_get` 归一化成什么?(`connector_call`)
-3. `parallel` 和 `race` 的区别?(parallel 等全部 converge;race 取首个完成者)
-4. 有 `target_role` 的 step 自动加什么依赖?(`llm_call`)
+1. `steps[].type` 表达什么？表达能力选择，最终映射到 workflow 模块。
+2. ⚠️ 有 `target_role` 的 step 会隐式加入什么？`llm_call` 模块依赖。
+3. 为什么插件模块不应被 Core 反向引用？Core 只提供注册机制，插件通过 module pack 向 Core 贡献能力。
 
 ⟦AI:AUTO-LOOP⟧

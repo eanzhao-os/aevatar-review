@@ -1,87 +1,110 @@
-# Maker 插件边界:maker_recursive + maker_vote、IWorkflowModulePack、架构门禁
+# Maker 插件边界：把多 Agent 求解放进 Workflow 扩展
 
-## 关键代码(事实源,以 ~/Code/aevatar 为准)
+## 事实源/设计抽象(以 ~/Code/aevatar 为准)
 
-- `src/workflow/extensions/Aevatar.Workflow.Extensions.Maker/MakerModulePack.cs` 第 10-25 行:`IWorkflowModulePack` named `workflow.extensions.maker`(第 18 行),注册 `maker_vote`(第 14 行)+ `maker_recursive`/`maker_recursive_solve`(第 15 行)。
-- `src/workflow/extensions/Aevatar.Workflow.Extensions.Maker/Modules/MakerVoteModule.cs` 第 15-16 行:`Name => "maker_vote"`,`Priority => 6`;第 28-29 行:`k` 默认 1、`max_response_length` 默认 2200。
-- `src/workflow/extensions/Aevatar.Workflow.Extensions.Maker/Modules/MakerRecursiveModule.cs` 第 19-22 行:state key `"maker_recursive"`、`Name => "maker_recursive"`、`Priority => 3`。
-- `src/workflow/extensions/Aevatar.Workflow.Extensions.Maker/ServiceCollectionExtensions.cs` 第 6-12 行:`AddWorkflowMakerExtensions()` → `AddWorkflowModulePack<MakerModulePack>()`。
-- `src/workflow/Aevatar.Workflow.Core/WorkflowModuleFactory.cs` 第 29-52 行:`IWorkflowModuleFactory` 从所有 pack 构建 name→module map。
-- `docs/canon/overview.md` 第 2/7/15 行:Maker 定位;第 51-65 行:§4 Maker 插件边界;第 106-112 行:架构门禁。
-- `docs/adr/0006-multi-agent-evolution.md` 第 4 行(status superseded)、第 7 行(title)、第 227-258 行(Phase 2-A worker actor-ization)、第 299 行(superseded note → ADR-0034)。
+- `src/workflow/extensions/Aevatar.Workflow.Extensions.Maker/MakerModulePack.cs:10-25`: Maker 通过 `IWorkflowModulePack` 贡献 workflow 模块。
+- `src/workflow/extensions/Aevatar.Workflow.Extensions.Maker/Modules/`: `maker_vote` 与 `maker_recursive` 的模块实现目录。
+- `docs/canon/overview.md:51-65`: Maker 是 workflow 插件扩展，依赖方向是 plugin 到 Workflow Core。
 
 ---
 
-## Maker 是什么
+## 一句话模型
 
-Maker 是 aevatar 的**多 Agent 协作求解插件**,提供两个 workflow 步骤模块:
+Maker 不是平行于 Workflow 的第二套 Host，而是挂在 Workflow 模块体系上的扩展包。它提供多 Agent 协作求解能力，但入口仍是普通 workflow step，状态仍由 run actor 承载。
 
-| 模块 | 文件 / Name 行 | 说明 |
+```mermaid
+flowchart LR
+    Host["Mainnet Host<br/>启用平台能力"] --> Platform["AddAevatarPlatform"]
+    Platform --> MakerExt["AddWorkflowMakerExtensions"]
+    MakerExt --> Pack["MakerModulePack"]
+    Pack --> Factory["WorkflowModuleFactory"]
+    Factory --> Run["WorkflowRunGAgent<br/>安装需要的模块"]
+```
+
+```mermaid
+flowchart TD
+    Workflow["Workflow Core"] --> Abstractions["Workflow abstractions"]
+    Maker["Maker extension"] --> Workflow
+    Maker --> Abstractions
+    Bad["Workflow Core -> Maker implementation"]:::bad
+    classDef bad fill:#ffe5e5,stroke:#d33,color:#111
+```
+
+## Maker 提供什么能力
+
+从 workflow 作者视角看，Maker 主要暴露两类 step：
+
+| primitive | 用途 | 适合场景 |
 |---|---|---|
-| `maker_vote` | `MakerVoteModule.cs:15` | first-to-ahead-by-k 投票,带响应长度红旗过滤(`k` 默认 1,`max_response_length` 默认 2200) |
-| `maker_recursive` | `MakerRecursiveModule.cs:21` | 递归 MAKER 求解:原子性决策 + 递归分解 + 每阶段投票;state 存 key `"maker_recursive"` |
+| `maker_vote` | 多个候选回答投票，按 ahead-by-k 收敛 | 需要快速达成多数或领先结论 |
+| `maker_recursive` | 把复杂问题递归拆解、求解、汇总 | 问题可分解，且每层需要多 Agent 审视 |
 
-它不是独立系统,而是通过 `IWorkflowModulePack` 机制挂进 workflow 的两个步骤模块。
+这两者都是模块，不是新的 controller。它们和 `llm_call`、`parallel`、`vote` 一样被 workflow 主循环调度。
 
----
+## maker_recursive 的执行心智模型
 
-## IWorkflowModulePack 注册体系
+```mermaid
+flowchart TD
+    Problem["输入问题"] --> Atomic{"能直接解决?"}
+    Atomic -->|是| Solve["原子求解"]
+    Atomic -->|否| Decompose["拆成子问题"]
+    Decompose --> Workers["多个 worker 求解"]
+    Workers --> Vote["maker_vote / agreement"]
+    Vote --> Merge["合并子结果"]
+    Merge --> Atomic
+    Solve --> Answer["输出答案"]
+```
 
-workflow 的模块注册通过 `IWorkflowModulePack` 接口。每个 pack 贡献一组模块:
+这张图只表达设计形状：递归求解仍发生在 workflow 模块边界内，不能越过 run actor 自己管理一套并行状态权威。
 
-- `WorkflowCoreModulePack`(Core,31 个模块)
-- `MakerModulePack`(`workflow.extensions.maker`,2 个模块)
-- `WorkflowScheduleModulePack`(`workflow.extensions.schedules`,1 个)
+## 为什么不是独立 Maker Host
 
-`WorkflowModuleFactory`(`WorkflowModuleFactory.cs` 第 29-52 行)从所有注册的 pack 构建 case-insensitive name→module map,拒绝重复名(第 40 行)。
+独立 Host 会带来三类额外复杂度：
 
-Maker 的注册入口:`AddWorkflowMakerExtensions()`(`ServiceCollectionExtensions.cs` 第 6-12 行)→ `AddWorkflowModulePack<MakerModulePack>()`。这个入口只在 Mainnet Host 的 `AddAevatarPlatform(options => EnableMakerExtensions = true)` 时被调用(见 `01/01-hosts-and-composition.md`)。
+- 第二套入口和生命周期。
+- 第二套状态和投影边界。
+- Workflow 与 Maker 之间的反向依赖风险。
 
----
+插件化后，Maker 只贡献模块，Workflow Core 只依赖抽象和注册机制。依赖方向清楚，架构门禁也更容易判断。
 
-## 为什么从"独立 Host"降级成"Workflow 插件"
+```mermaid
+flowchart LR
+    Core["稳定核心<br/>Workflow Core"] --> Mechanism["module pack / factory / kernel"]
+    Plugin["变化能力<br/>Maker extension"] --> Mechanism
+    Mechanism --> YAML["YAML step type"]
+    YAML --> Run["run actor 主循环"]
+```
 
-`docs/canon/overview.md` §4(第 51-65 行)明确 Maker 插件边界:
+## 和普通 primitive 的关系
 
-**Maker 的定位**(`overview.md` 第 15 行):"Workflow 插件扩展,不是独立能力系统"。
+Maker 可以被看作组合型能力：
 
-**职责**(第 57-59 行):
-- 提供 `maker_recursive`/`maker_vote` 模块
-- `AddWorkflowMakerExtensions()` 入口(platform 启用 Maker 时调用)
-- 通过 `IWorkflowModulePack` 贡献
+- 它复用 workflow 的 step 调度、重试、timeout 和状态宿主。
+- 它可以和普通控制流 primitive 放在同一张 YAML 图里。
+- 它不要求调用方知道内部 worker 怎么组织，只需要理解输入、输出和失败语义。
 
-**依赖约束**(第 61-65 行):
-- ✅ 允许:plugin → `Workflow.Core`/`Workflow.Abstractions` + Foundation abstractions
-- ❌ 禁止:`Workflow` 反向依赖 plugin 实现(第 64 行)
-- ❌ 禁止:独立 CQRS/Projection pipeline(第 65 行)
+```yaml
+steps:
+  - id: solve_hard_problem
+    type: maker_recursive
+    prompt: "{{input.problem}}"
 
-**架构门禁**(`overview.md` 第 106-112 行)CI 强制:
-- 禁止 `Workflow → Maker` 反向依赖(第 108 行)
-- 禁止残留独立 Maker 项目(第 109 行)
-- 禁止 `AddMakerCapability()`/`/api/maker/*`(第 110 行)
-- 强制 Mainnet 通过 `AddAevatarPlatform(...EnableMakerExtensions=true...)` 装配(第 111 行)
+  - id: summarize
+    type: llm_call
+    role: reporter
+```
 
-**为什么这么做**:Maker 本质是两个 workflow 步骤模块。让它成为插件而非独立 Host,消除了平行"第二系统",符合 "单一主干,插件扩展" 的架构哲学。
+## 边界规则
 
----
-
-## ADR-0006 历史背景
-
-`docs/adr/0006-multi-agent-evolution.md`(status: **superseded**,第 4 行)是"Workflow 调度 Actor 化 & 多智能体协作演进方案"RFC(第 7 行)。关键内容:
-
-- 单个 `WorkflowRunGAgent` 串行化步骤执行,即使 `ParallelFanOutModule`/`ForEachModule`/`MapReduceModule` 也是(第 27-29 行)
-- Phase 2-A 提出 worker actor-ization,保持 run-actor 为唯一状态权威(第 227-258 行)
-- 背压(默认 `max_concurrent_workers_per_run = 20`,第 191 行)和幂等 `execution_id`(第 200-219 行)在此提出,现已实现(见 `02/03-execution-kernel.md`)
-- 原可选补偿草案(§Phase 2-B,第 262-297 行)被 ADR-0034 的 saga 补偿取代(第 299 行 note)
-- Foundation MultiAgent 生产面(`TaskBoardGAgent`/`TeamManagerGAgent`)已退役(第 15-19 行)
-
----
+1. Workflow Core 可以定义模块机制，不能反向引用 Maker 实现。
+2. Maker 可以依赖 Workflow Core / Abstractions 来贡献模块。
+3. Mainnet Host 通过平台装配启用 Maker，而不是新增 `/api/maker/*` 这类平行入口。
+4. Maker 的运行结果仍应进入 workflow run 的事件和状态链路。
 
 ## 验收
 
-1. Maker 提供哪两个模块?(`maker_vote` + `maker_recursive`)
-2. Maker 通过什么机制注册?(`IWorkflowModulePack`,MakerModulePack)
-3. 为什么禁止 `Workflow → Maker` 反向依赖?(Maker 是 Workflow 的插件,反向依赖违反分层,overview.md 第 64 行)
-4. 架构门禁禁止什么?(独立 Maker 项目、`/api/maker/*`、`AddMakerCapability()`,第 108-110 行)
+1. Maker 的定位是什么？Workflow 插件扩展，不是独立 Host。
+2. Maker 通过什么机制接入？`IWorkflowModulePack`。
+3. 为什么禁止 Workflow Core 反向依赖 Maker？会破坏“稳定核心 + 插件扩展”的方向。
 
 ⟦AI:AUTO-LOOP⟧
