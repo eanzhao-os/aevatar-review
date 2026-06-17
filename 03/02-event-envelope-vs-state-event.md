@@ -1,13 +1,8 @@
 # ★ 最易误解的边界:EventEnvelope(runtime message) vs StateEvent(事实源)
 
-## 关键代码(事实源,以 ~/Code/aevatar 为准)
+## 本篇涉及的设计抽象
 
-- `src/Aevatar.Foundation.Abstractions/agent_messages.proto` 第 44-51 行:`EventEnvelope`;第 142-149 行:`StateEvent`;第 151-160 行:commit result 与 committed-state publication payload。
-- `src/Aevatar.Foundation.Abstractions/Persistence/IEventStore.cs` 第 11-41 行:Event Sourcing append log,包含 OCC append、range query 与压缩。
-- `src/Aevatar.Foundation.Abstractions/Persistence/IStateStore.cs` 第 11-21 行:snapshot store,不是写侧事实源。
-- `src/Aevatar.Foundation.Core/GAgentBase.TState.cs` 第 205-230 行:领域事件 commit + state fold;第 276-309 行:committed state event 发布给 observer。
-- `docs/canon/architecture.md` 第 51-55 行、第 71 行:EventEnvelope 与 StateEvent 的边界。
-- `docs/canon/event-sourcing.md` 第 13 行、第 23-27 行:Runtime envelope 流不是 Event Sourcing 事实源。
+> 以下论断均可回指 `~/Code/aevatar` 源码验证,但本篇用设计语言描述,不贴文件路径/行号。
 
 ---
 
@@ -38,10 +33,10 @@ Event Sourcing 的权威事实在另一层。只有 actor 在处理消息后显�
 <details>
 <summary>proto 字段证据</summary>
 
-- `EventEnvelope` 位于 `agent_messages.proto` 第 44-51 行,包含 `id`、`timestamp`、`payload`、`route`、`propagation`、`runtime`。
-- `StateEvent` 位于第 142-149 行,包含 `event_id`、`timestamp`、`version`、`event_type`、`event_data`、`agent_id`。
-- route 细节位于第 53-79 行,包含 direct、topology publication、observer publication。
-- `EventStoreCommitResult` 与 `CommittedStateEventPublished` 位于第 151-160 行。
+- `EventEnvelope` 位于 `agent_messages` 包含 `id`、`timestamp`、`payload`、`route`、`propagation`、`runtime`。
+- `StateEvent` 位于包含 `event_id`、`timestamp`、`version`、`event_type`、`event_data`、`agent_id`。
+- route 细节位于包含 direct、topology publication、observer publication。
+- `EventStoreCommitResult` 与 `CommittedStateEventPublished` 位于。
 
 </details>
 

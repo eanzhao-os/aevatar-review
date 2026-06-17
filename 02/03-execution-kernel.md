@@ -2,9 +2,9 @@
 
 ## 事实源/设计抽象(以 ~/Code/aevatar 为准)
 
-- `src/workflow/Aevatar.Workflow.Core/Execution/WorkflowExecutionKernel.cs:14-1153`: kernel 事件入口、启动、step dispatch、completion、retry、timeout 和补偿请求处理。
-- `src/workflow/Aevatar.Workflow.Core/WorkflowRunGAgent.cs:1360-1566`: run actor 内的补偿 ledger、cursor、dead-letter 与恢复逻辑。
-- `src/workflow/Aevatar.Workflow.Core/workflow_state.proto:139-162`: `WorkflowRunState` 中 execution states、compensable ledger 和 saga 状态字段。
+- `WorkflowExecutionKernel`: kernel 事件入口、启动、step dispatch、completion、retry、timeout 和补偿请求处理。
+- `WorkflowRunGAgent`: run actor 内的补偿 ledger、cursor、dead-letter 与恢复逻辑。
+- `workflow_state`: `WorkflowRunState` 中 execution states、compensable ledger 和 saga 状态字段。
 
 ---
 

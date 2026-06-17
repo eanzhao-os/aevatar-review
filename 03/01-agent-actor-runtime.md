@@ -1,14 +1,8 @@
 # 核心概念辨析:Agent / Actor / Runtime / Stream
 
-## 关键代码(事实源,以 ~/Code/aevatar 为准)
+## 本篇涉及的设计抽象
 
-- `src/Aevatar.Foundation.Abstractions/IAgent.cs` 第 13-32 行:`IAgent` 的身份、事件处理、订阅与生命周期;第 38-42 行:`IAgent<TState>` 的 typed state。
-- `src/Aevatar.Foundation.Abstractions/IActor.cs` 第 11-33 行:`IActor` 是包住 `IAgent` 的运行容器,同时暴露父子拓扑读取。
-- `src/Aevatar.Foundation.Abstractions/IActorRuntime.cs` 第 11-43 行:`IActorRuntime` 负责创建、销毁、查找、链接与取消链接 actor。
-- `src/Aevatar.Foundation.Abstractions/IStream.cs` 第 14-36 行:`IStream` 负责 produce、subscribe 与 relay binding。
-- `src/Aevatar.Foundation.Abstractions/IActorDispatchPort.cs` 第 68-76 行:外部 dispatch 只返回 admission,不是处理完成承诺。
-- `docs/canon/architecture.md` 第 21-29 行:五个核心概念;第 27 行明确 Runtime 是 Stream 之上的 Actor 语义层。
-- `src/Aevatar.Foundation.Runtime.Implementations.Local/Actors/LocalActorRuntime.cs` 第 102-107 行:Local runtime 为 actor 注入基于 stream 的 publisher。
+> 以下论断均可回指 `~/Code/aevatar` 源码验证,但本篇用设计语言描述,不贴文件路径/行号。
 
 ---
 

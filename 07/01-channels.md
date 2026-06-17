@@ -2,9 +2,9 @@
 
 ## 事实源/设计抽象(以 ~/Code/aevatar 为准)
 
-- `docs/adr/0012-channel-runtime-credential-boundary.md`:ChannelRuntime 不是凭证权威;生产路径收敛到 Lark/Telegram -> NyxID -> Aevatar。
-- `docs/adr/0013-unified-channel-inbound-backbone.md`:统一入站骨干是 transport adapter -> `ChatActivity` -> `ConversationGAgent` -> turn runner。
-- `docs/adr/0014-interactive-reply-abstraction.md`:交互回复是 turn-scoped collector + composer + relay dispatcher 的加法扩展。
+- `0012-channel-runtime-credential-boundary`:ChannelRuntime 不是凭证权威;生产路径收敛到 Lark/Telegram -> NyxID -> Aevatar。
+- `0013-unified-channel-inbound-backbone`:统一入站骨干是 transport adapter -> `ChatActivity` -> `ConversationGAgent` -> turn runner。
+- `0014-interactive-reply-abstraction`:交互回复是 turn-scoped collector + composer + relay dispatcher 的加法扩展。
 
 ---
 

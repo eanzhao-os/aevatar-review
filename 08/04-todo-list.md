@@ -1,3 +1,7 @@
+## 事实源
+
+> 本篇汇总全书 ⚠️ 待决策项,详见 \#97 tech-debt。
+
 # TODO List:设计待论证 / 已知缺口 / 已删组件
 
 > 本篇汇总全书所有标 ⚠️ 的设计疑点、未实现项、已删组件。按 #97 tech-debt issue 组织。
@@ -17,9 +21,9 @@
 
 | # | 疑点 | 文档出处 | 实际 | 决策 |
 |---|---|---|---|---|
-| B1 | **RunManager / RunContextScope** | `architecture.md:82` | 只有 `AsyncLocalAgentContext` | ⚠️ 待 owner |
+| B1 | **RunManager / RunContextScope** | `architecture.md` | 只有 `AsyncLocalAgentContext` | ⚠️ 待 owner |
 | B2 | **saga 补偿**(ADR-0034 proposed) | 02/03 | 实现程度不明 | ⚠️ 待 owner |
-| B3 | **Timeline/Graph ArtifactProjector** | canon `architecture.md:184` | 已删,从 InsightReport 派生 | canon 需同步 |
+| B3 | **Timeline/Graph ArtifactProjector** | canon `architecture.md` | 已删,从 InsightReport 派生 | canon 需同步 |
 | B4 | **streaming-proxy room/participant** | Sunset 2026-11-25 | `/v1/responses` 无对应 | ⚠️ 待 owner |
 | B5 | **voice 静态 key 移除**(ADR-0033) | 07/04 | 落地不明 | ⚠️ 待 owner |
 

@@ -1,15 +1,15 @@
 # Demo Cookbook:Maker / CaseProjection / Workflow.Web / Cli / Inspector 可复现合集
 
-## 关键代码(事实源,以 ~/Code/aevatar 为准)
+## 本篇涉及的设计抽象
 
-⚠️ **重要**:当前 HEAD 的 `demos/` 目录大部分 demo 源码已在清理 commit 中删除(`4ff5c2d1b` CaseProjection、`4a029981c` "Clean non-production assets"、`40a36bbe2` Inspector 残留)。物理目录还在(空壳 `bin/`/`obj/`)。当前 HEAD **仅 `demos/lark-interaction-probe/` 有源码**。其余 demo 从 `git show <deletion>^:` 可恢复。本篇如实记录各 demo 的设计与恢复方式。
+> 以下论断均可回指 `~/Code/aevatar` 源码验证,但本篇用设计语言描述,不贴文件路径/行号。
 
 ---
 
 ## 当前 HEAD 可用
 
 ### `demos/lark-interaction-probe/` ✅ 在 HEAD
-- `README.md`、`cn-reimbursement-shadow.yaml`(18 字段报销审核 fixture)
+- `README.md`、`cn-reimbursement fixture`(18 字段报销审核 fixture)
 - **演示**:把 n8n 表单页迁移到 typed Lark card 交互的 Phase 1 探针。load YAML → `notify` 步骤经 Lark card composer 渲染 → 发到真实 Lark test tenant → 截 desktop+mobile 截图 + 脱敏 callback → 校验 18 个逻辑字段 key。证据策略:截图/callback 必须来自实际 run。
 
 ---
@@ -28,11 +28,11 @@
 
 ### `Aevatar.Demos.Cli/`(删于 `4a029981c`)
 - **演示**:runtime 行为场景 CLI(list/run hierarchy/fanout/pipeline/hooks/lifecycle),JSON timeline 渲染到 CLI + HTML
-- agents:DemoCollector/Counter/Faulty/Transformer + `demo_messages.proto`
+- agents:DemoCollector/Counter/Faulty/Transformer + `demo_messages`
 - 恢复:`git show 4a029981c^:demos/Aevatar.Demos.Cli/`
 
 ### `Aevatar.Demos.Inspector/`(删于 `40a36bbe2`,残留在 `67795553f` 起清理)
-- **演示**:本地两级 Actor Inspector 可视化(`dotnet run -- --no-browser`,默认 `http://localhost:5100`)
+- **演示**:本地两级 Actor Inspector 可视化(`dotnet run -- --no-browser`,默认 `http://localhost`)
 - Tier 1 REST:`/api/inspector/actors`、`/workflow-runs`、`/readmodels[/{name}]`
 - Tier 2 `/api/inspector/events`:live SSE,由 `Aevatar.Agents` OTel activities 喂
 - 无需 LLM 可 populate:`curl -X POST .../api/inspector/demo/hierarchy`
@@ -41,8 +41,8 @@
 
 ### `Aevatar.Demos.Maker/`(删于 `4a029981c`)
 - **演示**:MAKER 模式(论文 arXiv 2511.09030):MAD(Maximal Agentic Decomposition)+ first-to-ahead-by-k voting + red-flagging
-- `DeterministicMakerProvider`、`maker.connectors.json`、roles(coordinator/worker.yaml)、`workflows/maker_analysis.yaml`
-- 核心实现已迁到 `src/maker/*`
+- `DeterministicMakerProvider`、`maker.connectors.json`、roles(coordinator/worker)、`maker_analysis`(已删 demo)
+- 核心实现已迁到 Maker 核心实现(已从 demo 迁出)
 - 恢复:`git show 4a029981c^:demos/Aevatar.Demos.Maker/`
 
 ### CaseProjection 四件套(删于 `4ff5c2d1b`)
@@ -50,7 +50,7 @@
 - `CaseProjection.Abstractions/`(context factory/service/proto)
 - `CaseProjection/`(core:`CaseProjectionService`/`CaseReadModelProjector`/`Reducers`/`InMemoryCaseReadModelStore`)
 - `CaseProjection.Extensions.Sla/`(外部 assembly 扩展:`CaseEscalatedEventReducer` 加 SLA 升级**不改核心投影项目** —— OCP open-for-extension + DIP 示例)
-- `CaseProjection.Host/`(`Program.cs` DI 组合 `AddCaseProjectionDemo` + `AddCaseProjectionExtensionsFromAssembly`)
+- `CaseProjection.Host/`(`Program` DI 组合 `AddCaseProjectionDemo` + `AddCaseProjectionExtensionsFromAssembly`)
 - 恢复:`git show 4ff5c2d1b^:demos/Aevatar.Demos.CaseProjection*/`
 
 ---

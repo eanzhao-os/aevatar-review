@@ -2,9 +2,9 @@
 
 ## 事实源/设计抽象(以 ~/Code/aevatar 为准)
 
-- `workflows/simple_qa.yaml:1-9`: 最小单角色、单步骤 workflow。
-- `workflows/cn_reimbursement_intake.yaml:18-173`: 报销 intake 的多角色、多路由、人工输入和子 workflow 组合。
-- `workflows/codex_long_running_handoff.yaml:4-25`: 长任务回调、等待信号和 fan-out 审阅形状。
+- `workflows/simple_qa.yaml`: 最小单角色、单步骤 workflow。
+- `workflows/cn_reimbursement_intake.yaml`: 报销 intake 的多角色、多路由、人工输入和子 workflow 组合。
+- `workflows/codex_long_running_handoff.yaml`: 长任务回调、等待信号和 fan-out 审阅形状。
 
 ---
 

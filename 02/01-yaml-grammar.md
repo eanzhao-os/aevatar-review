@@ -2,9 +2,9 @@
 
 ## 事实源/设计抽象(以 ~/Code/aevatar 为准)
 
-- `src/workflow/Aevatar.Workflow.Core/Primitives/WorkflowDefinition.cs:11-186`: workflow 顶层结构、角色结构、运行配置和分支取后继规则。
-- `src/workflow/Aevatar.Workflow.Core/Primitives/StepDefinition.cs:6-109`: step 契约、重试、错误策略、超时和 `compensation` 引用。
-- `src/workflow/Aevatar.Workflow.Core/Primitives/WorkflowParser.cs:19-164`: YAML 解析、snake_case 约定、step type 默认值与参数提升。
+- `WorkflowDefinition`: workflow 顶层结构、角色结构、运行配置和分支取后继规则。
+- `StepDefinition`: step 契约、重试、错误策略、超时和 `compensation` 引用。
+- `WorkflowParser`: YAML 解析、snake_case 约定、step type 默认值与参数提升。
 
 ---
 

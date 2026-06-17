@@ -1,10 +1,8 @@
 # Run 语义:标识、生命周期和事件流边界
 
-## 关键代码(事实源,以 ~/Code/aevatar 为准)
+## 本篇涉及的设计抽象
 
-- `README.md`: Run 语义的四条重要规则,包括默认不按 run 隔离事件流。
-- `docs/canon/workflow-runtime.md`: 从 `/api/chat` 到 run actor、kernel、投影和 SSE 的完整链路。
-- `docs/canon/llm-streaming.md`: `actorId/runId/commandId/sessionId/messageId` 等会话标识和实时输出生命周期。
+> 以下论断均可回指 `~/Code/aevatar` 源码验证,但本篇用设计语言描述,不贴文件路径/行号。
 
 ---
 

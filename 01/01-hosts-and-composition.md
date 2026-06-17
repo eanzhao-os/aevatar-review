@@ -1,10 +1,8 @@
 # Host 是协议出口和能力组合
 
-## 关键代码(事实源,以 ~/Code/aevatar 为准)
+## 本篇涉及的设计抽象
 
-- `docs/canon/overview.md`: 当前架构基线、Host 职责、Maker 插件边界和架构守卫。
-- `src/Aevatar.Mainnet.Host.Api/Hosting/MainnetHostBuilderExtensions.cs`: Mainnet Host 的生产装配入口和端点映射。
-- `src/workflow/extensions/Aevatar.Workflow.Extensions.Hosting/AevatarPlatformHostBuilderExtensions.cs`: `AddAevatarPlatform(...)` 的能力开关和 Maker 依赖校验。
+> 以下论断均可回指 `~/Code/aevatar` 源码验证,但本篇用设计语言描述,不贴文件路径/行号。
 
 ---
 

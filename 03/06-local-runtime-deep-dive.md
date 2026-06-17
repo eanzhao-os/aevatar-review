@@ -1,14 +1,8 @@
 # Local Runtime 深入:LocalActorRuntime / LocalActor 邮箱串行 / LocalActorPublisher
 
-## 关键代码(事实源,以 ~/Code/aevatar 为准)
+## 本篇涉及的设计抽象
 
-- `src/Aevatar.Foundation.Runtime.Implementations.Local/Actors/LocalActorRuntime.cs` 第 23-331 行:本地 `IActorRuntime`;第 25 行:本地 actor 字典;第 231-251 行:Link 同时更新拓扑和 relay。
-- `src/Aevatar.Foundation.Runtime.Implementations.Local/Actors/LocalActor.cs` 第 11-242 行:本地 actor;第 13-17 行:single-reader mailbox;第 48-112 行:激活与 stream 订阅;第 174-228 行:入队与逐条处理。
-- `src/Aevatar.Foundation.Runtime.Implementations.Local/Actors/LocalActorPublisher.cs` 第 15-151 行:direct/topology/observer 三类发送实现。
-- `src/Aevatar.Foundation.Runtime.Implementations.Local/Actors/LocalActorDispatchPort.cs` 第 5-26 行:外部 dispatch 进入本地 actor。
-- `src/Aevatar.Foundation.Runtime.Implementations.Local/DependencyInjection/ServiceCollectionExtensions.cs` 第 37-106 行:`AddAevatarRuntime()` 的本地运行时装配。
-- `src/Aevatar.Foundation.Runtime/Streaming/InMemoryStream.cs` 第 14 行:DEV/TEST ONLY;第 52-62 行:ingress/dispatch 双 channel;第 169-220 行:stream pump 与 subscriber dispatch。
-- `docs/canon/architecture.md` 第 128-138 行:InMemory 仅 dev/test,生产目标是 Orleans + 持久化后端。
+> 以下论断均可回指 `~/Code/aevatar` 源码验证,但本篇用设计语言描述,不贴文件路径/行号。
 
 ---
 
