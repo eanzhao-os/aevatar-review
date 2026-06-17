@@ -23,7 +23,7 @@ flowchart LR
   composer --> nyx
 ```
 
-![NyxID 凭证流转](../docs/assets/07-channel-nyxid-credentials.png)
+![NyxID 凭证流转](../assets/07-channel-nyxid-credentials.png)
 
 ## 三个边界
 

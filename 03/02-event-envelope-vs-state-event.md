@@ -17,7 +17,7 @@
 
 Event Sourcing 的权威事实在另一层。只有 actor 在处理消息后显式持久化领域事件,它才会变成 `StateEvent` 并进入 `EventStore`。所以这两层有关联,但权威性完全不同。
 
-![EventEnvelope 与 StateEvent 是两层](../docs/assets/03-two-layers.png)
+![EventEnvelope 与 StateEvent 是两层](../assets/03-two-layers.png)
 
 ---
 

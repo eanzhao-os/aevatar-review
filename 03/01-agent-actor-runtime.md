@@ -16,7 +16,7 @@
 
 Aevatar 的 Foundation 不是把业务对象直接塞进消息总线。它分两层:下面是 Stream,负责把 `EventEnvelope` 送到对应通道;上面是 Runtime,把这些通道组织成 actor 的身份、生命周期、拓扑和串行处理语义。
 
-![Runtime 是 Stream 之上的 Actor 语义层](../docs/assets/03-runtime-over-stream.png)
+![Runtime 是 Stream 之上的 Actor 语义层](../assets/03-runtime-over-stream.png)
 
 这句话的重点是“之上”。Stream 只知道有消息被 produce、subscribe、relay;它不天然知道哪个业务实体应该被创建、谁是谁的 parent、同一个 actor 的消息是否应该串行。Runtime 补上这些语义,于是上层可以用 `IActorRuntime` / `IActorDispatchPort` / `IEventPublisher` 说话,而不是直接操作一堆 stream。
 
