@@ -1,62 +1,45 @@
-# 前端控制台 apps/aevatar-console-web:技术栈 + SSE 对接
+# 前端控制台:技术栈意图与 SSE 消费模式
 
-## 关键代码(事实源,以 ~/Code/aevatar 为准)
+## 事实源/设计抽象(以 ~/Code/aevatar 为准)
 
-- `apps/aevatar-console-web/README.md` 第 5-12 行(技术栈)、第 45-59 行(NyxID 登录 env)、第 78 行(Mainnet API `http://127.0.0.1:5080`)、第 93-108 行(本地代理 split + scope)。
-- `apps/aevatar-console-web/package.json` 第 5-6 行:`packageManager pnpm 10.2.1`、`@umijs/max ^4.6.25`;第 30-31 行:`antd ^6.2.2` + `@ant-design/pro-components`;第 40-41 行:`react ^19.2.4`;第 60 行:@umijs/max。
-- `apps/aevatar-console-web/src/shared/api/runtimeRunsApi.ts` 第 117 行(`invoke/${endpointId}:stream`)、第 124 行(`invoke/chat:stream`)、第 240/255 行(`streamChat` + `Accept: text/event-stream`)、第 275/290 行(`streamTeamChat`)、第 315/324 行(`streamDraftRun`)。
-- `apps/aevatar-console-web/src/shared/agui/`:`sseFrameNormalizer.ts`、`runtimeEventSemantics.ts`(`RuntimeEvent` type)、`customEventData.ts` —— AGUI SSE 帧归一化。
-- `apps/aevatar-console-web/src/shared/studio/observeSession.ts` 第 1、14、25 行:`RuntimeEvent` import、`mode: 'stream'|'invoke'`、storage prefix `aevatar-console:studio:observe-session:`。
+- `apps/aevatar-console-web/README.md`:控制台技术栈、本地 API 目标、NyxID 登录环境和代理 split。
+- `apps/aevatar-console-web/src/shared/api/runtimeRunsApi.ts`:chat/team/draft run 的 SSE 请求入口。
+- `apps/aevatar-console-web/src/shared/agui/sseFrameNormalizer.ts`:后端 SSE 帧到 AGUI/UI runtime event 的归一化逻辑。
 
 ---
 
-## 技术栈
+Console Web 是观察与操作台,不是新的事实源。它的职责是把 Studio/runtime/readmodel/API/SSE 组合成可操作界面:命令写回后端,查询读 readmodel/API,实时运行只订阅 SSE frame 并归一化成 UI 事件。
 
-`apps/aevatar-console-web/README.md` 第 5-12 行 + `package.json`:
+## 技术栈意图
 
-| 维度 | 选型 |
+| 选择 | 意图 |
 |---|---|
-| 框架 | **React 19**(`react ^19.2.4`) |
-| 应用骨架 | **@umijs/max ^4.6.25**(脚本用 `max dev`/`max build`) |
-| UI | **antd ^6.2.2** + **@ant-design/pro-components 3.1.2-0** + `@ant-design/icons ^6.1.0` |
-| 包管理 | **pnpm 10.2.1** |
-| 数据 | `@tanstack/react-query ^5.90.21` |
-| 图画布 | `@xyflow/react ^12.10.1` |
-| 编辑器 | `@monaco-editor/react` + `monaco-editor` |
-| AGUI SDK | `@aevatar-react-sdk/agui` + `@aevatar-react-sdk/types 0.5.0` |
-| Lint/Test | Biome `^2.1.1` + `@umijs/lint`、Jest 29 + jsdom、TypeScript `^5.6.3` |
+| React + Umi | 提供多页工作台、路由、构建和本地代理骨架 |
+| antd / Pro Components | 承载表单、表格、布局、设置页等管理台交互 |
+| React Query | 把普通 API 查询缓存和失效控制留在前端边界 |
+| AGUI event model | 让后端运行帧进入 typed UI event,避免页面各自解析 SSE |
+| Monaco / XYFlow | 分别服务 Studio 编辑和 workflow/图形化编排体验 |
 
----
+这里保留的是产品/架构选择,不是 package.json 行号库存。版本号会变,但"控制台只消费后端契约,不拥有运行事实"这个边界不能变。
 
-## SSE 对接(关键)
+## SSE 消费模式
 
-`runtimeRunsApi.ts` 是 SSE 消费核心:
-- `streamChat`(第 240 行):`Accept: "text/event-stream"`(第 255 行)
-- `streamTeamChat`(第 275 行)
-- `streamDraftRun`(第 315 行)
-- `streamEndpoint`(第 412 行)
+运行类入口会以 Accept: text/event-stream 请求后端 stream,拿到 response 后交给 UI 层逐帧消费。前端只做三件事:
 
-`src/shared/agui/`(`sseFrameNormalizer.ts`/`runtimeEventSemantics.ts`/`customEventData.ts`)做 AGUI SSE 帧归一化 —— 把服务端 `WorkflowRunEventEnvelope` JSON 帧解析成 typed `RuntimeEvent`。
+1. 打开 chat/team/draft run 等 stream。
+2. 用 shared AGUI normalizer 兼容 oneof-style、typed+nested、already-flat 三类帧。
+3. 把 typed runtime event 送入页面 accumulator/renderer。
 
-`observeSession.ts`(第 1、14、25 行):观察会话 `mode: 'stream'|'invoke'`,storage prefix `aevatar-console:studio:observe-session:`。
+这意味着前端看到的是观察流,不是查询事实源。run 是否完成、readmodel 当前状态、Studio member/team 当前态,仍应以后端 query/readmodel 契约为准。
 
----
+## 本地代理 split
 
-## 本地代理 split(`README.md` 第 93-96 行)
-
-| 路由 | 转发到 |
-|---|---|
-| runtime(`/api/chat`、`/api/workflows/*`、`/api/actors/*`、`/api/runs/*`、`/api/primitives`、`/api/capabilities`、多数 `/api/scopes/*`) | Mainnet Host API(`http://127.0.0.1:5080`) |
-| Studio(`/api/app/*`、`/api/auth/*`、`/api/workspace/*`、`/api/editor/*`、`/api/executions/*`、`/api/roles/*`、`/api/connectors/*`、`/api/settings/*`、`/api/scopes/{scopeId}/teams*`) | Studio Hosting API |
-
-scope(README 第 98-108 行):Overview/Studio/Primitives/Runs/Actors/Workflows/Observability/Settings。
-
----
+README 里的代理 split 把 runtime routes 与 Studio Hosting routes 分到不同后端目标。这个 split 是开发便利,不是架构新边界:生产语义仍然是 Console 通过 Host/Studio API 与主干交互。
 
 ## 验收
 
-1. 技术栈?(React 19 + @umijs/max + antd + pnpm)
-2. SSE 怎么对接?(streamChat 等,Accept: text/event-stream + agui/sseFrameNormalizer 归一化)
-3. 本地代理怎么 split?(runtime→Mainnet;Studio→Studio Hosting)
+1. Console Web 拥有运行事实吗?不拥有,它消费 API/readmodel/SSE。
+2. SSE 帧在哪里归一化?shared AGUI normalizer。
+3. 本地 proxy split 是什么性质?开发期目标拆分,不是新的事实权威。
 
 ⟦AI:AUTO-LOOP⟧

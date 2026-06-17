@@ -1,54 +1,62 @@
-# ChatRouting:ChatRoutePolicy(配置 Actor + 边界解析器)+ tool-first ingress
+# ChatRouting:配置 Actor + 无状态边界解析器
 
-## 关键代码(事实源,以 ~/Code/aevatar 为准)
+## 事实源/设计抽象(以 ~/Code/aevatar 为准)
 
-- `src/Aevatar.ChatRouting.Abstractions/`:`chat_route_policy.proto`、`buf.yaml`(proto-only 底层)。
-- `src/Aevatar.ChatRouting.Core/ChatRouteResolver.cs` 第 10、26 行:无状态边界解析器(`Resolve(snapshot, input) → ChatRouteDecision`;解析顺序:rules by priority → default_target → env/options fallback);`EnvChatRouteFallbackProvider.cs`(冷启动 fallback = `ForwardToModel(env AEVATAR_DEFAULT_LLM_MODEL)`)。
-- `agents/Aevatar.GAgents.ChatRouting/ChatRoutePolicyGAgent.cs`:per-scope **config-only** actor(处理 Upsert/RemoveRule,不 turn dispatch);`ChatRoutePolicyCurrentStateProjector.cs`、`ChatRoutePolicyCommittedStateProjectionActivationPlanProvider.cs`。
-- `docs/adr/0024-chat-route-policy.md`(Accepted):L41-49 三段式(policy authority `ChatRoutePolicyGAgent` + 决策引擎 `ChatRouteResolver` 库函数 + 查询视图 `ChatRoutePolicyCurrentStateDocument`,热路径零新 actor hop);L62-68 `ChatRouteDecision` 不持久化;L135-144 `default_target` 必填 + 冷启动 fallback 标 `used_fallback=true`。
-- `docs/adr/0026-tool-first-chat-ingress.md`(Accepted):L28-40 tool-calling backbone 已 load-bearing(`ToolCallLoop` + 30+ `IAgentToolSource`);L49-59 折叠到 `Reject` + `ForwardToModel`(`ForwardToGAgent`→tool `aevatar_invoke_gagent` 等);L62-72 `ForwardToModel` 增 `tool_set_ref` + `tool_choice_hint`。
+- `docs/adr/0024-chat-route-policy.md`:三段式 routing:policy authority、stateless resolver、readmodel。
+- `docs/adr/0026-tool-first-chat-ingress.md`:动作收敛为 `Reject` + `ForwardToModel`,GAgent/team/workflow 通过 tool 暴露。
+- `src/Aevatar.ChatRouting.Core/ChatRouteResolver.cs`:入口热路径调用的无状态解析函数。
 
 ---
 
-## 两层切分
+ChatRouting 不是新增一个"路由 actor"卡在所有请求中间。它把"谁能改策略"和"每次入口怎么做瞬时判断"分开:策略由 actor/event store 拥有,入口只读投影快照并同步调用纯解析器。
 
-ChatRouting 分两层:
+```mermaid
+flowchart TD
+  owner[Scope owner / admin] --> cmd[Upsert or remove route rule]
+  cmd --> policy[ChatRoutePolicyGAgent<br/>config authority]
+  policy --> committed[Committed policy events]
+  committed --> projection[ChatRoutePolicyCurrentStateDocument]
+  inbound[Channel / Responses / Voice ingress] --> snapshot[Read policy snapshot]
+  projection --> snapshot
+  snapshot --> resolver[ChatRouteResolver<br/>stateless library function]
+  resolver --> reject[Reject]
+  resolver --> model[ForwardToModel]
+  model --> tools[tool_set_ref + tool_choice_hint]
+  tools --> invoke[aevatar_invoke_gagent / team / workflow]
+```
 
-| 层 | 项目 | 职责 |
+## 两层职责
+
+| 层 | 做什么 | 不做什么 |
 |---|---|---|
-| 边界解析器 | `ChatRouting.Core/ChatRouteResolver.cs:10` | 无状态库函数,热路径零新 actor hop |
-| 配置 Actor | `agents/…/ChatRoutePolicyGAgent.cs` | per-scope config-only(Upsert/RemoveRule,不 dispatch) |
+| ChatRoutePolicyGAgent | 接收配置命令,持久化规则/default target,让 projection 生成当前态 | 不 dispatch turn,不拿 reply token,不处理音频帧 |
+| ChatRouteResolver | 在入口边界根据 snapshot + input 产出一次 ChatRouteDecision | 不持久化,不缓存跨请求状态,不是 actor |
 
-`ChatRouteDecision`(ADR-0024 L62-68)**不持久化** —— 它是 per-request 决策,不是事实。
+ChatRouteDecision 是 per-request 决策,可作为 telemetry 观察,但不能进入 actor state、event store、readmodel 或持久日志。它被入口消费后就消失。
 
----
+## 为什么 resolver 是无状态库函数
 
-## 三段式设计(ADR-0024 第 41-49 行)
+热路径上多一个 actor hop 只会增加排队和失败面,却不增加事实所有权。策略事实已经由 ChatRoutePolicyGAgent 拥有,入口只需要对一个已物化的 snapshot 做确定性解析。把 resolver 保持成库函数有三个直接收益:
 
-1. policy authority:`ChatRoutePolicyGAgent`(配置 actor)
-2. 决策引擎:`ChatRouteResolver` 库函数
-3. 查询视图:`ChatRoutePolicyCurrentStateDocument`
+1. 性能上零 actor 往返,Channel/Responses/Voice 入口都能在自己的边界内完成判断。
+2. 正确性上不复制策略状态,避免出现"policy actor 一份、router actor 又缓存一份"。
+3. 测试上可以用输入/输出覆盖优先级、default target、fallback、voice attach target,不用启动运行时。
 
-热路径**零新 actor hop** —— 解析是纯函数调用,不需要额外 actor 往返。
+## Tool-first ingress
 
----
+ADR-0026 把旧的 ForwardToGAgent、ForwardToTeam、ForwardToWorkflow 收敛为 tool 调用。policy wire action 只剩:
 
-## Tool-first ingress(ADR-0026)
+| action | 语义 |
+|---|---|
+| Reject | 治理边界直接拒绝 |
+| ForwardToModel | 选择模型,并通过 tool_set_ref/tool_choice_hint 注入可用工具或预填目标 |
 
-`docs/adr/0026`:tool-calling backbone 已是 load-bearing(`ToolCallLoop` + 30+ `IAgentToolSource`)。Forward actions 折叠到 `Reject` + `ForwardToModel`:
-- `ForwardToGAgent` → tool `aevatar_invoke_gagent`
-- `ForwardToTeam` → tool `aevatar_invoke_team`
-- `ForwardToWorkflow` → tool `aevatar_start_workflow`
-
-`ForwardToModel` 增 `tool_set_ref` + `tool_choice_hint`(含 `voice_attach_target` 子消息给 `/ws/voice` attach)。
-
----
+这样 routing 不再维护第二套调用方言。GAgent/team/workflow 的执行进入既有 tool-calling backbone,继续沿 actor/run/projection 主链产生事实和观察结果。
 
 ## 验收
 
-1. ChatRouteResolver 是 actor 吗?(不是,是无状态库函数,热路径零 actor hop)
-2. ChatRouteDecision 持久化吗?(不,是 per-request 决策)
-3. tool-first ingress 把 Forward 折叠成什么?(Reject + ForwardToModel,Forward 动作变 tool)
-4. ChatRoutePolicyGAgent 做什么?(per-scope config-only,Upsert/RemoveRule)
+1. ChatRouting 的配置权威是谁?ChatRoutePolicyGAgent。
+2. ChatRouteResolver 是 actor 吗?不是,是无状态库函数。
+3. GAgent/team/workflow routing 现在怎么表达?通过 ForwardToModel 携带 tool set/hint,由工具执行。
 
 ⟦AI:AUTO-LOOP⟧
