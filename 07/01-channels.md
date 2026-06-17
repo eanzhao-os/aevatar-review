@@ -42,6 +42,8 @@ flowchart LR
 
 ⚠️ Telegram direct-callback 和 local-credential 路径已从 ADR-0012 的支持契约移除;ADR-0013 的 Telegram 修正案把 Telegram 也放到同一 NyxID relay 骨干上。本篇按"有意收敛到 NyxID"解释,但是否还要恢复 direct-callback 兼容面需要维护者另行决策。
 
+本章只描述当前支持契约,不把被移除的本地凭证路径当作待补教程。
+
 ## 验收
 
 1. ChannelRuntime 是凭证权威吗?不是,它只保存非 secret routing/identity/status/handle。
