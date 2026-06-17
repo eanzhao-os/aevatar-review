@@ -1,103 +1,149 @@
-# WorkflowExecutionKernel 主循环:current step / variables / retry / timeout
+# WorkflowExecutionKernel：run actor 内部的主循环
 
-## 关键代码(事实源,以 ~/Code/aevatar 为准)
+## 事实源/设计抽象(以 ~/Code/aevatar 为准)
 
-- `src/workflow/Aevatar.Workflow.Core/Execution/WorkflowExecutionKernel.cs` 第 14 行:`class WorkflowExecutionKernel : IEventModule<IEventHandlerContext>`;第 36 行:`Name => "workflow_execution_kernel"`;第 37 行:`Priority => 0`;**这个 kernel 就是 `workflow_loop` primitive**,由 `WorkflowRunGAgent.cs:977` 自动注入。全文 1882 行。
-- 第 39 行:`CanHandle`(`StartWorkflowEvent`/`CompensationRequestEvent`/`CompensationStepCompletedEvent`/`StepCompletedEvent`/`WorkflowStoppedEvent`/`WorkflowStepTimeoutFiredEvent`/`WorkflowStepRetryBackoffFiredEvent`)。
-- 第 99 行:`HandleStartWorkflowAsync`;第 130-145 行:重置全部执行状态;第 153-161 行:merge fork-seed/start params 进 `Variables`;第 164 行:解析入口 step;第 189 行:`DispatchStepAsync(entry)`。
-- 第 1060 行:`DispatchStepAsync`;第 1077 行:每 dispatch 生成新 `execution_id`;第 1092/1153 行:schedule step timeout lease(`ScheduleStepTimeoutLeaseAsync`,clamp `100..600_000` ms,第 1163 行);第 1099 行:publish `StepRequestEvent` to Self。
-- 第 246 行:`HandleStepCompletedAsync`;第 294 行:reject stale `execution_id`;第 436-463 行:解析 next step;第 466-482 行:dispatch next 或 publish `WorkflowCompletedEvent`。
-- 第 766 行:`TryRetryAsync`;第 785 行:max_attempts clamp 1-10;第 792-795 行:backoff clamp ≤60s;第 830/934 行:durable retry backoff。
-- 第 192 行:`HandleTimeoutFiredAsync`;第 233-239 行:超时 → failed `StepCompletedEvent`。
-- 第 1294 行:`LoadState`(`WorkflowExecutionStateAccess.Load`,`ModuleStateKey = "workflow_execution_kernel"`,第 16 行);第 1297 行:`SaveStateAsync`。
-- `src/workflow/Aevatar.Workflow.Core/Execution/WorkflowExecutionStateKeys.cs` 第 1-24 行:`Engine(name)→"engine/{name}"`、`Component(name)→"components/{name}"`、`Step(stepId)→"steps/{stepId}"`。
-- `src/workflow/Aevatar.Workflow.Core/Execution/WorkflowExecutionStateAccess.cs` 第 1-33 行:`Load/LoadMany/Save/Clear` 委托 `ctx.LoadState/SaveState/ClearState`。
+- `src/workflow/Aevatar.Workflow.Core/Execution/WorkflowExecutionKernel.cs:14-1153`: kernel 事件入口、启动、step dispatch、completion、retry、timeout 和补偿请求处理。
+- `src/workflow/Aevatar.Workflow.Core/WorkflowRunGAgent.cs:1360-1566`: run actor 内的补偿 ledger、cursor、dead-letter 与恢复逻辑。
+- `src/workflow/Aevatar.Workflow.Core/workflow_state.proto:139-162`: `WorkflowRunState` 中 execution states、compensable ledger 和 saga 状态字段。
 
 ---
 
-## kernel 是什么
+## 一句话模型
 
-`WorkflowExecutionKernel`(`WorkflowExecutionKernel.cs`)**就是 `workflow_loop` primitive**。它是一个 `IEventModule<IEventHandlerContext>`(第 14 行),`Name = "workflow_execution_kernel"`(第 36 行),`Priority = 0`(第 37 行,最先执行),由 `WorkflowRunGAgent` 在第 977 行自动注入。它不是用户在 YAML 里写的步骤,而是引擎内部的主循环调度器。
+`WorkflowExecutionKernel` 是 `workflow_loop` primitive 的实现，但用户不在 YAML 里写它。它被 run actor 自动安装，用事件驱动方式推进当前 step、变量、重试、timeout 和 saga 补偿。真正的执行事实仍在 run actor state 里，kernel 只是主循环控制器。
 
-它处理的全部事件(`CanHandle`,第 39 行):`StartWorkflowEvent`、`CompensationRequestEvent`、`CompensationStepCompletedEvent`、`StepCompletedEvent`、`WorkflowStoppedEvent`、`WorkflowStepTimeoutFiredEvent`、`WorkflowStepRetryBackoffFiredEvent`。
+```mermaid
+flowchart LR
+    Run["WorkflowRunGAgent"] --> Kernel["WorkflowExecutionKernel<br/>workflow_loop"]
+    Kernel --> Bridge["WorkflowExecutionBridgeModule"]
+    Bridge --> Modules["step modules"]
+    Modules --> Complete["StepCompletedEvent"]
+    Complete --> Kernel
+    Kernel --> State["WorkflowRunState.ExecutionStates"]
+```
 
----
+```mermaid
+stateDiagram-v2
+    [*] --> Idle
+    Idle --> Running: StartWorkflowEvent
+    Running --> WaitingStep: StepRequestEvent published
+    WaitingStep --> Running: StepCompletedEvent success
+    WaitingStep --> Retrying: StepCompletedEvent failure + retry left
+    Retrying --> WaitingStep: retry backoff fired
+    WaitingStep --> Compensating: terminal failure + compensable ledger
+    WaitingStep --> Failed: terminal failure + no ledger
+    Compensating --> Compensating: next compensation requested
+    Compensating --> CompensatedFailed: all compensations completed
+    Compensating --> CompensationDeadLetter: compensation failed
+    Running --> Completed: no next step
+    Running --> Stopped: WorkflowStoppedEvent
+```
 
-## 主循环:启动 → dispatch → 完成 → 推进
+## 完整主循环
+
+下面这张图是读 `02/03` 的主干：所有路径都回到同一个 actor-owned loop，不靠后台线程偷偷推进。
 
 ```mermaid
 flowchart TD
-    Start["StartWorkflowEvent<br/>(HandleStartWorkflowAsync:99)"] --> Reset["重置全部执行状态<br/>(130-145)"]
-    Reset --> Merge["merge fork-seed/start params 进 Variables<br/>(153-161)"]
-    Merge --> Entry["解析入口 step<br/>(164)"]
-    Entry --> Dispatch["DispatchStepAsync(entry)<br/>(189/1060)"]
-    Dispatch --> GenId["生成新 execution_id<br/>(1077)"]
-    GenId --> Timeout["schedule timeout lease<br/>(1092, clamp 100-600000ms)"]
-    Timeout --> Pub["publish StepRequestEvent to Self<br/>(1099)"]
-    Pub --> Wait["等待 StepCompletedEvent"]
-    Wait --> Complete["HandleStepCompletedAsync<br/>(246)"]
-    Complete --> CheckStale{"execution_id 匹配?<br/>(294)"}
-    CheckStale -->|stale| Reject["StaleStepCompletionRejectedEvent<br/>(301)"]
-    CheckStale -->|ok| Fail{"成功?"}
-    Fail -->|失败| Retry{"可重试?<br/>(TryRetryAsync:766)"}
-    Retry -->|是| Backoff["durable backoff<br/>(934)"]
-    Retry -->|否| OnError["on_error / 补偿 / terminal<br/>(369-425)"]
-    Fail -->|成功| Write["写 Variables[stepId]+input<br/>(363-365)"]
-    Write --> Next["解析 next step<br/>(436-463)"]
-    Next --> HasNext{"有 next?"}
+    Start["StartWorkflowEvent"] --> Reset["重置 kernel execution state"]
+    Reset --> Seed["合并 fork seed / start parameters 到 Variables"]
+    Seed --> Entry["解析 entry step"]
+    Entry --> Dispatch["DispatchStepAsync"]
+    Dispatch --> ExecId["生成新的 execution_id"]
+    ExecId --> Timeout["按 step timeout 注册 durable callback"]
+    Timeout --> Request["向 self 发布 StepRequestEvent"]
+    Request --> Bridge["bridge 选择对应 step module"]
+    Bridge --> Module["模块执行并发布 StepCompletedEvent"]
+    Module --> Complete["HandleStepCompletedAsync"]
+    Complete --> Stale{"execution_id 是否匹配当前 step?"}
+    Stale -->|否| Reject["拒绝 stale completion"]
+    Stale -->|是| Success{"step 成功?"}
+    Success -->|是| Persist["写 Variables / usage / ledger"]
+    Persist --> Next["按 branches / next / 顺序解析后继"]
+    Next --> HasNext{"有后继?"}
     HasNext -->|是| Dispatch
-    HasNext -->|否| Done["publish WorkflowCompletedEvent<br/>(466-482)"]
+    HasNext -->|否| Completed["WorkflowCompletedEvent success"]
+    Success -->|否| Retry{"retry 还可用且非 timeout?"}
+    Retry -->|是| Backoff["注册 durable retry backoff"]
+    Backoff --> RetryFired["WorkflowStepRetryBackoffFiredEvent"]
+    RetryFired --> Dispatch
+    Retry -->|否| ErrorPolicy{"on_error 能前向恢复?"}
+    ErrorPolicy -->|fallback / skip| Recovery["派发 fallback 或继续后继"]
+    Recovery --> Dispatch
+    ErrorPolicy -->|fail| Saga{"有可补偿 ledger?"}
+    Saga -->|有| CompReq["CompensationRequestEvent"]
+    Saga -->|无| Failed["WorkflowCompletedEvent failure"]
+    CompReq --> CompDispatch["派发 compensation step"]
+    CompDispatch --> CompDone["CompensationStepCompletedEvent"]
+    CompDone --> CompMore{"还有上一个 ledger entry?"}
+    CompMore -->|有| CompReq
+    CompMore -->|无| CompFinished["WorkflowCompensationCompletedEvent"]
+    CompDone --> CompFailed{"补偿失败且重试耗尽?"}
+    CompFailed -->|是| Dead["WorkflowCompensationFailedEvent"]
 ```
-
----
 
 ## actor-owned execution state
 
-kernel 的全部状态存在 `WorkflowExecutionKernelState` protobuf 里,通过 `LoadState`/`SaveStateAsync` 落到 run actor 的 `WorkflowRunState.ExecutionStates["workflow_execution_kernel"]`。
+kernel 自己也有状态，但它不放在 kernel 对象字段里当权威。current step、当前输入、变量表、retry 计数、timeout callback、execution id 和补偿 execution id 都通过 execution state 存在 run actor 中。
 
-状态字段(`HandleStartWorkflowAsync` 第 130-145 行重置清单):
-`Active`、`RunId`、`CurrentStepId`、`CurrentStepInput`、`CurrentStepInputFileRefs`、`InputFileRefs`、`Variables`、`RetryAttemptsByStepId`、`TimeoutsByStepId`、`RetryBackoffsByStepId`、`ExecutionIdsByStepId`、`IdempotencyByStepId`、`CompensationExecutionIdsByStepId`、`Usage`、`CurrentStepDispatchPending`、`CurrentStepTimeoutCallbackId`。
+```mermaid
+flowchart TD
+    Kernel["Kernel Load/Save state"] --> Access["WorkflowExecutionStateAccess"]
+    Access --> Host["IWorkflowExecutionStateHost"]
+    Host --> RunState["WorkflowRunState.ExecutionStates"]
+    RunState --> Replay["重启或 replay 后继续对账"]
+```
 
-**关键设计**:current step / variables / retry / timeout 全部在 **actor-owned execution state** 里,不在进程内存。这保证 run actor 重启后能恢复执行进度(Event Sourcing)。
+这就是为什么 timeout 和 retry 都可以是 durable 的：callback 回来时只带一个事件，kernel 再用 actor state 判断它是否仍然有效。
 
----
+## retry 与 timeout 是事件化的
 
-## retry / timeout 机制
+retry 不等于线程 sleep。失败后如果还能重试，kernel 记录 retry attempt，再注册 durable backoff；backoff fired event 回到同一个 actor 后重新 dispatch。timeout 也是同样的形状：注册 timeout lease，fired 后转成失败的 `StepCompletedEvent`，再进入统一失败分支。
 
-**retry**(`TryRetryAsync`,第 766 行):
-- `step.Retry.MaxAttempts` clamp 1-10(第 785 行)
-- timeout 错误不重试(第 777 行)
-- `fixed`/`exponential` backoff,clamp ≤60s(第 792-795 行)
-- durable backoff:通过 `ScheduleSelfDurableTimeoutAsync` → `WorkflowStepRetryBackoffFiredEvent`(`StartRetryBackoffAsync` 第 934 行,handler `HandleRetryBackoffFiredAsync` 第 830 行)
+```mermaid
+sequenceDiagram
+    participant K as Kernel
+    participant B as Durable callback
+    participant S as Run state
 
-**timeout**(`HandleTimeoutFiredAsync`,第 192 行):
-- 匹配后 publish failed `StepCompletedEvent`,reason `TIMEOUT after {ms}ms`(第 233-239 行)
-- timeout lease 在 dispatch 时 schedule(`ScheduleStepTimeoutLeaseAsync`,第 1153 行),clamp `100..600_000` ms(第 1163 行)
+    K->>S: record current execution_id
+    K->>B: schedule timeout/backoff
+    B-->>K: fired event
+    K->>S: compare current step and ids
+    alt still current
+        K->>K: emit timeout failure or retry dispatch
+    else stale
+        K->>K: ignore / reject stale event
+    end
+```
 
----
+## ⚠️ saga 补偿状态按事实理解
 
-## 状态 key 命名
+补偿不是另起一个全局 saga coordinator。run actor 自己持有 `compensable_ledger`、`compensation_cursor`、`saga_status`、`compensation_execution_id` 和 dead-letter 字段。失败进入补偿阶段时，kernel 只负责发布下一条 `CompensationRequestEvent`；每个补偿 step 仍然通过同一个 dispatch/complete 机制执行。
 
-`WorkflowExecutionStateKeys.cs`(第 1-24 行)定义命名约定:
-- `Engine(name)` → `"engine/{name}"`
-- `Component(name)` → `"components/{name}"`
-- `Step(stepId)` → `"steps/{stepId}"`
+```mermaid
+flowchart RL
+    L3["ledger: step C -> comp C"] --> L2["ledger: step B -> comp B"]
+    L2 --> L1["ledger: step A -> comp A"]
+    Cursor["compensation_cursor"] --> L3
+    L3 --> ReqC["request comp C"]
+    ReqC --> DoneC["completed"]
+    DoneC --> ReqB["request comp B"]
+    ReqB --> DoneB["completed"]
+    DoneB --> ReqA["request comp A"]
+    ReqA --> End["compensated_failed 或 dead_letter"]
+```
 
-kernel 自己用 `ModuleStateKey = "workflow_execution_kernel"`(第 16 行)。
+⚠️ 当前事实是“已成功、且声明了补偿的 step”才会进入补偿 ledger；补偿按反向顺序串行执行，失败耗尽后进入 durable dead-letter 状态，而不是静默吞掉。
 
----
+## stale completion 为什么重要
 
-## stale completion 保护
-
-每次 `DispatchStepAsync` 生成新 `execution_id`(第 1077 行),存入 `state.ExecutionIdsByStepId`。`HandleStepCompletedAsync`(第 294 行)校验完成事件的 `execution_id` 是否匹配当前 step 的;不匹配 → `StaleStepCompletionRejectedEvent`(第 301 行)。这防止旧步骤的延迟完成污染当前步骤。
-
----
+每次 dispatch 都生成新的 `execution_id`。step completion 回来时，kernel 比对当前 step 的 execution id；不匹配说明这是旧派发、旧 timeout 或旧补偿的迟到消息，不能改写当前状态。这个保护让重试、timeout 和补偿可以共享同一条事件通道。
 
 ## 验收
 
-1. `workflow_loop` 是用户写的步骤吗?(不是,是 `WorkflowExecutionKernel`,自动注入,第 36 行)
-2. kernel 状态存在哪?(`WorkflowRunState.ExecutionStates["workflow_execution_kernel"]`,actor-owned)
-3. retry 的 max_attempts 范围?(1-10,第 785 行)
-4. stale completion 怎么防护?(每次 dispatch 新 `execution_id`,完成时校验,第 294 行)
+1. `workflow_loop` 是用户 YAML step 吗？不是，它是 run actor 自动安装的 kernel。
+2. kernel 主循环的闭环是什么？dispatch step、等待 completion、校验 id、推进后继或失败分支。
+3. ⚠️ saga 状态归谁？归 run actor 的 `WorkflowRunState`，不是外部 coordinator。
 
 ⟦AI:AUTO-LOOP⟧

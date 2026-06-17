@@ -1,180 +1,56 @@
-# Workflow YAML 完整语法:name/roles/steps + steps[].type 取值全表
+# Workflow YAML 语法：声明一张可执行的图
 
-## 关键代码(事实源,以 ~/Code/aevatar 为准)
+## 事实源/设计抽象(以 ~/Code/aevatar 为准)
 
-- `src/workflow/Aevatar.Workflow.Core/Primitives/WorkflowDefinition.cs` 第 11-51 行:`WorkflowDefinition`(Name/Roles/Steps/Configuration/OnFailure);第 73-88 行:`GetNextStep` 分支解析顺序;第 95-112 行:`WorkflowRuntimeConfiguration.ClosedWorldMode` + `WorkflowRunFailurePolicy`。
-- `src/workflow/Aevatar.Workflow.Core/Primitives/StepDefinition.cs` 第 6-78 行:`StepDefinition`(Id/Type/TargetRole/Parameters/Next/Branches/Retry/OnError/TimeoutMs/Compensation);第 84-109 行:`StepRetryPolicy` + `StepErrorPolicy`。
-- `src/workflow/Aevatar.Workflow.Core/Primitives/WorkflowDefinition.cs` 第 118-186 行:`RoleDefinition`(Id/Name/AgentKind/SystemPrompt/Provider/Model/Temperature/MaxTokens/Connectors allowlist)。
-- `src/workflow/Aevatar.Workflow.Core/Primitives/WorkflowParser.cs` 第 19-21 行:YamlDotNet snake_case;第 83-99 行:`Parse`;第 143-164 行:`MapStep`(默认 type=`llm_call`,canonical 化);第 835 行:`ApplyErgonomicDefaults`;第 23-75 行:`RootParameterMappings`(~50 个根字段提升)。
-- `src/workflow/Aevatar.Workflow.Core/Primitives/WorkflowPrimitiveCatalog.cs` 第 12-57 行:canonical 别名表 + `IdentityPrimitives` + `CapabilityPrimitives`;第 71 行:`ToCanonicalType`。
-- `src/workflow/Aevatar.Workflow.Core/WorkflowCoreModulePack.cs` 第 9-41 行:31 个模块注册(canonical step type 注册表)。
-- `docs/canon/workflow-primitives.md` 第 41-73 行:role schema;第 74-102 行:saga compensation;第 104-784 行:primitive 分组(Data/Control/AI/Composition/Integration/Human/Engine-internal)。
+- `src/workflow/Aevatar.Workflow.Core/Primitives/WorkflowDefinition.cs:11-186`: workflow 顶层结构、角色结构、运行配置和分支取后继规则。
+- `src/workflow/Aevatar.Workflow.Core/Primitives/StepDefinition.cs:6-109`: step 契约、重试、错误策略、超时和 `compensation` 引用。
+- `src/workflow/Aevatar.Workflow.Core/Primitives/WorkflowParser.cs:19-164`: YAML 解析、snake_case 约定、step type 默认值与参数提升。
 
 ---
 
-## 顶层结构
+## 一句话模型
 
-一个 workflow YAML 的最小骨架(综合 `WorkflowDefinition.cs` + `workflow-primitives.md`):
+Workflow YAML 不是脚本语言，而是一张声明式执行图：`roles` 定义谁能做事，`steps` 定义图上的节点和边，`configuration` 与失败策略定义运行时边界。解析器把宽松的 YAML 写法归一化成强类型 `WorkflowDefinition`，后续的 definition actor、run actor 和 kernel 都只看这个模型。
 
-```yaml
-name: my_workflow              # 必填,WorkflowDefinition.cs:16
-description: "..."             # 可选,:21
-when_to_use: "..."             # 可选,:26
-roles:                          # 必填,List<RoleDefinition>,:31
-  - id: assistant
-    name: Assistant
-    system_prompt: "..."
-    provider: openai
-    model: gpt-4o
-    connectors: [github_router] # role connector allowlist,:186
-steps:                          # 必填,List<StepDefinition>,:36
-  - id: answer
-    type: llm_call              # 默认 type,:145
-    role: assistant
-    next: done                  # 显式后继
-    retry:                      # StepDefinition.cs:63
-      max_attempts: 3
-      backoff: exponential
-      delay_ms: 1000
-    on_error:                   # :73
-      strategy: fallback
-      fallback_step: handle_error
-    timeout_ms: 30000           # :78
-configuration:                  # 可选,:41
-  closed_world_mode: true       # :95-101
-on_failure:                     # 可选,:46
-  action: fork_from_failed_step # :112
-  max_attempts: 2
+```mermaid
+flowchart LR
+    Y["YAML 文本"] --> P["WorkflowParser<br/>归一化字段和默认值"]
+    P --> D["WorkflowDefinition<br/>name / roles / steps / configuration"]
+    D --> V["WorkflowValidator<br/>引用、分支、补偿关系"]
+    V --> R["WorkflowRunGAgent<br/>按强类型定义执行"]
 ```
 
-> **注意**:aevatar **没有** `RouteDefinition` 类型。路由通过 `StepDefinition.Branches`(dict)+ `Next` + `on_error`/`retry`/`compensation` 表达(`StepDefinition.cs` 第 43-78 行)。
+```mermaid
+classDiagram
+    class WorkflowDefinition {
+      name
+      roles
+      steps
+      configuration
+      on_failure
+    }
+    class RoleDefinition {
+      id
+      agent_kind
+      model settings
+      connectors allowlist
+    }
+    class StepDefinition {
+      id
+      type
+      target_role
+      parameters
+      next / branches
+      retry / on_error / timeout
+      compensation
+    }
+    WorkflowDefinition "1" --> "*" RoleDefinition
+    WorkflowDefinition "1" --> "*" StepDefinition
+```
 
----
+## 最小骨架
 
-## roles:角色定义(`RoleDefinition`,`WorkflowDefinition.cs` 第 118-186 行)
-
-| 字段 | 行号 | 含义 |
-|---|---|---|
-| `id` | 第 123 行 | 角色标识,step 通过 `role`/`target_role` 引用 |
-| `name` | 第 128 行 | 显示名 |
-| `agent_kind` | 第 133 行 | 默认 `workflow.role-agent` |
-| `system_prompt` | 第 138 行 | 系统提示词 |
-| `provider` / `model` / `temperature` / `max_tokens` | 第 143-168 行 | LLM 配置 |
-| `max_tool_rounds` / `max_history_messages` | 第 168 行 | 工具轮次/历史上限 |
-| `event_modules` / `event_routes` | 第 173-178 行 | 动态事件模块 |
-| `agent_tool_scope` | 第 180 行 | 工具作用域 |
-| `connectors` | 第 186 行 | **connector allowlist**(授权,不是连接定义) |
-
-`connectors` 是授权清单:`connector_call` 步骤运行时检查 role 的 `connectors` 是否包含该 connector(`src/Aevatar.Configuration/README.md` 第 44-50 行)。省略 `role` 则跳过 allowlist(向后兼容,第 50 行)。
-
----
-
-## steps:步骤定义 + 分支解析
-
-`StepDefinition`(`StepDefinition.cs` 第 6-78 行):
-
-| 字段 | 行号 | 含义 |
-|---|---|---|
-| `id` | 第 11 行 | 步骤标识 |
-| `type` | 第 16 行 | 步骤类型(默认 `llm_call`,第 145 行) |
-| `target_role` / `role` | 第 21 行 | 目标角色 |
-| `parameters` | 第 26 行 | `Dictionary<string,string>` 参数 |
-| `next` | 第 43 行 | 显式后继 |
-| `branches` | 第 58 行 | `Dictionary<string,string>?` 条件分支 |
-| `retry` | 第 63 行 | `StepRetryPolicy`(max_attempts 1-10,backoff fixed/exponential) |
-| `on_error` | 第 73 行 | `StepErrorPolicy`(fail/skip/fallback) |
-| `timeout_ms` | 第 78 行 | 超时 |
-| `compensation` | 第 48 行 | saga 补偿 |
-
-**分支解析顺序**(`WorkflowDefinition.GetNextStep`,第 73-88 行):
-`Branches[branchKey]` → `Branches["_default"]` → `step.Next` → next-by-index。
-
-**重试**(`StepRetryPolicy`,第 84-94 行):`max_attempts` 默认 3,范围 1-10;`backoff` = `fixed`/`exponential`;`delay_ms` 默认 1000。
-
-**错误策略**(`StepErrorPolicy`,第 99-109 行):`strategy` = `fail`/`skip`/`fallback`;可选 `fallback_step`、`default_output`。
-
----
-
-## steps[].type 取值全表
-
-canonical 类型注册在 `WorkflowPrimitiveCatalog.cs`(第 12-57 行)和 `WorkflowCoreModulePack.cs`(第 9-41 行,31 个模块)。别名通过 `ToCanonicalType`(第 71 行)归一化。
-
-### 别名归一化表(`WorkflowPrimitiveCatalog.cs` 第 12-41 行)
-
-| 别名 | canonical |
-|---|---|
-| `loop` | `while` |
-| `sub_workflow` | `workflow_call` |
-| `for_each` / `foreach_llm` | `foreach` |
-| `parallel_fanout` / `fan_out` | `parallel` |
-| `mapreduce` / `map_reduce_llm` | `map_reduce` |
-| `judge` | `evaluate` |
-| `select` | `race` |
-| `assert` | `guard` |
-| `sleep` | `delay` |
-| `publish` | `emit` |
-| `wait` | `wait_signal` |
-| `bridge_call` / `cli_call` / `mcp_call` / `http_get` / `http_post` / `http_put` / `http_delete` | `connector_call` |
-| `secure_connector` | `secure_connector_call` |
-| `secret_input` | `secure_input` |
-| `vote_consensus` | `vote` |
-| `mutex` | `lease` |
-| `schedule_workflow` | `self_reschedule` |
-
-### canonical 类型全集(31 个,`WorkflowCoreModulePack.cs` 第 9-41 行)
-
-| 分组 | 类型 | 最小 YAML 片段 |
-|---|---|---|
-| **Data** | `transform` | `type: transform` + `operation` |
-| | `assign` | `type: assign` + `target`/`value` |
-| | `retrieve_facts` | `type: retrieve_facts` |
-| | `cache` | `type: cache` + `key`/`ttl_ms` |
-| **Control** | `conditional` | `type: conditional` → `true`/`false` 分支 |
-| | `switch` | `type: switch` + `on` + `branch.*` |
-| | `while` | `type: while` + `condition`/`max_iterations` |
-| | `foreach` | `type: foreach` + `delimiter`/`sub_step_type` |
-| | `parallel` | `type: parallel` + `workers`/`vote_step_type` |
-| | `race` | `type: race` → 首个完成者胜 |
-| | `map_reduce` | `type: map_reduce` + map/reduce 子步 |
-| | `workflow_call` | `type: workflow_call` + `workflow` |
-| | `dynamic_workflow` | `type: dynamic_workflow` |
-| | `delay` | `type: delay` + `duration_ms` |
-| | `wait_signal` | `type: wait_signal` + `signal_name` |
-| | `checkpoint` | `type: checkpoint` |
-| | `lease` | `type: lease` + acquire/renew/release |
-| | `guard` | `type: guard` + 校验 |
-| **AI** | `llm_call` | `type: llm_call` + `role`/`prompt_prefix` |
-| | `tool_call` | `type: tool_call` + `tool`/`operation` |
-| | `evaluate` | `type: evaluate` + threshold 分支 |
-| | `reflect` | `type: reflect` + `max_rounds` |
-| **Integration** | `connector_call` | `type: connector_call` + `connector`/`operation` |
-| | `emit` | `type: emit` + `event_type`/`payload` |
-| | `notify` | `type: notify` |
-| | `actor_send` | `type: actor_send` |
-| **Human** | `human_input` | `type: human_input` |
-| | `human_approval` | `type: human_approval` + `on_reject` |
-| | `secure_input` | `type: secure_input` |
-| **Engine-internal** | `workflow_loop` | 自动注入,用户不写(= `WorkflowExecutionKernel`) |
-| | `workflow_yaml_validate` | `type: workflow_yaml_validate` |
-
-> 每个 step type 的详细语义、参数、最小 YAML 见 `02/04-step-modules-catalog.md`。
-
----
-
-## 语法糖:`RootParameterMappings` + `ApplyErgonomicDefaults`
-
-`WorkflowParser` 对 LLM 生成的 YAML 做了大量容错(`WorkflowParser.cs`):
-
-- **`RootParameterMappings`**(第 23-75 行):~50 个根字段(`prompt`、`workers`、`vote_step_type`、`signal_name`、`timeout`、`quorum_count`、`key`、`ttl_ms`…)自动提升进 `parameters`,允许把参数写在 step 根级。
-- **`ApplyErgonomicDefaults`**(第 835 行):`http_get/post/put/delete` → 自动补 `method`;`mcp_call` → `operation=<tool>`;`foreach_llm` → `sub_step_type=llm_call`;`map_reduce_llm` → map+reduce llm_call。
-
-这让手写和 LLM 生成都能用更自然的写法,parser 统一归一化。
-
----
-
-## 最小示例(simple_qa)
-
-`workflows/simple_qa.yaml`(第 1-9 行):
+一个合法 workflow 至少要有名字、角色和步骤。没有显式 `type` 时，parser 会按当前契约把 step 当成 `llm_call` 处理；为了让文档和人工审核更稳定，示例仍建议显式写出 `type`。
 
 ```yaml
 name: simple_qa
@@ -188,15 +64,112 @@ steps:
     role: assistant
 ```
 
-这是最小合法 workflow:1 个 role + 1 个 `llm_call` step,无路由。`WorkflowParser.Parse`(第 83 行)把它解析成 `WorkflowDefinition`,`EntryStepId` = `Steps[0].Id`(第 51 行)。
+`roles` 是能力和授权边界，不是运行线程。一个 role 可以配置模型参数，也可以声明 `connectors` allowlist；真正的外部连接定义在 host 配置里，详见 `02/07-connectors.md`。
 
----
+## steps 是执行图的节点
+
+每个 step 至少需要一个稳定的 `id`。`type` 决定由哪个模块处理，`parameters` 提供模块输入，`next` 和 `branches` 决定图怎么继续走。
+
+```yaml
+steps:
+  - id: classify
+    type: switch
+    on: "{{input.kind}}"
+    branches:
+      invoice: extract_invoice
+      resume: screen_resume
+      _default: ask_human
+
+  - id: extract_invoice
+    type: llm_call
+    role: invoice_extractor
+    next: submit_approval
+```
+
+后继解析遵循一个稳定顺序：先查命中的 `branches`，再查 `_default`，再看显式 `next`，最后才落到 YAML 中的下一个 step。这样既能写线性流程，也能在关键节点改成条件图。
+
+```mermaid
+flowchart TD
+    Done["step 完成"] --> Key{"有 branch key?"}
+    Key -->|命中 branches[key]| Branch["跳到匹配分支"]
+    Key -->|未命中| Default{"有 _default?"}
+    Default -->|有| Dst["跳到默认分支"]
+    Default -->|无| Next{"有 next?"}
+    Next -->|有| Explicit["跳到 next"]
+    Next -->|无| Index["按 YAML 顺序取下一个 step"]
+```
+
+## 参数可以写得更顺手
+
+YAML 面向人和 LLM 生成器，所以 parser 接受两类写法：
+
+- 模块参数写在 `parameters` 下，最接近强类型模型。
+- 常用参数直接写在 step 根级，parser 再提升进 `parameters`。
+
+```yaml
+steps:
+  - id: wait_a_bit
+    type: delay
+    duration_ms: 5000
+```
+
+这类语法糖只改变输入形状，不改变执行语义。模块最终仍收到归一化后的参数表。
+
+## retry / on_error / timeout
+
+`retry` 是当前 step 的本地重试策略；`on_error` 是重试耗尽后的前向恢复策略；`timeout_ms` 由 kernel 转成 durable timeout 事件处理。
+
+```yaml
+steps:
+  - id: call_external
+    type: connector_call
+    role: coordinator
+    connector: github_router
+    operation: list_repos
+    retry:
+      max_attempts: 3
+      backoff: exponential
+      delay_ms: 1000
+    on_error:
+      strategy: fallback
+      fallback_step: report_unavailable
+    timeout_ms: 30000
+```
+
+这里的恢复仍然是执行图的一部分：fallback step 也是普通 step，会继续进入同一个 kernel 主循环。
+
+## compensation 是显式反向动作
+
+`compensation` 不是自动推断的“撤销”。它只是一个 step id 引用，表示当前 step 成功后，如果 workflow 后续进入补偿阶段，run actor 可以按补偿 ledger 反向调度对应动作。
+
+```yaml
+steps:
+  - id: charge_card
+    type: connector_call
+    role: payment_worker
+    connector: payment_gateway
+    operation: charge
+    compensation: refund_card
+
+  - id: refund_card
+    type: connector_call
+    role: payment_worker
+    connector: payment_gateway
+    operation: refund
+```
+
+⚠️ `compensation` 目标不应被当作正向路径上的普通后继来双重执行；它属于 saga 补偿阶段，状态机细节见 `02/03-execution-kernel.md`。
+
+## 读 YAML 时先看三件事
+
+1. `roles`：谁可以调用模型、工具或 connector。
+2. `steps[].type`：每个节点由哪类模块处理。
+3. `next` / `branches` / `compensation`：正向图和失败后的反向动作是否清楚。
 
 ## 验收
 
-1. workflow YAML 的必填顶层字段?(`name`、`roles`、`steps`,`WorkflowDefinition.cs` 第 16/31/36 行)
-2. `switch` 步骤的分支怎么解析?(`Branches[key]` → `_default` → `Next` → next-by-index,第 73-88 行)
-3. `http_get` 是 canonical 类型吗?(不是,归一化成 `connector_call`,`WorkflowPrimitiveCatalog.cs` 第 12-41 行)
-4. role 的 `connectors` 是什么?(授权 allowlist,不是连接定义,第 186 行)
+1. YAML 的最小合法骨架是什么？`name`、`roles`、`steps`。
+2. 分支取后继的顺序是什么？命中分支、默认分支、显式 `next`、YAML 顺序。
+3. `compensation` 是什么？显式声明的补偿 step 引用，不是自动生成的逆操作。
 
 ⟦AI:AUTO-LOOP⟧
