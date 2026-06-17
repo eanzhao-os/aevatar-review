@@ -2,66 +2,50 @@
 
 ## 关键代码(事实源,以 ~/Code/aevatar 为准)
 
-- `src/Aevatar.Foundation.Core/GAgentBase.cs` 第 31 行:`GAgentBase : IAgent, IEventModuleContainer<IEventHandlerContext>`;第 121-190 行:`HandleEventAsync`;第 402-411 行:`GetOrBuildPipeline`(lazy + cache);第 192-234 行:双 Hook;第 376-397 行:`LoadHooksFromDI`/`RunHooksAsync`。
-- `src/Aevatar.Foundation.Abstractions/Attributes/EventHandlerAttribute.cs` 第 13-36 行:`Priority`(第 18 行,lower=first)/`AllowSelfHandling`/`OnlySelfHandling`/`EndpointName`。
-- `src/Aevatar.Foundation.Abstractions/EventModules/IEventModule.cs` 第 13-27 行:`Name`/`Priority`/`CanHandle`/`HandleAsync`。
-- `src/Aevatar.Foundation.Core/Pipeline/EventPipelineBuilder.cs` 第 16-27 行:`Build`(静态 handler adapter + 动态 module,按 Priority 升序排序)。
-- `src/Aevatar.Foundation.Core/Pipeline/StaticHandlerAdapter.cs` 第 12-101 行:编译 typed delegate(非反射)。
-- `src/Aevatar.Foundation.Abstractions/Hooks/IGAgentExecutionHook.cs` 第 16-32 行:`OnEventHandlerStartAsync`/`OnEventHandlerEndAsync`/`OnErrorAsync`/`Priority`。
-- `docs/canon/architecture.md` 第 73-107 行:§Foundation.Core。
+- `src/Aevatar.Foundation.Core/GAgentBase.cs` 第 31 行:`GAgentBase` 同时是 `IAgent` 与 `IEventModuleContainer<IEventHandlerContext>`;第 121-190 行:统一 dispatch 主路径;第 192-234 行:virtual hook;第 376-411 行:DI hook 与 pipeline cache。
+- `src/Aevatar.Foundation.Abstractions/Attributes/EventHandlerAttribute.cs` 第 13-36 行:静态 handler 标注与 priority。
+- `src/Aevatar.Foundation.Abstractions/EventModules/IEventModule.cs` 第 13-27 行:动态模块契约。
+- `src/Aevatar.Foundation.Core/Pipeline/EventPipelineBuilder.cs` 第 16-27 行:静态 handler adapter 与动态 module 合并,按 priority 升序排序。
+- `src/Aevatar.Foundation.Core/Pipeline/StaticHandlerAdapter.cs` 第 12-101 行:静态 handler 适配为 pipeline module。
+- `src/Aevatar.Foundation.Abstractions/Hooks/IGAgentExecutionHook.cs` 第 16-32 行:DI hook 的 start/end/error 观测点。
+- `docs/canon/architecture.md` 第 73-107 行:Foundation.Core 职责。
 
 ---
 
-## 统一 pipeline
+## GAgentBase 解决的问题
 
-`GAgentBase` 把两类处理器合并成一条 pipeline:
+Actor runtime 只负责把 envelope 交给 Agent。到了 Agent 内部,还需要一个稳定规则回答三个问题:哪些 handler 参与处理?动态能力怎么插进来?日志、追踪、指标这类横切逻辑放在哪里?
 
-| 来源 | 机制 | 文件 |
-|---|---|---|
-| 静态 | `[EventHandler]` 特性标注的方法 | `EventHandlerAttribute.cs:13` |
-| 动态 | `IEventModule<IEventHandlerContext>`(运行时注册) | `IEventModule.cs:13` |
-
-`EventPipelineBuilder.Build`(`EventPipelineBuilder.cs` 第 16-27 行):
-1. 每个静态 handler 经 `StaticHandlerAdapter` 适配成 `IEventModule`(第 19-20 行)
-2. 与动态 module 拼接(第 22-24 行)
-3. `Array.Sort(... Priority.CompareTo)` 升序排序(第 25 行)—— **Priority 小的先执行**
-
-`StaticHandlerAdapter`(第 12-101 行)编译 typed delegate(`CompileHandler` 第 73-87 行)而非反射,提升性能。
-
-pipeline lazy 构建并缓存(`GetOrBuildPipeline`,`GAgentBase.cs` 第 402-411 行),在 `RegisterModule`/`SetModules` 时失效(第 246、262 行)。
+`GAgentBase` 的答案是一条统一 pipeline。开发者写在类上的 `[EventHandler]` 是静态处理器;运行期注册的 `IEventModule<IEventHandlerContext>` 是动态处理器。二者都会被适配成同一种 pipeline entry,再按 priority 合并执行。
 
 ---
 
-## HandleEventAsync 执行流程(第 121-190 行)
+## 为什么静态和动态要合并
 
-1. `StateGuard.BeginWriteScope()`(第 123 行)—— 开启状态写权限
-2. external-link short-circuit(第 132-136 行)
-3. `GetOrBuildPipeline()`(第 138 行)
-4. 按 priority 顺序 `foreach` handler(第 140-184 行):
-   - **双 Hook 通道**:virtual `OnEventHandlerStartAsync`(第 160 行)+ `RunHooksAsync(OnEventHandlerStart)`(第 161 行)
-   - 执行 `handler.HandleAsync`(第 163 行)
-   - 异常时 `RunHooksAsync(OnError)`(第 170 行)+ fail-fast(除非 `ShouldSuppressHandlerException`,第 172-173 行)
-   - finally:hook-pipeline `OnEventHandlerEndAsync`(第 181 行)+ virtual `OnEventHandlerEndAsync`(第 182 行)
+如果静态 handler 和动态 module 各跑一套链路,优先级、错误处理和观测点就会分叉。Aevatar 把它们合并后,一个 envelope 进入 Agent 时只有一套顺序、一套 fail-fast 策略、一套 hook 观测面。
+
+这里的设计收益不是“少写几行反射代码”,而是把 Agent 的可扩展性变成可推理的顺序语义:priority 小的先执行;handler 是否能处理由 `CanHandle` 决定;异常默认中断,除非子类明确选择 suppress。
 
 ---
 
-## 双 Hook 通道
+## 双 Hook 的位置
 
-两个并行扩展机制(`GAgentBase.cs` 第 192-234 行):
+GAgentBase 留了两条 hook 通道。第一条是子类 override 的 virtual hook,适合 agent 自己的局部扩展。第二条是 DI 注入的 `IGAgentExecutionHook`,适合 tracing、metrics、审计这类跨 agent 的横切能力。
 
-| 通道 | 机制 | 文件 |
-|---|---|---|
-| Virtual 方法 | 子类 override | 第 195-218 行 |
-| `IGAgentExecutionHook` DI pipeline | DI 注册的 hook | `IGAgentExecutionHook.cs:16-32` |
+这两条通道共享同一个 handler 生命周期,所以观察到的是同一条 pipeline,不会出现“静态 handler 有日志、动态 module 没日志”这类分裂。
 
-DI hook 从 `LoadHooksFromDI`(第 376-384 行)加载,按 priority 排序,在 `RunHooksAsync`(第 387-397 行)best-effort 执行。这让横切关注点(日志/追踪/指标)可在不继承基类的情况下注入。
+---
+
+## 和状态写保护的关系
+
+`HandleEventAsync` 进入时会打开 StateGuard 的 writable scope。也就是说,pipeline 不是任意业务代码的集合,而是 actor 串行 mailbox 内、被框架允许修改状态的执行区。下一篇会专门讲这个 AsyncLocal 闸门为什么存在。
 
 ---
 
 ## 验收
 
-1. 静态 `[EventHandler]` 和动态 `IEventModule` 怎么合并?(`EventPipelineBuilder.Build` 按 Priority 升序排序)
-2. Priority 小的先还是后执行?(先,`EventPipelineBuilder.cs:25`)
-3. 双 Hook 通道是什么?(virtual override + DI `IGAgentExecutionHook` pipeline)
+1. 静态 `[EventHandler]` 和动态 `IEventModule` 怎么合并?(适配成同一种 pipeline entry 后按 priority 升序排序)
+2. Priority 小的先还是后执行?(先执行)
+3. 双 Hook 通道是什么?(子类 virtual hook + DI `IGAgentExecutionHook` pipeline)
 
 ⟦AI:AUTO-LOOP⟧

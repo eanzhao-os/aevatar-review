@@ -2,97 +2,62 @@
 
 ## 关键代码(事实源,以 ~/Code/aevatar 为准)
 
-- `src/Aevatar.Foundation.Abstractions/agent_messages.proto` 第 44-51 行:`EventEnvelope`(id/timestamp/payload/route/propagation/runtime);第 142-149 行:`StateEvent`(event_id/timestamp/version/event_type/event_data/agent_id)。
-- `agent_messages.proto` 第 53-60 行:`EnvelopeRoute`;第 62-64 行:`DirectRoute`;第 66-79 行:`PublicationRoute`(topology/observer);第 29-40 行:`TopologyAudience`/`ObserverAudience` 枚举。
-- `agent_messages.proto` 第 151-160 行:`EventStoreCommitResult`/`CommittedStateEventPublished`。
-- `src/Aevatar.Foundation.Abstractions/Persistence/IStateStore.cs` 第 11-21 行:简单 snapshot(Load/Save/Delete)。
-- `src/Aevatar.Foundation.Abstractions/Persistence/IEventStore.cs` 第 11-41 行:Event Sourcing append log(AppendAsync OCC → EventStoreCommitResult;GetEventsAsync;DeleteEventsUpToAsync 压缩)。
-- `src/Aevatar.Foundation.Core/GAgentBase.TState.cs` 第 205-230 行:`PersistDomainEventsAsync`(核心 commit 路径);第 276-309 行:`PublishCommittedDomainEventsAsync`。
-- `docs/canon/architecture.md` 第 51-55 行、第 71 行:EventEnvelope vs StateEvent 边界。
-- `docs/canon/event-sourcing.md` 第 13 行、第 23-27 行:§2.1 与 Runtime 消息流的边界。
+- `src/Aevatar.Foundation.Abstractions/agent_messages.proto` 第 44-51 行:`EventEnvelope`;第 142-149 行:`StateEvent`;第 151-160 行:commit result 与 committed-state publication payload。
+- `src/Aevatar.Foundation.Abstractions/Persistence/IEventStore.cs` 第 11-41 行:Event Sourcing append log,包含 OCC append、range query 与压缩。
+- `src/Aevatar.Foundation.Abstractions/Persistence/IStateStore.cs` 第 11-21 行:snapshot store,不是写侧事实源。
+- `src/Aevatar.Foundation.Core/GAgentBase.TState.cs` 第 205-230 行:领域事件 commit + state fold;第 276-309 行:committed state event 发布给 observer。
+- `docs/canon/architecture.md` 第 51-55 行、第 71 行:EventEnvelope 与 StateEvent 的边界。
+- `docs/canon/event-sourcing.md` 第 13 行、第 23-27 行:Runtime envelope 流不是 Event Sourcing 事实源。
 
 ---
 
-## 全书最容易踩坑的概念
+## 两层先分开
 
-`EventEnvelope` 名字里有 "Event",但在 Foundation 语义上它是 **runtime message envelope** —— payload 既可能是 command-like request/signal/reply/timeout,也可能是业务事件。**Event Sourcing 的持久化事实是 `StateEvent` + `EventStore`,不是运行时消息流。** 两者有关联但不是一回事。
+`EventEnvelope` 的名字很容易误导人。它虽然叫 Event,但它在 Foundation 里首先是 runtime message envelope:外部 command、内部 signal、reply、timeout,甚至业务事件 payload,都可以先装进这个信封,经 Stream 进入 actor。
 
-`docs/canon/event-sourcing.md` 第 23-27 行的四条边界:
-1. EventEnvelope = runtime message envelope(第 24 行)
-2. payload 可能是 command/signal/reply/timeout/业务事件(第 25 行)
-3. 只有显式持久化的领域事件才成为 EventStore 里的 StateEvent(第 26 行)
-4. 两条流是不同的层(第 27 行)
+Event Sourcing 的权威事实在另一层。只有 actor 在处理消息后显式持久化领域事件,它才会变成 `StateEvent` 并进入 `EventStore`。所以这两层有关联,但权威性完全不同。
+
+![EventEnvelope 与 StateEvent 是两层](../docs/assets/03-two-layers.png)
 
 ---
 
-## 两层分开画
+## 为什么不能把消息流当事实源
 
-```mermaid
-graph LR
-    subgraph "运行时消息层 (on Stream)"
-        EE["EventEnvelope<br/>id/timestamp/payload/route/propagation/runtime<br/>(proto:44-51)"]
-        EE -. "command/signal/reply/event<br/>都装这里" .- EE2["在 actor stream 间流动"]
-    end
-    subgraph "事实层 (in EventStore)"
-        SE["StateEvent<br/>event_id/timestamp/version/event_type/event_data/agent_id<br/>(proto:142-149)"]
-        SE -. "OCC append<br/>唯一业务事实源" .- ES["IEventStore<br/>(AppendAsync OCC)"]
-    end
-    EE == "PersistDomainEventAsync<br/>(显式持久化)" ==> SE
-```
+运行时消息的目标是“送达并触发处理”。它可能是请求、控制信号、回包或转发出来的观察消息。这样的流适合驱动 actor,但不适合作为业务事实源:它没有天然表达“这个领域决定已经被提交”,也不能直接承担 OCC、版本递增和可重放 reducer 的责任。
 
-| | `EventEnvelope` | `StateEvent` |
-|---|---|---|
-| 是什么 | Actor runtime 的消息信封 | Event Sourcing 写侧事实 |
-| proto 行号 | 第 44-51 行 | 第 142-149 行 |
-| 字段 | id/timestamp/payload/route/propagation/runtime | event_id/timestamp/**version**/event_type/event_data/agent_id |
-| 装什么 | command/signal/reply/timeout/业务事件 | 已提交的领域事件 |
-| 存哪 | Stream(运行时传输) | EventStore(持久化,带 OCC version) |
-| 关系 | 只有 `PersistDomainEventAsync` 后才进入事实层 | 是 EventEnvelope payload 的持久化投影 |
+`EventStore` 的价值就在这里。它把 actor 已经确认的领域事件追加成带版本的事实流,让恢复、投影和一致性观察有同一个锚点。`IStateStore` 只适合 snapshot/恢复优化,不能替代这个事实层。
 
 ---
 
-## 一个具体例子:它如何同时出现在两层
+## 从消息层进入事实层
 
-以 `WorkflowRunGAgent` 处理 `ChatRequestEvent` 为例:
+典型路径是:actor 收到一个 runtime envelope,业务 handler 做判断,然后调用持久化领域事件的 API。提交成功后,框架把 committed events fold 回当前 state,再发布 committed-state observation,让 projection/live sink 看到“事实已经发生”。
 
-1. **运行时层**:`ChatRequestEvent` 作为 `EventEnvelope.payload` 从 API 经 dispatch port 进入 run actor 的 inbox(消息流)。
-2. **事实层**:run actor 决定持久化 `WorkflowRunExecutionStartedEvent` → 调 `PersistDomainEventAsync` → 该事件成为 `StateEvent`(带 version)存入 EventStore。
+这也是 Aevatar 和普通“消息总线 + mutable object”写法的关键区别。消息本身不等于事实;actor 的领域决定经过 `EventStore` 提交后,才成为可恢复、可投影、可审计的事实。
 
-两个事件都"叫 event",但 `ChatRequestEvent` 是运行时消息(command-like),`WorkflowRunExecutionStartedEvent` 是已提交事实。前者可以丢弃/重放;后者是权威业务记录。
+<details>
+<summary>proto 字段证据</summary>
 
----
+- `EventEnvelope` 位于 `agent_messages.proto` 第 44-51 行,包含 `id`、`timestamp`、`payload`、`route`、`propagation`、`runtime`。
+- `StateEvent` 位于第 142-149 行,包含 `event_id`、`timestamp`、`version`、`event_type`、`event_data`、`agent_id`。
+- route 细节位于第 53-79 行,包含 direct、topology publication、observer publication。
+- `EventStoreCommitResult` 与 `CommittedStateEventPublished` 位于第 151-160 行。
 
-## IStateStore vs IEventStore
-
-| | `IStateStore<TState>` | `IEventStore` |
-|---|---|---|
-| 文件 | `Persistence/IStateStore.cs:11-21` | `Persistence/IEventStore.cs:11-41` |
-| 用途 | 简单 key/value snapshot(Load/Save/Delete) | Event Sourcing append log |
-| 特性 | 无版本 | OCC append(`AppendAsync(agentId, events, expectedVersion)` → `EventStoreCommitResult`,第 17-21 行)+ range query + 压缩(`DeleteEventsUpToAsync`) |
-| 角色 | 快照/恢复 | **唯一业务事实源** |
-
-`docs/canon/event-sourcing.md` 第 16-17 行明确:`EventStore`/`StateEvent` 是唯一业务事实源;`GAgentBase<TState>` 不用 `StateStore` 存事实(只用于恢复)。
+</details>
 
 ---
 
-## PersistDomainEventAsync:从消息层到事实层的桥
+## 一个判断口诀
 
-`GAgentBase<TState>.PersistDomainEventsAsync`(`GAgentBase.TState.cs` 第 205-230 行):
-
-1. `eventSourcing.RaiseEvent(evt)` 缓冲到 `_pending`(第 220 行)
-2. `eventSourcing.ConfirmEventsAsync(ct)` 原子 append `StateEvent` 到 `IEventStore`(OCC,第 222 行)
-3. 在 `StateGuard.BeginWriteScope()`(第 224 行)内,逐个 `eventSourcing.TransitionState(_state, evt)` fold(第 226 行)
-4. `OnStateChangedAsync` hook(第 228 行)+ `PublishCommittedDomainEventsAsync`(第 229 行)
-
-`PublishCommittedDomainEventsAsync`(第 276-309 行):把每个 committed `StateEvent` 包成 `CommittedStateEventPublished`(第 282-286 行),经 `CommittedStateEventPublisher.PublishAsync` 以 `ObserverAudience.CommittedFacts`(第 287、303-307 行)发布。这是从事实层回到运行时观察的桥。
+看到 `EventEnvelope`,先问:它是不是只是 actor runtime 正在传的一封消息?多数情况下答案是“是”。看到 `StateEvent`,再问:它是不是已经通过 EventStore append 成功、带版本、可重放的领域事实?这个答案才决定它能不能作为写侧权威。
 
 ---
 
 ## 验收
 
-1. EventEnvelope 是 Event Sourcing 的事实吗?(不是,是 runtime message envelope;事实是 StateEvent + EventStore)
-2. 一个事件怎么从消息层进入事实层?(显式 `PersistDomainEventAsync`,`GAgentBase.TState.cs:205`)
-3. IStateStore 和 IEventStore 区别?(前者 snapshot;后者 OCC append log,唯一事实源)
-4. StateEvent 的 version 字段做什么?(OCC 乐观并发控制)
+1. EventEnvelope 是 Event Sourcing 的事实吗?(不是,它是 runtime message envelope)
+2. 什么才是写侧事实源?(`StateEvent` + `EventStore`)
+3. 一个业务事件怎么从消息层进入事实层?(actor 显式持久化领域事件,提交成功后成为 StateEvent)
+4. proto 字段在哪里看?(正文不贴字段表;字段细节在本篇 `<details>` 和关键代码清单里)
 
 ⟦AI:AUTO-LOOP⟧
