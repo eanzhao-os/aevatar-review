@@ -2,71 +2,54 @@
 
 ## 关键代码(事实源,以 ~/Code/aevatar 为准)
 
-- `src/Aevatar.Foundation.Abstractions/IAgent.cs` 第 13-32 行:`IAgent`(Id/HandleEventAsync/GetSubscribedEventTypesAsync/Activate/Deactivate);第 38-42 行:`IAgent<TState>`(typed State)。
-- `src/Aevatar.Foundation.Abstractions/IActor.cs` 第 11-33 行:`IActor`(运行容器,持 `IAgent Agent`,第 17 行;父子拓扑 GetParentIdAsync/GetChildrenIdsAsync)。
-- `src/Aevatar.Foundation.Abstractions/IActorRuntime.cs` 第 11-43 行:`IActorRuntime`(Create/Destroy/Get/Exists/Link/Unlink)。
-- `src/Aevatar.Foundation.Abstractions/IStream.cs` 第 14-36 行:`IStream`(StreamId/ProduceAsync/SubscribeAsync/UpsertRelayAsync);`IStreamProvider.cs` 第 11-15 行。
-- `src/Aevatar.Foundation.Abstractions/IActorDispatchPort.cs` 第 68-76 行:外部 envelope admission(只承诺 accepted-for-dispatch)。
-- `src/Aevatar.Foundation.Abstractions/IEventContext.cs` 第 6-33 行:inbound-envelope 视图;`IEventPublisher.cs` 第 15-29 行:outbound publish/send。
-- `docs/canon/architecture.md` 第 21-29 行:五概念表;第 27 行:Runtime 构建"在 Stream 之上的 Actor 语义层"。
-- `src/Aevatar.Foundation.Runtime.Implementations.Local/Actors/LocalActorRuntime.cs` 第 102-107 行:Runtime 用 IStreamProvider 构造 publisher。
+- `src/Aevatar.Foundation.Abstractions/IAgent.cs` 第 13-32 行:`IAgent` 的身份、事件处理、订阅与生命周期;第 38-42 行:`IAgent<TState>` 的 typed state。
+- `src/Aevatar.Foundation.Abstractions/IActor.cs` 第 11-33 行:`IActor` 是包住 `IAgent` 的运行容器,同时暴露父子拓扑读取。
+- `src/Aevatar.Foundation.Abstractions/IActorRuntime.cs` 第 11-43 行:`IActorRuntime` 负责创建、销毁、查找、链接与取消链接 actor。
+- `src/Aevatar.Foundation.Abstractions/IStream.cs` 第 14-36 行:`IStream` 负责 produce、subscribe 与 relay binding。
+- `src/Aevatar.Foundation.Abstractions/IActorDispatchPort.cs` 第 68-76 行:外部 dispatch 只返回 admission,不是处理完成承诺。
+- `docs/canon/architecture.md` 第 21-29 行:五个核心概念;第 27 行明确 Runtime 是 Stream 之上的 Actor 语义层。
+- `src/Aevatar.Foundation.Runtime.Implementations.Local/Actors/LocalActorRuntime.cs` 第 102-107 行:Local runtime 为 actor 注入基于 stream 的 publisher。
 
 ---
 
-## 五个核心概念
+## 先抓住一条主线
 
-`docs/canon/architecture.md` 第 21-29 行把 Foundation 的核心拆成五个概念:
+Aevatar 的 Foundation 不是把业务对象直接塞进消息总线。它分两层:下面是 Stream,负责把 `EventEnvelope` 送到对应通道;上面是 Runtime,把这些通道组织成 actor 的身份、生命周期、拓扑和串行处理语义。
 
-| 概念 | 抽象 | 它是什么 |
-|---|---|---|
-| **Agent** | `IAgent` / `IAgent<TState>` | 业务逻辑单元(`IAgent.cs:13-32`)。持 `Id`,处理 `EventEnvelope` |
-| **Actor** | `IActor` | Agent 的**运行容器**(`IActor.cs:11-33`)。持 `IAgent Agent`(第 17 行)+ 父子拓扑 + 生命周期 |
-| **Runtime** | `IActorRuntime` / `IActorDispatchPort` | Actor 语义层(`IActorRuntime.cs:11-43`)。创建/销毁/寻址/激活/链接 |
-| **Event Context** | `IEventPublisher` / `IEventContext` | 当前 actor 执行中的 publish/send(`IEventPublisher.cs:15-29`)+ inbound envelope 视图(`IEventContext.cs:6-33`) |
-| **Stream** | `IStream` / `IStreamProvider` | `EventEnvelope` 的传输骨架(`IStream.cs:14-36`) |
+![Runtime 是 Stream 之上的 Actor 语义层](../docs/assets/03-runtime-over-stream.png)
+
+这句话的重点是“之上”。Stream 只知道有消息被 produce、subscribe、relay;它不天然知道哪个业务实体应该被创建、谁是谁的 parent、同一个 actor 的消息是否应该串行。Runtime 补上这些语义,于是上层可以用 `IActorRuntime` / `IActorDispatchPort` / `IEventPublisher` 说话,而不是直接操作一堆 stream。
 
 ---
 
-## 关系:Runtime 在 Stream 之上
+## 四个词不要混在一起
 
-`docs/canon/architecture.md` 第 27 行明确:Runtime 是"构建在 Stream 之上的 Actor 语义层"。
+Agent 是业务逻辑:它知道收到某种 payload 后要做什么。Actor 是运行容器:它持有一个 Agent,还承担生命周期、邮箱和父子拓扑。Runtime 管 actor 的创建、查找、链接和外部投递。Stream 是消息传输骨架,不负责解释业务含义。
 
-```mermaid
-graph TB
-    subgraph "Runtime 层 (Actor 语义)"
-        RT["IActorRuntime<br/>(Create/Get/Link)"]
-        DP["IActorDispatchPort<br/>(外部 admission)"]
-        AC["IActor<br/>(容器 + 父子拓扑)"]
-        AG["IAgent<br/>(业务逻辑)"]
-        RT --> AC --> AG
-        DP --> AC
-    end
-    subgraph "Stream 层 (传输骨架)"
-        SP["IStreamProvider"]
-        ST["IStream<br/>(Produce/Subscribe/Relay)"]
-        SP --> ST
-    end
-    AC -.-"envelope 经 Stream 投递"-.- ST
-```
-
-具体落点(`LocalActorRuntime.cs` 第 102-107 行):Runtime 用 `IStreamProvider` 构造 `LocalActorPublisher`;publisher 解析目标 actor 的 `IStream` 并 `ProduceAsync` envelope(`LocalActorPublisher.cs:114`)。`LocalActor`(第 52-53 行)订阅自己的 self-stream 接收 envelope。
-
-- **Runtime** 负责 Actor 身份/生命周期/拓扑/寻址
-- **Stream** 是承载 `EventEnvelope` 在 actor stream 之间流动的"线"
-- **Relay 绑定**(`IStream.UpsertRelayAsync`,第 29 行)做实际的 fan-out
+用一个请求来想会更直观:API 侧把消息交给 dispatch port;Runtime 找到目标 actor;actor 把消息放进自己的处理路径;Agent 里真正执行业务 handler。下面的 Stream 仍然参与投递,但读者不需要先理解所有 relay 细节,才能理解“这个消息最终进了哪个 actor”。
 
 ---
 
-## IActorDispatchPort:只承诺"已受理"
+## Dispatch 不是完成保证
 
-`IActorDispatchPort.DispatchAsync(actorId, envelope)` 返回 `DispatchAdmission`(`IActorDispatchPort.cs:75`)。注释(第 67、72-74 行)明确:完成只意味着 **accepted-for-dispatch**,不意味着已 handled/committed/observed。这与 `01/03-run-semantics.md` 的"终止事件收敛"呼应 —— 强保证要靠独立契约/异步观察。
+`IActorDispatchPort` 的返回语义很克制:它只表示消息已经被受理进入 dispatch 路径,不表示 handler 已经执行完,也不表示领域事件已经提交,更不表示 projection 已经观察到结果。
+
+这个边界很重要。Aevatar 后续的 run 完成、SSE 输出、CQRS 查询,都不能把 dispatch 返回当作业务完成。真正的完成语义要看 actor 后续发出的事实事件和投影收敛结果。
+
+---
+
+## 为什么要这样分层
+
+如果没有 Runtime 层,上层就会直接依赖 stream 的具体实现,生命周期、拓扑和串行保证会散落在业务代码里。Aevatar 把这些收回到 Runtime,所以 Local、Orleans、Kafka/Garnet 等实现可以替换,而业务仍然面对同一组 Actor 原语。
+
+这也是后面几篇的入口:`03/02` 先拆消息层和事实层,`03/05` 再拆 route 语义,`03/06` 最后看 LocalRuntime 怎样用本地 mailbox 实现这套模型。
 
 ---
 
 ## 验收
 
-1. Agent 和 Actor 的关系?(Agent 是业务逻辑;Actor 是运行容器,持 Agent + 拓扑)
-2. Runtime 在 Stream 之上是什么意思?(Stream 是传输骨架,Runtime 是其上的 Actor 语义层)
-3. `DispatchAsync` 完成意味着什么?(只承诺 accepted-for-dispatch,不承诺已处理)
+1. Agent 和 Actor 的关系是什么?(Agent 是业务逻辑;Actor 是运行容器,持有 Agent 并承载拓扑/生命周期)
+2. Runtime 在 Stream 之上是什么意思?(Stream 只传 envelope;Runtime 在其上提供 Actor 身份、寻址、拓扑和串行语义)
+3. `DispatchAsync` 完成意味着什么?(只表示 accepted-for-dispatch,不承诺已处理、已提交或已投影)
 
 ⟦AI:AUTO-LOOP⟧

@@ -1,74 +1,71 @@
-# 路由与拓扑:DirectRoute / PublicationRoute.topology / PublicationRoute.observer
+# 路由与拓扑:DirectRoute / topology publication / observer publication
 
 ## 关键代码(事实源,以 ~/Code/aevatar 为准)
 
-- `src/Aevatar.Foundation.Abstractions/agent_messages.proto` 第 53-60 行:`EnvelopeRoute`(publisher_actor_id + oneof direct/publication);第 62-64 行:`DirectRoute`;第 66-79 行:`PublicationRoute`(oneof topology/observer);第 29-40 行:`TopologyAudience`(SELF/PARENT/CHILDREN/PARENT_AND_CHILDREN)/`ObserverAudience`(COMMITTED_FACTS)。
-- `src/Aevatar.Foundation.Abstractions/EnvelopeRouteSemantics.cs` 第 5-41 行:`CreateTopologyPublication`/`CreateDirect`/`CreateObserverPublication`;第 60-72 行:accessors。
-- `src/Aevatar.Foundation.Runtime.Implementations.Local/Actors/LocalActorPublisher.cs` 第 15 行:`IEventPublisher, ICommittedStateEventPublisher`;第 40-90 行:`PublishAsync`(topology);第 92-115 行:`SendToAsync`(direct);第 117-139 行:observer publish;第 141-149 行:`GetRouteTargetCount`。
-- `src/Aevatar.Foundation.Core/EventSourcing/ICommittedStateEventPublisher.cs` 第 8-15 行:`internal interface`(`PublishAsync(CommittedStateEventPublished, ObserverAudience)`)。
-- `docs/canon/architecture.md` 第 144-159 行:拓扑事实落点 + 三种路由行为。
-- `src/Aevatar.Foundation.Runtime.Implementations.Local/Actors/LocalActor.cs` 第 18/25/45-46/156-170 行:Local 拓扑字段。
-- `src/Aevatar.Foundation.Runtime.Implementations.Orleans/Grains/RuntimeActorGrainState.cs` 第 16/19 行:Orleans 拓扑(`[Id(2)] ParentId`/`[Id(3)] Children`)。
+- `src/Aevatar.Foundation.Abstractions/agent_messages.proto` 第 29-40 行:topology/observer audience;第 53-79 行:route 的 direct 与 publication 结构。
+- `src/Aevatar.Foundation.Abstractions/EnvelopeRouteSemantics.cs` 第 5-41 行:创建 direct、topology publication、observer publication 的 helper。
+- `src/Aevatar.Foundation.Runtime.Implementations.Local/Actors/LocalActorPublisher.cs` 第 40-90 行:topology publish;第 92-115 行:direct send;第 117-139 行:committed-state observer publish。
+- `src/Aevatar.Foundation.Core/EventSourcing/ICommittedStateEventPublisher.cs` 第 8-15 行:framework-internal committed-state observer publisher。
+- `docs/canon/architecture.md` 第 144-159 行:拓扑事实落点与三种路由行为。
+- `src/Aevatar.Foundation.Runtime.Implementations.Local/Actors/LocalActor.cs` 第 18、25、45-46、156-170 行:Local actor 的 parent/children 状态。
+- `src/Aevatar.Foundation.Runtime.Implementations.Orleans/Grains/RuntimeActorGrainState.cs` 第 15-19 行:Orleans runtime actor 的 parent/children 持久态。
 
 ---
 
-## 三种路由
+## 先把三种投递语义分开
 
-`docs/canon/architecture.md` 第 154-159 行明确三种路由行为:
+```mermaid
+flowchart LR
+    Sender["publisher actor"]
 
-| 路由 | proto | 行为 | 代码落点 |
-|---|---|---|---|
-| `DirectRoute` | 第 62-64 行 | runtime 直投目标 actor inbox | `architecture.md:155` |
-| `PublicationRoute.topology` | 第 66-71 行 + `TopologyAudience` | stream forwarding / relay binding(Self/Parent/Children/ParentAndChildren) | `architecture.md:156` |
-| `PublicationRoute.observer` | 第 66-71 行 + `ObserverAudience`(CommittedFacts) | 只给 projection/live sink/observer,**不进业务 actor inbox** | `architecture.md:157` |
+    Sender -->|"DirectRoute"| Target["target actor inbox"]
+    Sender -->|"PublicationRoute.topology"| Topology["runtime topology<br/>self / parent / children"]
+    Topology -->|"stream relay / forwarding"| BusinessInbox["business actor inbox"]
 
----
+    Sender -->|"PublicationRoute.observer"| Observer["projection / live sink / observer"]
+    Observer -. "不进入" .-> Blocked["business actor inbox"]
 
-## LocalActorPublisher:三种 publish
+    classDef actor fill:#dbeafe,stroke:#2563eb,color:#172554;
+    classDef observer fill:#fef3c7,stroke:#d97706,color:#451a03;
+    classDef blocked fill:#fee2e2,stroke:#dc2626,color:#7f1d1d;
+    class Sender,Target,Topology,BusinessInbox actor;
+    class Observer observer;
+    class Blocked blocked;
+```
 
-`LocalActorPublisher`(`LocalActorPublisher.cs` 第 15 行)实现 `IEventPublisher` + `ICommittedStateEventPublisher`:
-
-**`PublishAsync`(topology,第 40-90 行)**:
-- 构造 `CreateTopologyPublication(_actorId, audience)`(第 54 行)
-- 按 audience 分发:`Self`→self stream(第 66-68 行);`Children`→self stream(第 69-71 行,经 relay);`Parent`→parent stream 或 self 回退(第 72-80 行);`ParentAndChildren`→self+parent streams(第 81-88 行)
-- 实际 fan-out 到 children 通过 stream relay binding,不是直接 produce
-
-**`SendToAsync`(direct,第 92-115 行)**:
-- 构造 `CreateDirect(_actorId, targetActorId)`(第 105 行)
-- `ProduceAsync` 到目标 stream(第 114 行)
-
-**observer publish(第 117-139 行)**:
-- 构造 `CreateObserverPublication(_actorId, audience)`(第 129 行)
-- `routeTargetCount: 0`(第 136 行,observer audience 无业务目标)
-- produce 到 self stream(第 138 行)
+`DirectRoute` 是点对点:明确目标 actor id,Runtime 把 envelope 送进目标 inbox。`PublicationRoute.topology` 是按父子拓扑传播:self、parent、children、parent-and-children 这些 audience 最终通过 runtime topology 和 stream relay 执行。`PublicationRoute.observer` 是观察分支:给 projection、live sink、observer 看 committed facts,不进入业务 actor inbox。
 
 ---
 
-## ICommittedStateEventPublisher
+## 为什么 observer 必须隔离
 
-`internal interface`(`ICommittedStateEventPublisher.cs` 第 8 行)—— `internal` 修饰符是为什么 `architecture.md:63` 说它"不进入业务 actor 公共能力面"。单方法 `PublishAsync(CommittedStateEventPublished, ObserverAudience=CommittedFacts)`。
+Event Sourcing commit 后,框架需要把已提交事实发给读侧。如果这类 observer publication 又被业务 actor 当普通消息处理,就会出现两个问题:读侧观察消息可能反过来驱动写侧业务;已提交事实的投影链路和业务命令链路会互相污染。
 
-被 `GAgentBase<TState>.PublishCommittedDomainEventsAsync`(`GAgentBase.TState.cs` 第 303-307 行)调用;`LocalActorPublisher` 显式实现(第 117 行);`NullCommittedStateEventPublisher` 存在于 `GAgentBase.cs` 第 542-551 行。
+所以 observer route 的语义是“可见但不业务处理”。它让 projection 能消费 committed facts,同时避免业务 actor 因观察消息再次产生领域行为。这条隔离线是 CQRS 能成立的前提之一。
 
 ---
 
-## 拓扑事实落点
+## 拓扑事实在哪里
 
-`docs/canon/architecture.md` 第 144-159 行:
+拓扑不是一个额外 EventRouter 对象在外面维护。Local runtime 把 parent/children 放在 `LocalActor`;Orleans runtime 把 parent/children 放在 `RuntimeActorGrainState`。Link/Unlink 同时更新 runtime actor 自己的拓扑状态和 stream relay binding。
 
-| Runtime | 拓扑持有者 | 字段 |
-|---|---|---|
-| Local | `LocalActor` | `_parentId`(`LocalActor.cs:25`/`:45`)、`_childrenIds`(`:18`/`:46`),`AddChild`/`RemoveChild`(`:156-157`)、`SubscribeToParentAsync`(`:159-170`) |
-| Orleans | `RuntimeActorGrainState` | `[Id(2)] ParentId`(`:16`)、`[Id(3)] Children`(`:19`) |
+这种收口方式让“谁是谁的 parent/children”跟 actor runtime 生命周期绑定,避免上层业务或中间服务各存一份拓扑事实。真正 fan-out 仍由 stream forwarding / relay binding 执行,但权威拓扑在 runtime actor 自身。
 
-`LocalActorRuntime.LinkAsync`(`LocalActorRuntime.cs` 第 231-251 行)同时更新拓扑 + stream relay:`parent.AddChild` + `child.SubscribeToParentAsync`(第 235-236 行),再 `UpsertRelayAsync` 建层级 binding(第 237-239 行)和 committed-observation binding child→parent(第 244-246 行)。
+---
+
+## ⚠️ owner 待确认:ICommittedStateEventPublisher internal
+
+`ICommittedStateEventPublisher` 当前是 `internal interface`,由框架在 committed state event 发布时使用,不暴露成业务 actor 公共能力面。这个边界和 observer 隔离是一致的:业务代码可以发布 topology/direct 消息,但 committed facts 的 observer publication 应由框架控制。
+
+⚠️ 这里保留 owner 待确认点:如果未来要扩展 committed-state observation 的能力面,需要维护者确认它仍应保持 internal,还是引入新的受控 port。本文不把它扩展为公开业务 API。
 
 ---
 
 ## 验收
 
-1. 三种路由分别是什么?(DirectRoute 直投;topology 经 stream relay;observer 只给 projection 不进业务 inbox)
-2. `PublicationRoute.observer` 的 audience 只有一个值?(CommittedFacts)
+1. 三种路由分别是什么?(DirectRoute 直投;topology 按父子拓扑传播;observer 只给读侧观察)
+2. observer route 为什么不进业务 actor inbox?(避免读侧观察反向驱动写侧业务,保持 CQRS 隔离)
 3. 拓扑事实在 Local 和 Orleans 各存哪?(LocalActor 字段 / RuntimeActorGrainState)
+4. `ICommittedStateEventPublisher` 当前是什么边界?(internal,⚠️ owner 待确认)
 
 ⟦AI:AUTO-LOOP⟧
