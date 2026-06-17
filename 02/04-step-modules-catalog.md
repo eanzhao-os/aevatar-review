@@ -2,9 +2,9 @@
 
 ## 事实源/设计抽象(以 ~/Code/aevatar 为准)
 
-- `src/workflow/Aevatar.Workflow.Core/WorkflowCoreModulePack.cs:9-48`: Core 模块注册表与 dependency expander 注册。
-- `src/workflow/Aevatar.Workflow.Core/Primitives/WorkflowPrimitiveCatalog.cs:12-113`: step type 别名归一化、内建 primitive 集合与副作用 primitive 判断。
-- `src/workflow/Aevatar.Workflow.Core/Composition/WorkflowStepTypeModuleDependencyExpander.cs:1-49`: 编译期从 steps 和参数中展开隐式模块依赖。
+- `WorkflowCoreModulePack`: Core 模块注册表与 dependency expander 注册。
+- `WorkflowPrimitiveCatalog`: step type 别名归一化、内建 primitive 集合与副作用 primitive 判断。
+- `WorkflowStepTypeModuleDependencyExpander`: 编译期从 steps 和参数中展开隐式模块依赖。
 
 ---
 

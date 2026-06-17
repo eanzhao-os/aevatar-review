@@ -2,9 +2,9 @@
 
 ## 事实源/设计抽象(以 ~/Code/aevatar 为准)
 
-- `src/workflow/extensions/Aevatar.Workflow.Extensions.Maker/MakerModulePack.cs:10-25`: Maker 通过 `IWorkflowModulePack` 贡献 workflow 模块。
+- `MakerModulePack`: Maker 通过 `IWorkflowModulePack` 贡献 workflow 模块。
 - `src/workflow/extensions/Aevatar.Workflow.Extensions.Maker/Modules/`: `maker_vote` 与 `maker_recursive` 的模块实现目录。
-- `docs/canon/overview.md:51-65`: Maker 是 workflow 插件扩展，依赖方向是 plugin 到 Workflow Core。
+- `overview`: Maker 是 workflow 插件扩展，依赖方向是 plugin 到 Workflow Core。
 
 ---
 

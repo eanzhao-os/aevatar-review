@@ -2,9 +2,9 @@
 
 ## 事实源/设计抽象(以 ~/Code/aevatar 为准)
 
-- `docs/canon/voice-presence-integration.md`:aevatar 作为 `/ws/voice` Brain,edge server 只在外部承担实时边缘职责。
-- `docs/adr/0025-voice-router-integration.md`:Voice 是 `VoicePresence` EventModule capability,挂到已有 actor。
-- `docs/adr/0031-voice-edge-local-tools.md`:LAN-only voice tools 走现有 NyxID service/node proxy 与 `IAgentToolSource`。
+- `voice-presence-integration`:aevatar 作为 `/ws/voice` Brain,edge server 只在外部承担实时边缘职责。
+- `0025-voice-router-integration`:Voice 是 `VoicePresence` EventModule capability,挂到已有 actor。
+- `0031-voice-edge-local-tools`:LAN-only voice tools 走现有 NyxID service/node proxy 与 `IAgentToolSource`。
 
 ---
 

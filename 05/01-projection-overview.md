@@ -1,32 +1,26 @@
 # Projection 总览:Command→EventEnvelope→Actor→持久化→Projection→ReadModel
 
-## 关键代码(事实源,以 ~/Code/aevatar 为准)
+## 本篇涉及的设计抽象
 
-- `docs/canon/cqrs-projection.md` 第 36-46 行:mermaid 主链路;第 48-53 行:投影口径澄清;第 55-78 行:CQRS Core 统一命令骨架 7 步;第 104-114 行:投影约束 1-9。
-- `docs/canon/architecture.md` 第 161-184 行:§CQRS 与 Projection 落点;第 198-201 行:输出分支。
-- `src/Aevatar.CQRS.Core.Abstractions/Interactions/ICommandInteractionService.cs` 第 6-14 行:交互接口。
-- `src/Aevatar.CQRS.Core/Interactions/DefaultCommandInteractionService.cs` 第 10-13 行:默认实现(Prepare→Observe→Dispatch→Pump→finalize);第 56-58 行:observation-before-dispatch 重构注释;第 125 行:dispatch。
-- `src/Aevatar.CQRS.Core/Commands/DefaultCommandDispatchPipeline.cs`:标准命令骨架。
-- `src/Aevatar.CQRS.Core/Commands/ActorCommandTargetDispatcher.cs`:经 `IActorDispatchPort` 落地。
-- `src/Aevatar.CQRS.Projection.Core/DependencyInjection/EventSinkProjectionRuntimeRegistration.cs` 第 54-85 行:session pipeline 注册;`ProjectionMaterializationRuntimeRegistration.cs` 第 44-79 行:durable pipeline 注册。
+> 以下论断均可回指 `~/Code/aevatar` 源码验证,但本篇用设计语言描述,不贴文件路径/行号。
 
 ---
 
 ## 统一投影链路
 
-`docs/canon/cqrs-projection.md` 第 36-46 行的 mermaid 主链路:
+`cqrs-projection` 的 mermaid 主链路:
 
 ```text
 Host API → Application Service → Actor/GAgent → Actor Envelope Stream + EventStore → Projection Pipeline → ReadModel → Query API/SSE/WS
 ```
 
-**关键口径**(第 48-53 行):EventEnvelope Stream 是**运行时消息流**,不是 ES 事实流;command → envelope → actor mailbox;只有显式持久化的领域事件进 EventStore;projection 消费 actor envelope stream。
+**关键口径**():EventEnvelope Stream 是**运行时消息流**,不是 ES 事实流;command → envelope → actor mailbox;只有显式持久化的领域事件进 EventStore;projection 消费 actor envelope stream。
 
-> 这条链路解释了为什么 API 推送(SSE/WS/AGUI)和 CQRS 读模型共享同一投影输入 —— 它们都是这条链路的输出分支(`architecture.md` 第 198-201 行)。
+> 这条链路解释了为什么 API 推送(SSE/WS/AGUI)和 CQRS 读模型共享同一投影输入 —— 它们都是这条链路的输出分支(`architecture.md` )。
 
 ---
 
-## CQRS 统一命令骨架 7 步(`cqrs-projection.md` 第 55-78 行)
+## CQRS 统一命令骨架 7 步(`cqrs-projection.md` )
 
 1. Normalize Command
 2. Resolve Target
@@ -36,11 +30,11 @@ Host API → Application Service → Actor/GAgent → Actor Envelope Stream + Ev
 6. Accepted Receipt
 7. Observe Result
 
-`DefaultCommandInteractionService`(`DefaultCommandInteractionService.cs` 第 10-13 行)实现:Prepare → Observe → DispatchPrepared → Accepted callback → Pump → finalize → cleanup。**observation-before-dispatch**(第 56-58 行重构注释):观察绑定必须在 dispatch 前完成,否则会丢事件。
+`DefaultCommandInteractionService`(`DefaultCommandInteractionService` )实现:Prepare → Observe → DispatchPrepared → Accepted callback → Pump → finalize → cleanup。**observation-before-dispatch**(重构注释):观察绑定必须在 dispatch 前完成,否则会丢事件。
 
 ---
 
-## 投影约束(`cqrs-projection.md` 第 104-114 行)
+## 投影约束(`cqrs-projection.md` )
 
 1. CQRS/AGUI/SSE/WS 共享同一投影输入
 2. EventTypeUrl 精确匹配

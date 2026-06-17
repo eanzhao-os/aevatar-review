@@ -2,9 +2,9 @@
 
 ## 事实源/设计抽象(以 ~/Code/aevatar 为准)
 
-- `docs/adr/0016-studio-member-first-published-service.md`:Studio 主对象是 member,生命周期是 Create -> Build -> Bind -> Invoke -> Observe。
-- `docs/adr/0017-studio-team-first-class-aggregate.md`:Team 是 scope 下的一等聚合,并组合在 member contract 之上。
-- `docs/canon/scripting.md`:Scripting 的行为、编译、沙箱、投影与发布能力说明。
+- `0016-studio-member-first-published-service`:Studio 主对象是 member,生命周期是 Create -> Build -> Bind -> Invoke -> Observe。
+- `0017-studio-team-first-class-aggregate`:Team 是 scope 下的一等聚合,并组合在 member contract 之上。
+- `scripting`:Scripting 的行为、编译、沙箱、投影与发布能力说明。
 
 ---
 

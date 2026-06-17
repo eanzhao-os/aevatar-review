@@ -2,8 +2,8 @@
 
 ## 事实源/设计抽象(以 ~/Code/aevatar 为准)
 
-- `docs/adr/0022-otel-aevatar-semantic-conventions.md`:aevatar.* activities/tags 与 GenAI OTel 的关系。
-- `docs/adr/0023-two-tier-inspector-architecture.md`:Inspector 分 Tier1 canonical readmodel 与 Tier2 OTel observation。
+- `0022-otel-aevatar-semantic-conventions`:aevatar.* activities/tags 与 GenAI OTel 的关系。
+- `0023-two-tier-inspector-architecture`:Inspector 分 Tier1 canonical readmodel 与 Tier2 OTel observation。
 - `tools/ci/inspector_tier_boundary_guard.sh`:Tier2 只能作为 `/api/inspector/events` live SSE,不能服务查询。
 
 ---

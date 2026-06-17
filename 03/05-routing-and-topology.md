@@ -1,14 +1,8 @@
 # 路由与拓扑:DirectRoute / topology publication / observer publication
 
-## 关键代码(事实源,以 ~/Code/aevatar 为准)
+## 本篇涉及的设计抽象
 
-- `src/Aevatar.Foundation.Abstractions/agent_messages.proto` 第 29-40 行:topology/observer audience;第 53-79 行:route 的 direct 与 publication 结构。
-- `src/Aevatar.Foundation.Abstractions/EnvelopeRouteSemantics.cs` 第 5-41 行:创建 direct、topology publication、observer publication 的 helper。
-- `src/Aevatar.Foundation.Runtime.Implementations.Local/Actors/LocalActorPublisher.cs` 第 40-90 行:topology publish;第 92-115 行:direct send;第 117-139 行:committed-state observer publish。
-- `src/Aevatar.Foundation.Core/EventSourcing/ICommittedStateEventPublisher.cs` 第 8-15 行:framework-internal committed-state observer publisher。
-- `docs/canon/architecture.md` 第 144-159 行:拓扑事实落点与三种路由行为。
-- `src/Aevatar.Foundation.Runtime.Implementations.Local/Actors/LocalActor.cs` 第 18、25、45-46、156-170 行:Local actor 的 parent/children 状态。
-- `src/Aevatar.Foundation.Runtime.Implementations.Orleans/Grains/RuntimeActorGrainState.cs` 第 15-19 行:Orleans runtime actor 的 parent/children 持久态。
+> 以下论断均可回指 `~/Code/aevatar` 源码验证,但本篇用设计语言描述,不贴文件路径/行号。
 
 ---
 

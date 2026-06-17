@@ -2,9 +2,9 @@
 
 ## 事实源/设计抽象(以 ~/Code/aevatar 为准)
 
-- `src/workflow/Aevatar.Workflow.Core/WorkflowGAgent.cs:16-224`: definition actor 的绑定、编译和子 workflow 定义快照服务。
-- `src/workflow/Aevatar.Workflow.Core/WorkflowRunGAgent.cs:35-168`: run actor 的状态宿主接口、运行状态和执行上下文入口。
-- `docs/canon/workflow-runtime.md:56-82`: workflow definition actor 与 run actor 的职责边界。
+- `WorkflowGAgent`: definition actor 的绑定、编译和子 workflow 定义快照服务。
+- `WorkflowRunGAgent`: run actor 的状态宿主接口、运行状态和执行上下文入口。
+- `workflow-runtime`: workflow definition actor 与 run actor 的职责边界。
 
 ---
 

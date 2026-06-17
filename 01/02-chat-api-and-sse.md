@@ -1,10 +1,8 @@
 # `/api/chat`、SSE 帧和 streaming-proxy 迁移边界
 
-## 关键代码(事实源,以 ~/Code/aevatar 为准)
+## 本篇涉及的设计抽象
 
-- `docs/canon/chat-api.md`: `/api/chat`、`/api/ws/chat`、输入模型、输出事件和恢复/信号接口。
-- `src/workflow/Aevatar.Workflow.Application.Abstractions/Runs/WorkflowRunEventTypes.cs`: Workflow run-event 的共享事件类型源。
-- `docs/2026-04-02-streaming-proxy-flow.md`: streaming-proxy 软废弃、Sunset、room/participant 迁移缺口。
+> 以下论断均可回指 `~/Code/aevatar` 源码验证,但本篇用设计语言描述,不贴文件路径/行号。
 
 ---
 

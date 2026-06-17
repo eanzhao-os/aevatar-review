@@ -2,9 +2,9 @@
 
 ## 事实源/设计抽象(以 ~/Code/aevatar 为准)
 
-- `docs/adr/0024-chat-route-policy.md`:三段式 routing:policy authority、stateless resolver、readmodel。
-- `docs/adr/0026-tool-first-chat-ingress.md`:动作收敛为 `Reject` + `ForwardToModel`,GAgent/team/workflow 通过 tool 暴露。
-- `src/Aevatar.ChatRouting.Core/ChatRouteResolver.cs`:入口热路径调用的无状态解析函数。
+- `0024-chat-route-policy`:三段式 routing:policy authority、stateless resolver、readmodel。
+- `0026-tool-first-chat-ingress`:动作收敛为 `Reject` + `ForwardToModel`,GAgent/team/workflow 通过 tool 暴露。
+- `ChatRouteResolver`:入口热路径调用的无状态解析函数。
 
 ---
 

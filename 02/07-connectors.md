@@ -2,9 +2,9 @@
 
 ## 事实源/设计抽象(以 ~/Code/aevatar 为准)
 
-- `docs/canon/connector.md:18-281`: connector 契约、配置形状、执行流程、host 边界和 `connector_call` / `tool_call` 区分。
-- `src/Aevatar.Configuration/README.md:44-80`: role 与 connector 的集中配置和 allowlist 分配方式。
-- `src/workflow/Aevatar.Workflow.Core/Modules/ConnectorCallModule.cs:31-181`: `connector_call` 模块的参数读取、registry 解析、allowlist 和容错执行。
+- `connector`: connector 契约、配置形状、执行流程、host 边界和 `connector_call` / `tool_call` 区分。
+- `src/Aevatar.Configuration/README.md`: role 与 connector 的集中配置和 allowlist 分配方式。
+- `ConnectorCallModule`: `connector_call` 模块的参数读取、registry 解析、allowlist 和容错执行。
 
 ---
 

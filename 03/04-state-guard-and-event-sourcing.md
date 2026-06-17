@@ -1,14 +1,8 @@
 # StateGuard(AsyncLocal 写权限闸门) + EventStore + reducer
 
-## 关键代码(事实源,以 ~/Code/aevatar 为准)
+## 本篇涉及的设计抽象
 
-- `src/Aevatar.Foundation.Core/StateGuard.cs` 第 14 行:`AsyncLocal<bool>` 保存当前调用链是否可写;第 20-28 行:开启 writable scope 与失败保护。
-- `src/Aevatar.Foundation.Core/GAgentBase.TState.cs` 第 31-34 行:`State.set` 强制检查 writable scope;第 109-118 行:`TransitionState`;第 205-230 行:领域事件提交与 state fold。
-- `src/Aevatar.Foundation.Core/EventSourcing/EventSourcingBehavior.cs` 第 243 行:replay fold;第 292-293 行:live transition 委托。
-- `src/Aevatar.Foundation.Core/EventSourcing/StateTransitionMatcher.cs`:推荐的 event-to-state 匹配 helper。
-- `src/Aevatar.Foundation.Abstractions/Persistence/IEventStore.cs` 第 17-21 行:OCC append 返回 `EventStoreCommitResult`。
-- `docs/canon/event-sourcing.md` 第 15-27 行:EventStore/StateEvent 是唯一业务事实源,Runtime envelope 流不是事实源。
-- `docs/canon/architecture.md` 第 81-83 行:StateGuard、RunManager/RunContextScope、AsyncLocalAgentContext 的设计口径。
+> 以下论断均可回指 `~/Code/aevatar` 源码验证,但本篇用设计语言描述,不贴文件路径/行号。
 
 ---
 
@@ -38,7 +32,7 @@ handler 运行时有 writable scope,但权威状态仍来自领域事件。commi
 
 ## ⚠️ owner 待确认:RunManager latest-wins
 
-`docs/canon/architecture.md` 和 `src/Aevatar.Foundation.Core/README.md` 都提到 `RunManager` / `RunContextScope` 的 latest-wins 运行管理,但当前 `src/` 没有对应类型定义。当前实际落点是 `AsyncLocalAgentContext` / `IAgentContextAccessor` 这条上下文传播链。
+`architecture` 和 `src/Aevatar.Foundation.Core/README.md` 都提到 `RunManager` / `RunContextScope` 的 latest-wins 运行管理,但当前 `src/` 没有对应类型定义。当前实际落点是 `AsyncLocalAgentContext` / `IAgentContextAccessor` 这条上下文传播链。
 
 所以本文只把 RunManager 作为文档中的设计意图记录,不把它写成已经落地的运行机制。这个 owner 待确认点需要后续由维护者确认:是补实现、改 canon 口径,还是保留为目标态说明。
 

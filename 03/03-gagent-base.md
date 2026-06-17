@@ -1,14 +1,8 @@
 # GAgentBase 统一事件 pipeline:静态[EventHandler] + 动态 IEventModule + 双 Hook
 
-## 关键代码(事实源,以 ~/Code/aevatar 为准)
+## 本篇涉及的设计抽象
 
-- `src/Aevatar.Foundation.Core/GAgentBase.cs` 第 31 行:`GAgentBase` 同时是 `IAgent` 与 `IEventModuleContainer<IEventHandlerContext>`;第 121-190 行:统一 dispatch 主路径;第 192-234 行:virtual hook;第 376-411 行:DI hook 与 pipeline cache。
-- `src/Aevatar.Foundation.Abstractions/Attributes/EventHandlerAttribute.cs` 第 13-36 行:静态 handler 标注与 priority。
-- `src/Aevatar.Foundation.Abstractions/EventModules/IEventModule.cs` 第 13-27 行:动态模块契约。
-- `src/Aevatar.Foundation.Core/Pipeline/EventPipelineBuilder.cs` 第 16-27 行:静态 handler adapter 与动态 module 合并,按 priority 升序排序。
-- `src/Aevatar.Foundation.Core/Pipeline/StaticHandlerAdapter.cs` 第 12-101 行:静态 handler 适配为 pipeline module。
-- `src/Aevatar.Foundation.Abstractions/Hooks/IGAgentExecutionHook.cs` 第 16-32 行:DI hook 的 start/end/error 观测点。
-- `docs/canon/architecture.md` 第 73-107 行:Foundation.Core 职责。
+> 以下论断均可回指 `~/Code/aevatar` 源码验证,但本篇用设计语言描述,不贴文件路径/行号。
 
 ---
 
