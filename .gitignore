@@ -10,3 +10,6 @@
 .refactor-loop/
 .worktrees/
 .config/consensus-rnd/host.env
+
+# mkdocs build output
+site/
