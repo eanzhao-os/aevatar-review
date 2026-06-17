@@ -1,125 +1,124 @@
-# POST /api/chat 协议、SSE 帧类型、/v1/responses 与软废弃 streaming-proxy
+# `/api/chat`、SSE 帧和 streaming-proxy 迁移边界
 
 ## 关键代码(事实源,以 ~/Code/aevatar 为准)
 
-- `docs/canon/chat-api.md` 第 19-39 行:端点清单;第 41-69 行:请求体字段 + 选择优先级;第 109-135 行:auto 编排路由;第 191-209 行:SSE 输出事件清单 + CUSTOM 子类型。
-- `docs/canon/llm-streaming.md` 第 46-71 行:组件分层;第 163-170 行:SSE 路径代码锚点;第 199-205 行:WebSocket 锚点;第 280-297 行:会话语义表;第 314-361 行:事件模型;第 371-383 行:收敛与终止。
-- `docs/canon/llm-streaming.md` 第 416-424 行:`WorkflowRunEventTypes` 是唯一共享常量源。
-- `src/workflow/Aevatar.Workflow.Application.Abstractions/Runs/WorkflowRunEventTypes.cs` 第 3-19 行:14 个事件类型常量(SSOT);第 20-42 行:`GetEventType` 映射。
-- `src/workflow/Aevatar.Workflow.Infrastructure/CapabilityApi/ChatEndpoints.cs` 第 44 行:`POST /api/chat` SSE 入口;第 152 行:WebSocket 入口。
-- `src/workflow/Aevatar.Workflow.Infrastructure/CapabilityApi/ChatSseResponseWriter.cs` 第 45 行:SSE writer。
-- `src/workflow/Aevatar.Workflow.Infrastructure/CapabilityApi/ChatWebSocketProtocol.cs` 第 16 行、`ChatWebSocketCommandParser.cs` 第 20 行、`ChatWebSocketRunCoordinator.cs` 第 22 行:WS 协议栈。
-- `docs/2026-04-02-streaming-proxy-flow.md` 第 5 行、第 55 行、第 277-291 行:streaming-proxy 软废弃 + Sunset 日期 + 旧 SSE 帧。
-- `agents/Aevatar.GAgents.StreamingProxy/StreamingProxyEndpoints.cs` 第 21-28 行:Sunset/Deprecation/Link 常量;第 37-41 行、第 72-77 行:废弃 header 注入。
-- `src/Aevatar.Mainnet.Host.Api/Responses/ResponsesEndpoints.cs` 第 30 行、第 39-40 行、第 163/191/222/287/469 行:`/v1/responses` 端点 + 新 SSE 事件。
+- `docs/canon/chat-api.md`: `/api/chat`、`/api/ws/chat`、输入模型、输出事件和恢复/信号接口。
+- `src/workflow/Aevatar.Workflow.Application.Abstractions/Runs/WorkflowRunEventTypes.cs`: Workflow run-event 的共享事件类型源。
+- `docs/2026-04-02-streaming-proxy-flow.md`: streaming-proxy 软废弃、Sunset、room/participant 迁移缺口。
 
 ---
 
-## POST /api/chat 协议
+## 先分清两条流
 
-入口见 `docs/canon/chat-api.md` 第 19-39 行:
+这里有两个容易混淆的入口:
 
-| 端点 | 传输 | 用途 |
+| 入口 | 本质 | 适合什么 |
 |---|---|---|
-| `POST /api/chat` | HTTP + SSE | 请求 + 运行事件 envelope 投影流 |
-| `GET /api/ws/chat` | WebSocket | 同等能力,WS 版 |
-| `POST /api/workflow-webhooks/{routeKey}` | HTTP | 外部 webhook → 新 run(`202 Accepted`) |
-| `POST /api/workflows/resume` | HTTP | 恢复 `human_input` / `human_approval` |
-| `POST /api/workflows/signal` | HTTP | 给 `wait_signal` 步骤发信号 |
+| `POST /api/chat` | 启动或复用一次 Workflow run,用 SSE 接收 run-event 投影 | Workflow 编排、step 状态、LLM 文本增量、工具事件、人工交互 |
+| streaming-proxy | 旧的 room-based 多 participant fan-out | 历史兼容的 room、participant、message stream |
 
-### 请求体字段(`chat-api.md` 第 41-69 行)
+事实源 1 说明 `/api/chat` 和 `/api/ws/chat` 走同一套执行链路,只是传输协议不同。事实源 3 说明 streaming-proxy 已软废弃,直接模型 streaming / tool / continuation 应迁向 `/v1/responses`,但 room 和 participant 语义没有无损替代。
 
-```json
-{
-  "prompt": "必填",
-  "workflow": "可选,已注册的 workflow 名",
-  "source": {
-    "kind": "definition_actor",
-    "definitionActor": { "actorId": "..." }
-  },
-  "workflowYamls": ["可选,内联 YAML bundle"]
-}
+```mermaid
+flowchart LR
+    Chat["POST /api/chat"] --> Run["Workflow run"]
+    Run --> Projection["run-event projection"]
+    Projection --> SSE["SSE / WS frames"]
+
+    Proxy["streaming-proxy"] --> Room["room actor"]
+    Room --> Fanout["participant fan-out"]
+    Fanout --> LegacySSE["legacy SSE frames"]
+
+    Proxy -. "soft deprecated" .-> Responses["/v1/responses"]
 ```
 
-**选择优先级**(`chat-api.md` 第 55-61 行):`workflowYamls` > `workflow` > 全空时默认路由 `auto` > `source.definitionActor.actorId`(复用已绑定 actor)。
+---
 
-> 注意:canon 请求体**没有**顶层 `agentId` 字段。agent 身份只通过 typed `source.definitionActor.actorId` 或 `source.inlineBundle.actorId` 传递(`chat-api.md` 第 66 行)。
+## `/api/chat` 请求怎么被解释
 
-内置 workflow 路由(`chat-api.md` 第 109-135 行):`direct`(直连 actor)、`auto`(分类 → 校验 → human_approval → dynamic_workflow)、`auto_review`(同 auto 但只 finalize 不自动执行)。
+最小请求可以只有 `prompt`。如果传更多字段,选择顺序按事实源 1 的契约理解:
+
+| 输入 | 语义 |
+|---|---|
+| `workflowYamls` | inline YAML bundle,优先级最高 |
+| `workflow` | 已注册 workflow 名称 |
+| 空 workflow/source/bundle | 外部 API 边界默认路由到 `auto` |
+| `source.definitionActor.actorId` | 复用已绑定 workflow actor |
+
+不要把顶层 `agentId` 当成 canon 契约。Actor 身份走 typed `source` 子消息,这样 Host 边界可以先把外部 JSON 归一化成应用命令,再进入 CQRS/Actor 主链路。
 
 ---
 
-## SSE 帧类型完整对照表
+## 简化 SSE 帧表
 
-事件类型常量在 `src/workflow/Aevatar.Workflow.Application.Abstractions/Runs/WorkflowRunEventTypes.cs` 第 3-19 行,这是 SSOT。`GetEventType`(第 20-42 行)把 proto `WorkflowRunEventEnvelope.EventOneofCase` 一一映射。
+事实源 2 是事件类型的共享源。消费方不需要背实现文件,只要按生命周期分组理解:
 
-| 帧名 | 常量行号 | 触发时机 | 关键 payload 字段 |
-|---|---|---|---|
-| `RUN_STARTED` | 第 5 行 | `StartWorkflowEvent` 投影生成(`llm-streaming.md` 第 421 行) | `runId`、`threadId`(=发布 actor 的 ActorId)、`workflowName` |
-| `RUN_FINISHED` | 第 6 行 | `WorkflowCompletedEvent(success=true)` 投影(`llm-streaming.md` 第 465-523 行) | `runId`、`threadId`、`result.output` |
-| `RUN_ERROR` | 第 7 行 | `WorkflowCompletedEvent(success=false)` 投影 | `runId`、code `"WORKFLOW_FAILED"` |
-| `RUN_STOPPED` | 第 8 行 | `WorkflowStoppedEvent` 投影 | `runId` |
-| `STEP_STARTED` | 第 9 行 | 步骤开始 | `stepId`、`stepType`、`role` |
-| `STEP_FINISHED` | 第 10 行 | 步骤完成 | `stepId`、`stepType`、`success` |
-| `TEXT_MESSAGE_START` | 第 11 行 | LLM 流式输出开始 | `role`、`messageId` |
-| `TEXT_MESSAGE_CONTENT` | 第 12 行 | LLM 每个 token 片段 | `role`、`delta` |
-| `TEXT_MESSAGE_END` | 第 13 行 | LLM 输出结束 | `role`、`messageId` |
-| `STATE_SNAPSHOT` | 第 14 行 | run 收敛后由 `WorkflowRunFinalizeEmitter` 发出(`llm-streaming.md` 第 420 行) | `actorId`、`commandId`、`projectionCompletion*` |
-| `TOOL_CALL_START` | 第 15 行 | 工具调用开始 | `toolName`、`callId` |
-| `TOOL_CALL_END` | 第 16 行 | 工具调用结束 | `callId`、`result` |
-| `USAGE` | 第 17 行 | `WorkflowCompletedEvent` 前发一次用量帧 | `promptTokens`/`completionTokens`/`totalTokens`/`model`/`cost`/`latencyMs` |
-| `CUSTOM` | 第 18 行 | 扩展子类型载体 | `eventType`(见下) |
-
-**CUSTOM 子类型**(`chat-api.md` 第 203-209 行):`aevatar.run.context`、`aevatar.step.request`、`aevatar.step.completed`、`aevatar.llm.reasoning`、`aevatar.media.chunk`(payload `MediaContentEvent`)、`aevatar.workflow.waiting_signal`。
-
-> `chat-api.md` 第 198 行列了 `HUMAN_INPUT_REQUEST`,但它在 `WorkflowRunEventTypes` 里**没有**独立常量 —— 在统一事件模型里通过 `CUSTOM` 子类型(`aevatar.step.request` / `aevatar.workflow.waiting_signal`)表达。把它当投影流里的遗留/规范名称,不是 proto oneof case。
-
-### WebSocket 帧协议(`chat-api.md` 第 211-239 行)
-
-客户端发:`{ "type": "chat.command", "requestId": "...", "payload": { "inputParts": [...] } }`。
-服务端依次回:`command.ack`(返回 `commandId` / `actorId` / `workflow`)→ 若干 `agui.event`(每帧一个 `WorkflowRunEventEnvelope` JSON)→ `command.error`(出错时)。文本帧和二进制帧都支持,回复帧类型匹配入站。
-
----
-
-## streaming-proxy 软废弃 + /v1/responses 迁移
-
-### Sunset 语义(`docs/2026-04-02-streaming-proxy-flow.md` 第 5、55 行)
-
-streaming-proxy route 保留向后兼容,但已**软废弃**:
-
-- **Sunset 日期**:`Wed, 25 Nov 2026 00:00:00 GMT`
-- 每个 response 带:`Deprecation: true`、`Sunset: Wed, 25 Nov 2026 00:00:00 GMT`、`Link: </v1/responses>; rel="successive-version"`
-
-代码常量在 `StreamingProxyEndpoints.cs` 第 21-28 行;`AddDeprecationHeaders`(第 72-77 行)对整个 route group 注入这三个 header(第 37-41 行的 filter)。
-
-### 旧 streaming-proxy 帧(不等价于新接口)
-
-`docs/2026-04-02-streaming-proxy-flow.md` 第 277-291 行的旧帧:`TOPIC_STARTED`、`AGENT_MESSAGE`、`PARTICIPANT_JOINED`、`PARTICIPANT_LEFT`、`RUN_FINISHED`、`RUN_ERROR`。这些是 room/fan-out/participant 语义,与新接口**没有一一对应**。
-
-### /v1/responses(替代)
-
-`src/Aevatar.Mainnet.Host.Api/Responses/ResponsesEndpoints.cs` 第 30 行 `MapResponsesApiEndpoints` 映射:
-- `POST /responses`(第 39 行)、`POST /responses/{id}/cancel`(第 40 行)
-
-新 SSE 事件类型:`response.created`(第 163 行)、`response.output_text.delta`(第 191 行)、`response.output_text.done`(第 222 行)、`response.completed`(第 287 行)、`response.failed`(第 469 行)。
-
-### 迁移边界
-
-| 语义 | streaming-proxy(旧) | /v1/responses(新) |
+| 分组 | 帧 | 读法 |
 |---|---|---|
-| 直接模型流式 / tool / continuation | 有 | **有**(直接迁移) |
-| room CRUD / participant / fan-out | 有 | **无一一对应**(`docs/2026-04-02-streaming-proxy-flow.md` 第 5 行) |
-| 帧类型 | `TOPIC_STARTED` / `AGENT_MESSAGE` / `PARTICIPANT_*` | `response.created` / `output_text.delta` / `output_text.done` / `response.completed` |
+| run 生命周期 | `RUN_STARTED`、`RUN_FINISHED`、`RUN_ERROR`、`RUN_STOPPED` | 一次 run 的开始、终止和异常收敛 |
+| step 生命周期 | `STEP_STARTED`、`STEP_FINISHED` | workflow step 的执行进度 |
+| 文本流 | `TEXT_MESSAGE_START`、`TEXT_MESSAGE_CONTENT`、`TEXT_MESSAGE_END` | LLM 文本增量,start 和 end 包住多段 content |
+| 工具流 | `TOOL_CALL_START`、`TOOL_CALL_END` | 工具调用的开始和结束 |
+| 状态和扩展 | `STATE_SNAPSHOT`、`USAGE`、`CUSTOM` | 收敛快照、用量、媒体/人工交互/等待信号等扩展事件 |
 
-> `POST /api/chat`(workflow 框架层能力,见 `00/03-quick-start.md`)和 streaming-proxy 是两个不同的东西:`/api/chat` 是 workflow run 事件投影,streaming-proxy 是旧的 room-based 多端转发。别混淆。
+`CUSTOM` 不是“随便塞字符串”的后门,而是把还没有独立顶层帧的领域事件收束在统一 envelope 下。比如人工交互、媒体分片、等待 signal,都应该先按事实源 1 的子类型口径消费。
+
+---
+
+## SSE 时序图
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant H as Chat API
+    participant A as Application command
+    participant R as WorkflowRunGAgent
+    participant P as Projection
+    participant S as SSE writer
+
+    C->>H: POST /api/chat
+    H->>A: normalize request and execute
+    A->>R: dispatch ChatRequestEvent
+    R-->>P: StartWorkflowEvent
+    P-->>S: RUN_STARTED
+    S-->>C: event: RUN_STARTED
+    R-->>P: TextMessageStart / Content* / End
+    P-->>S: TEXT_MESSAGE_*
+    S-->>C: token frames
+    R-->>P: WorkflowCompletedEvent
+    P-->>S: USAGE + RUN_FINISHED or RUN_ERROR
+    S-->>C: terminal frames
+```
+
+这条链路的设计重点是:Host 不直接拼业务事件,SSE 输出来自投影后的 `WorkflowRunEventEnvelope`。这能让 HTTP SSE 和 WebSocket 共享同一套运行事件模型。
+
+---
+
+## streaming-proxy 到 `/v1/responses` 的迁移
+
+事实源 3 的迁移口径可以压缩成一句话:能迁的是“直接模型流式 / tool / continuation”,不能直接迁的是“room CRUD / participant join-post / room fan-out”。
+
+![streaming-proxy 到 responses 的迁移时间线](assets/streaming-proxy-to-responses-timeline.png)
+
+| 语义 | streaming-proxy | `/v1/responses` |
+|---|---|---|
+| 直接模型流式 | 有 | 可迁移 |
+| tool / continuation | 有 | 可迁移 |
+| room CRUD | 有 | 无一一对应 |
+| participant join/post | 有 | 无一一对应 |
+| room fan-out | 有 | 无一一对应 |
+
+⚠️ streaming-proxy 的 room/participant 迁移缺口需要架构 owner 确认。当前文档只能把缺口标出来,不能把 `/v1/responses` 写成这些语义的无损替代。
 
 ---
 
 ## 验收
 
-1. `POST /api/chat` 请求体有哪些字段?选择优先级?(`prompt`/`workflow`/`source`/`workflowYamls`,`chat-api.md` 第 41-69 行)
-2. `TEXT_MESSAGE_CONTENT` 前后是什么帧?(`TEXT_MESSAGE_START` → `CONTENT`×N → `END`,`WorkflowRunEventTypes.cs` 第 11-13 行)
-3. streaming-proxy 的 Sunset 日期?(2026-11-25,`StreamingProxyEndpoints.cs` 第 21-28 行)
-4. streaming-proxy 的 room/participant 语义在新接口有一一对应吗?(没有,`docs/2026-04-02-streaming-proxy-flow.md` 第 5 行)
+读完这篇,应该能回答:
+
+1. `/api/chat` 是什么?它是 Workflow run 的 HTTP + SSE 入口。
+2. `TEXT_MESSAGE_CONTENT` 应该怎么看?它是 start/end 包住的文本增量帧。
+3. streaming-proxy 为什么不能直接等同 `/v1/responses`?因为 room、participant 和 fan-out 语义没有一一对应替代。
+4. 哪个迁移点必须带风险标注?streaming-proxy room/participant 缺口,需架构 owner 确认。
 
 ⟦AI:AUTO-LOOP⟧

@@ -1,124 +1,122 @@
-# Run 语义:runId/sessionId 服务端生成、不按 run 隔离事件流、终止事件收敛
+# Run 语义:标识、生命周期和事件流边界
 
 ## 关键代码(事实源,以 ~/Code/aevatar 为准)
 
-- `README.md` 第 89-105 行:「Run 语义(重要)」节,四条反直觉规则 + LiveSink/projection 上下文。
-- `docs/canon/workflow-runtime.md` 第 56-82 行:`WorkflowRunGAgent`(一次 run 一个 actor)+ 事件链;第 272-308 行:run 链路(POST /api/chat → ExecuteAsync → resolver → lifecycle → dispatch → StartWorkflowEvent → kernel → WorkflowCompletedEvent → 投影 → SSE);第 393-398 行:和 CQRS 投影的关系。
-- `docs/canon/llm-streaming.md` 第 280-297 行:会话语义表(actorId/runId/commandId/correlationId/sessionId/chatSessionId/messageId)。
-- `src/Aevatar.CQRS.Core/Commands/DefaultCommandContextPolicy.cs` 第 16-21 行:`commandId = Guid.NewGuid()`,`correlationId` 默认等于 `commandId`。
-- `src/workflow/Aevatar.Workflow.Core/WorkflowRunGAgent.cs` 第 389-391 行:`runId` 从 actor `Id` 派生(`WorkflowRunIdNormalizer.Normalize`);第 404、418、422 行:写入事件并发布。
-- `src/workflow/Aevatar.Workflow.Core/Primitives/WorkflowRunIdNormalizer.cs` 第 6-13 行:runId 规范化(空→`default`,否则 trim)。
-- `src/workflow/Aevatar.Workflow.Application/Runs/WorkflowChatRequestEnvelopeFactory.cs` 第 15-17 行:`sessionId = command.SessionId ?? context.CorrelationId`。
-- `src/workflow/Aevatar.Workflow.Application/Runs/WorkflowRunCompletionPolicy.cs` 第 11-35 行:`TryResolve` 把 `RUN_FINISHED`→Completed、`RUN_ERROR`→Failed、`RUN_STOPPED`→Stopped。
-- `src/workflow/Aevatar.Workflow.Presentation.AGUIAdapter/EventEnvelopeToWorkflowRunEventMapper.cs` 第 122-150 行:`StartWorkflowEvent` → `RUN_STARTED`(threadId = 发布 actor 的 ActorId);第 465-523 行:`WorkflowCompletedEvent` → `USAGE` + `RUN_FINISHED`/`RUN_ERROR`;第 823-829 行:`ResolveThreadId` = `envelope.Route.PublisherActorId`。
-- `src/workflow/Aevatar.Workflow.Application/Runs/WorkflowRunFinalizeEmitter.cs` 第 19-53 行:run 收敛后发终止 `STATE_SNAPSHOT`。
+- `README.md`: Run 语义的四条重要规则,包括默认不按 run 隔离事件流。
+- `docs/canon/workflow-runtime.md`: 从 `/api/chat` 到 run actor、kernel、投影和 SSE 的完整链路。
+- `docs/canon/llm-streaming.md`: `actorId/runId/commandId/sessionId/messageId` 等会话标识和实时输出生命周期。
 
 ---
 
-## 四条反直觉规则(`README.md` 第 89-94 行)
+## 先记住四句话
 
-aevatar 的 run 语义有几个让习惯传统请求/响应模型的人踩坑的点:
+Run 语义最容易误解,因为它不像传统“一个 HTTP 请求等于一个私有响应流”的模型。按事实源 1,先记住四句话:
 
-1. **同一 Actor 多次运行,默认不按 run 隔离事件流**(第 91 行):客户端收到的是该 Actor 的全量事件,不是只收当前 run 的。
-2. **单次请求只在"当前 runId 的终止事件"到达时结束**(第 92 行):终止事件是 `RUN_FINISHED` 或 `RUN_ERROR`。
-3. **`RUN_STARTED` 由 `StartWorkflowEvent` 投影统一生成**(第 93 行):不是 actor 直接发的运行开始信号,而是投影层把领域事件映射出来的。`threadId` = 发布该 `StartWorkflowEvent` 的 ActorId。
-4. **`runId` 与内部 `sessionId` 都由服务端生成**(第 94 行):客户端请求只需 `prompt` / `workflow` / `agentId`,不需要自己造 runId。
+1. 同一 Actor 多次运行时,默认不按 run 隔离事件流。
+2. 单次请求只在当前 runId 的终止事件到达时结束。
+3. `RUN_STARTED` 由 `StartWorkflowEvent` 投影统一生成。
+4. `runId` 和内部 `sessionId` 都由服务端生成。
+
+这四句话共同指向一个设计:客户端观察的是 Actor 维度上的运行事件投影,而不是 Host 临时造出来的“请求私有管道”。
 
 ---
 
-## runId / sessionId / commandId 从哪来
+## 标识语义表
 
-这三个标识都是服务端生成的,客户端不参与:
-
-| 标识 | 生成位置 | 规则 |
+| 标识 | 谁拥有语义 | 怎么读 |
 |---|---|---|
-| `commandId` | `DefaultCommandContextPolicy.cs` 第 16-21 行 | `Guid.NewGuid().ToString("N")`;写入 `EventEnvelope.Id`,是 session stream key 的一部分 |
-| `correlationId` | 同上 | 默认 = `commandId` |
-| `runId` | `WorkflowRunGAgent.cs` 第 389-391 行 | 从 actor `Id` 派生:`WorkflowRunIdNormalizer.Normalize(Id)`;空/whitespace 时返回 `"default"`(`WorkflowRunIdNormalizer.cs` 第 6-13 行) |
-| `sessionId` | `WorkflowChatRequestEnvelopeFactory.cs` 第 15-17 行 | `command.SessionId ?? context.CorrelationId`(回退到 correlationId) |
+| `actorId` | Actor Runtime / Workflow actor binding | 定位目标 Actor,不是 runId |
+| `runId` | Workflow run binding | 业务 run 维度,用于判断当前 run 是否终止 |
+| `commandId` | Application command context | 一次交互命令维度,也是实时观察句柄的一部分 |
+| `correlationId` | Command propagation | 跨组件追踪维度,默认可与 commandId 同值但语义独立 |
+| `sessionId` | Chat request envelope | chat 会话维度,未传时由服务端回退生成 |
+| `messageId` | run-event mapper | 单条文本/消息流维度,用于拼接增量 |
 
-`runId` 生成后写入 `WorkflowRunExecutionStartedEvent`(`WorkflowRunGAgent.cs` 第 404 行)、`StartWorkflowEvent.RunId`(第 418 行),再 publish 到 self(第 422 行)。kernel 的 `ResolveRunIdOrCurrent`(`WorkflowExecutionKernel.cs` 第 1490-1496 行)复用它。
-
-> `llm-streaming.md` 第 280-297 行的会话语义表强调:`runId` 是 workflow run 绑定标识,**不是** actor 地址。actor 地址是 `actorId`。session stream key 是 `workflow-run:{actorId}:{commandId}`(第 286 行)。
-
----
-
-## 为什么不按 run 隔离事件流?
-
-这是最容易误解的一点。`README.md` 第 91 行说同一 Actor 多次运行默认**不按 run 隔离**。
-
-**原因**:aevatar 的 actor 是有状态的业务实体(一个 `WorkflowRunGAgent` = 一次 run)。事件流是 actor 维度的(`workflow-run:{actorId}:{commandId}`),不是 run 维度的隔离管道。客户端订阅的是一个 actor 的事件投影,会收到该 actor 在该 commandId 生命周期内的全部 run 事件。
-
-**那客户端怎么知道该停?** —— 靠终止事件收敛。`WorkflowRunCompletionPolicy.cs` 第 11-35 行的 `TryResolve`:
-
-- `RUN_FINISHED` → `Completed`
-- `RUN_ERROR` → `Failed`
-- `RUN_STOPPED` → `Stopped`
-
-这个 `ICommandCompletionPolicy`(注册在 `ServiceCollectionExtensions.cs` 第 85 行)决定 SSE/WS 流何时结束。单次请求只在**当前 runId 的终止事件**到达时结束(`README.md` 第 92 行)。
+这里的关键不是“哪个字段在哪一行生成”,而是字段之间不要互相冒充。`actorId` 用来定位 Actor,`runId` 用来识别业务执行,`commandId` 用来追踪这次命令和观察流。
 
 ---
 
-## 一次 run 的完整事件序列
+## run 生命周期
 
-以 `simple_qa` 为例,run 链路见 `docs/canon/workflow-runtime.md` 第 272-308 行:
+```mermaid
+stateDiagram-v2
+    [*] --> Accepted: /api/chat accepted
+    Accepted --> Dispatched: ChatRequestEvent envelope
+    Dispatched --> Started: StartWorkflowEvent projected
+    Started --> Running: step events / text deltas / tool events
+    Running --> Waiting: human input / signal needed
+    Waiting --> Running: resume / signal
+    Running --> Completed: WorkflowCompletedEvent success
+    Running --> Failed: WorkflowCompletedEvent failure
+    Running --> Stopped: WorkflowStoppedEvent
+    Completed --> FinalSnapshot: STATE_SNAPSHOT
+    Failed --> FinalSnapshot: STATE_SNAPSHOT
+    Stopped --> FinalSnapshot: STATE_SNAPSHOT
+    FinalSnapshot --> [*]
+```
+
+事实源 2 的主链路可以这样读:
 
 ```text
 POST /api/chat
-  → ICommandInteractionService.ExecuteAsync
-  → WorkflowRunCommandTargetResolver(workflowYaml 优先,否则 registry,否则 default)
-  → WorkflowRunObservationLifecycle(attach 到已有 projection session,无 pre-dispatch projection activation)
-  → dispatch ChatRequestEvent envelope
-  → WorkflowRunGAgent 收到,生成 runId,发 StartWorkflowEvent
-  → WorkflowExecutionKernel 推进:StepRequestEvent → StepCompletedEvent → ...
-  → WorkflowCompletedEvent
-  → 投影(EventEnvelopeToWorkflowRunEventMapper)
-  → SSE 流
+  -> Application command
+  -> target resolve + observation lifecycle
+  -> ChatRequestEvent envelope
+  -> WorkflowRunGAgent
+  -> WorkflowExecutionKernel
+  -> domain events
+  -> Projection
+  -> WorkflowRunEventEnvelope
+  -> SSE / WS
 ```
 
-投影层把领域事件映射成 run 事件(`EventEnvelopeToWorkflowRunEventMapper.cs`):
-
-| 领域事件 | 映射到的 run 事件 | 代码行号 |
-|---|---|---|
-| `StartWorkflowEvent` | `RUN_STARTED`(`threadId` = 发布 actor 的 ActorId) | 第 122-150 行 |
-| `WorkflowCompletedEvent(success=true)` | `USAGE` + `RUN_FINISHED` | 第 465-523 行 |
-| `WorkflowCompletedEvent(success=false)` | `RUN_ERROR`(code `"WORKFLOW_FAILED"`) | 第 465-523 行 |
-| `WorkflowStoppedEvent` | `RUN_FINISHED` / `RUN_ERROR` | 第 525+ 行 |
-
-run 收敛后,`WorkflowRunFinalizeEmitter.cs` 第 19-53 行发一个终止 `STATE_SNAPSHOT`,携带 actorId / workflowName / commandId / projection completion + 可选 snapshot(`llm-streaming.md` 第 420-421 行)。
+终止不是 Host 说“我写完响应了”,而是投影流里出现当前 runId 的终止语义。终止后还可能有 `STATE_SNAPSHOT`,用于把收敛后的状态事实交给消费方。
 
 ---
 
-## threadId = 发布该事件的 ActorId
+## 为什么默认不按 run 隔离
 
-`RUN_STARTED` 和 `RUN_FINISHED` 的 `threadId` 由 `ResolveThreadId`(`EventEnvelopeToWorkflowRunEventMapper.cs` 第 823-829 行)决定:
+```mermaid
+flowchart TB
+    subgraph Actor["同一个 workflow actor"]
+        R1["run A events"]
+        R2["run B events"]
+        R3["run C events"]
+    end
 
-```csharp
-public static string ResolveThreadId(EventEnvelope envelope, string fallback)
-{
-    var publisherActorId = envelope.Route?.PublisherActorId;
-    return string.IsNullOrWhiteSpace(publisherActorId) ? fallback : publisherActorId;
-}
+    Actor --> Stream["actor-scoped event stream"]
+    Stream --> Projection["run-event projection"]
+    Projection --> Sink["workflow-run:{actorId}:{commandId}"]
+    Sink --> Client["client observes frames"]
+
+    Client -. "用 runId 识别当前 run 的终止事件" .-> Projection
 ```
 
-即 `threadId` = 发布 `StartWorkflowEvent` / `WorkflowCompletedEvent` 的那个 actor 的 ActorId(通常是 `WorkflowRunGAgent`),缺失时回退到 `evt.WorkflowName`。这解释了为什么 `RUN_STARTED` 的 `threadId` 不是客户端传的,而是服务端 actor 身份。
+默认不按 run 隔离的意思不是“runId 没用”,而是“隔离边界不应该被理解成 Host 维护的进程内 `runId -> sink` 字典”。事实源 3 的实时生命周期强调通过显式句柄、投影 session 和 sink 绑定来观察事件,跨请求事实不能藏在中间层内存里。
+
+这也是为什么客户端要同时关心 `actorId`、`commandId` 和 `runId`:前两个帮助定位和观察,后一个帮助判断本次业务 run 是否收敛。
 
 ---
 
-## LiveSink 绑定(`README.md` 第 96-105 行)
+## RunManager/latest-wins 边界
 
-客户端订阅 run 事件靠 LiveSink,绑定方式是 `workflow-run:{actorId}:{commandId}` stream 的 subscribe/unsubscribe(`README.md` 第 96 行)。**没有**进程内 sink 列表 —— 这条约束(`docs/adr/0002-mainnet-architecture.md` 第 1054 行)禁止在中间层引入 `runId -> context` 进程内事实映射。投影并发通过 `projection:{rootActorId}` coordinator actor 协调(`README.md` 第 105 行)。
+⚠️ `RunManager/latest-wins` 需要架构 owner 确认。它属于 Foundation 运行上下文管理口径,不应被本文直接解释成 Workflow SSE 的 run 隔离策略,也不应拿来替代 `actorId + commandId + runId` 的观察语义。
+
+在 owner 明确前,这篇只做保守结论:
+
+1. Workflow run-event 默认按 Actor 维度观察,客户端用当前 runId 的终止事件收敛。
+2. Host 和中间层不应发明进程内 run 映射来“修正”这个语义。
+3. `RunManager/latest-wins` 如果要进入用户可见协议说明,需要由架构 owner 明确它和 Workflow run 投影之间的关系。
 
 ---
 
 ## 验收
 
-用一次具体 run 回答:
+读完这篇,应该能回答:
 
-1. runId 从哪来?(服务端从 actor Id 派生,`WorkflowRunGAgent.cs` 第 389-391 行;客户端不传)
-2. 为什么不按 run 隔离事件流?(事件流是 actor 维度,客户端收该 actor 全量,`README.md` 第 91 行)
-3. 客户端怎么知道该停?(当前 runId 的终止事件 `RUN_FINISHED`/`RUN_ERROR`,`WorkflowRunCompletionPolicy.cs` 第 11-35 行)
-4. `RUN_STARTED` 怎么产生的?(投影层把 `StartWorkflowEvent` 映射出来,`EventEnvelopeToWorkflowRunEventMapper.cs` 第 122-150 行)
-5. `threadId` 是什么?(发布该事件的 actor 的 ActorId,第 823-829 行)
+1. `runId` 是客户端传的吗?不是,服务端生成或绑定。
+2. 为什么默认不按 run 隔离事件流?因为观察对象是 Actor 维度的事件投影,不是 Host 临时私有管道。
+3. 客户端怎么知道请求结束?看到当前 runId 的终止事件,再处理收敛快照。
+4. `RunManager/latest-wins` 能不能直接当成 Workflow SSE 隔离策略?不能,需要架构 owner 确认。
 
 ⟦AI:AUTO-LOOP⟧
