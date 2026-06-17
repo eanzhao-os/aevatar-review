@@ -25,18 +25,18 @@ LocalRuntime 的价值是把 Runtime-on-Stream 这套语义用最小本地实现
 ```mermaid
 sequenceDiagram
     participant Stream as self stream / dispatch port
-    participant Actor as LocalActor
+    participant Local as LocalActor
     participant Mailbox as Channel<MailboxWorkItem>
     participant Agent as Agent.HandleEventAsync
 
-    Stream->>Actor: EventEnvelope
-    Actor->>Actor: route 分类与去重入口
-    Actor->>Mailbox: EnqueueAsync
+    Stream->>Local: EventEnvelope
+    Local->>Local: route 分类与去重入口
+    Local->>Mailbox: EnqueueAsync
     loop single reader, one item at a time
-        Mailbox->>Actor: next MailboxWorkItem
-        Actor->>Agent: HandleEventAsync(envelope)
-        Agent-->>Actor: handler 完成或失败
-        Actor-->>Mailbox: complete item
+        Mailbox->>Local: next MailboxWorkItem
+        Local->>Agent: HandleEventAsync(envelope)
+        Agent-->>Local: handler 完成或失败
+        Local-->>Mailbox: complete item
     end
 ```
 

@@ -12,15 +12,15 @@
 
 ```mermaid
 flowchart TD
-  committed[Committed actor / projection facts] --> readmodel[Projection readmodels]
-  readmodel --> tier1[Tier1 Inspector query endpoints]
-  readmodel --> status[/api/status and /status]
+  committed["Committed actor / projection facts"] --> readmodel["Projection readmodels"]
+  readmodel --> tier1["Tier1 Inspector query endpoints"]
+  readmodel --> status["/api/status and /status"]
 
-  runtime[Runtime activities] --> otel[AevatarActivitySource / GenAIActivitySource]
-  otel --> listener[ActivityListener]
-  listener --> channel[BoundedChannel<TelemetryFrame><br/>drop-oldest, no replay]
-  channel --> tier2[/api/inspector/events SSE]
-  tier2 --> animation[Browser animation only]
+  runtime["Runtime activities"] --> otel["AevatarActivitySource / GenAIActivitySource"]
+  otel --> listener["ActivityListener"]
+  listener --> channel["BoundedChannel<TelemetryFrame><br/>drop-oldest, no replay"]
+  channel --> tier2["/api/inspector/events SSE"]
+  tier2 --> animation["Browser animation only"]
 ```
 
 ## OTel 负责什么

@@ -91,7 +91,7 @@ steps:
 ```mermaid
 flowchart TD
     Done["step 完成"] --> Key{"有 branch key?"}
-    Key -->|命中 branches[key]| Branch["跳到匹配分支"]
+    Key -->|命中 branches 的 key| Branch["跳到匹配分支"]
     Key -->|未命中| Default{"有 _default?"}
     Default -->|有| Dst["跳到默认分支"]
     Default -->|无| Next{"有 next?"}
