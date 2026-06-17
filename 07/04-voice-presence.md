@@ -1,47 +1,42 @@
-# VoicePresence:语音在场(MiniCPM/OpenAI)+ 语音路由
+# VoicePresence:语音是挂载能力,不是第二套会话主干
 
-## 关键代码(事实源,以 ~/Code/aevatar 为准)
+## 事实源/设计抽象(以 ~/Code/aevatar 为准)
 
-- `src/Aevatar.Foundation.VoicePresence.Abstractions/`:`IVoiceTransport.cs`、`IRealtimeVoiceProvider.cs`、`IVoiceSessionCredentialStore.cs`、`IVoiceToolCatalog.cs`、`IVoiceToolInvoker.cs`、`IVoicePresenceRuntimeStateOwner.cs`、`Protos/voice_presence.proto`、`Sessions/`(lease/attachment/media-stream/capability-query ports)。
-- `src/Aevatar.Foundation.VoicePresence/`:`Transport/WebSocketVoiceTransport.cs`、`Transport/WebRtcVoiceTransport.cs`、`Modules/VoicePresenceModule.cs`(EventModule capability)、`Hosting/VoicePresenceEndpoints.cs`(`MapVoicePresenceWebSocket` L19/27、`MapVoicePresenceWhip` L114/124、fail-closed `503` L186/247/256/273/281)、`Hosting/ActorOwnedVoiceRealtimeSession.cs`。
-- `src/Aevatar.Foundation.VoicePresence.OpenAI/OpenAIRealtimeProvider.cs` 第 22 行:`IRealtimeVoiceProvider`(嵌套 `OpenAIRealtimeProviderSession` 第 339 行)。
-- `src/Aevatar.Foundation.VoicePresence.MiniCPM/MiniCPMRealtimeProvider.cs` 第 21 行:`IRealtimeVoiceProvider`(MiniCPM-o demo-protocol adapter);`Internal/MiniCPMWaveCodec.cs`、`MiniCPMSsePayloadReader.cs`。
-- `docs/canon/voice-presence-integration.md` 第 1-23 行:aevatar 作为 `/ws/voice` Brain;voice-presence 是外部 edge server,aevatar 持有全部 brain-side(realtime provider/persona/tools/turn lifecycle/NyxID-brokered creds)。
-- `docs/adr/0025-voice-router-integration.md`(Accepted):policy-aware WS 边界;attach target 经 `ForwardToModel.tool_choice_hint.voice_attach_target`(被 ADR-0026 取代 target 编码);Voice 是 `VoicePresence` EventModule capability,挂到已有 actor —— 无独立 `VoiceSessionGAgent`。
-- `docs/adr/0031-voice-edge-local-tools.md`(Accepted):cloud voice session 执行 LAN-only tool(Home Assistant/Frigate/ESP32);`VoiceFunctionCallRequested` → `VoicePresenceModule.ExecuteToolCallAsync` → `IVoiceToolInvoker` → `AgentToolVoiceInvoker` → `IAgentToolSource` → `IRealtimeVoiceProvider.SendToolResultAsync`。
-- `docs/adr/0033-voice-provider-nyxid-ephemeral-broker.md`(proposed):移除静态 `OPENAI_API_KEY` 依赖,凭证经 NyxID ephemeral broker;无静态 key 时 `/ws/voice` fail-closed `503 voice_not_configured`。
+- `docs/canon/voice-presence-integration.md`:aevatar 作为 `/ws/voice` Brain,edge server 只在外部承担实时边缘职责。
+- `docs/adr/0025-voice-router-integration.md`:Voice 是 `VoicePresence` EventModule capability,挂到已有 actor。
+- `docs/adr/0031-voice-edge-local-tools.md`:LAN-only voice tools 走现有 NyxID service/node proxy 与 `IAgentToolSource`。
 
 ---
 
-## VoicePresence 是什么
+VoicePresence 的关键不是"多了 OpenAI/MiniCPM provider",而是语音流怎样不绕开现有 actor 生命周期。普通 `/ws/voice` 先经过 ChatRouting 得到 typed attach target,再把 transport/provider/session 状态机挂到已有 voice-enabled actor 上。
 
-aevatar 作为 `/ws/voice` 的 Brain(`docs/canon/voice-presence-integration.md`)。voice-presence 是外部 edge server,aevatar 持有全部 brain-side:realtime provider、persona、tools、turn lifecycle、NyxID-brokered creds。
+| 部分 | 职责 | 主干边界 |
+|---|---|---|
+| transport | WebSocket/WebRTC attach、lease、媒体转发 | raw PCM 是 volatile media,不进 event store/readmodel |
+| provider | OpenAI/MiniCPM realtime session | provider result 回到 actor-owned voice session |
+| VoicePresenceModule | 处理 transcript/control/tool-call lifecycle | EventModule capability,复用 actor 执行上下文 |
+| tool invoker | 把模型 function call 交给 IAgentToolSource | 不建进程本地 session -> token 映射 |
 
-四个项目:
-- **Abstractions**:transport/provider/credential/tool/runtime-state ports + proto
-- **VoicePresence**(runtime/host):WebSocket/WebRtc transport、`VoicePresenceModule`(EventModule capability)、fail-closed endpoints
-- **OpenAI**:`OpenAIRealtimeProvider`(`:22`)
-- **MiniCPM**:`MiniCPMRealtimeProvider`(MiniCPM-o demo-protocol,`:21`)
+## 为什么不是 `VoiceSessionGAgent`
 
----
+Voice 的稳定事实属于被 attach 的业务 actor:它知道 persona、tool catalog、turn lifecycle 和授权边界。另起 VoiceSessionGAgent 会把语音会话 ID、连接元数据、临时 provider 状态变成第二个事实拥有者,还会诱导 raw audio 或 volatile session 状态进入 Actor/Event/ReadModel 层。
 
-## 关键设计
+把 Voice 做成 EventModule capability 更符合现有主链:
 
-**Voice 是 capability,不是独立 actor**(ADR-0025):`VoicePresence` 是 EventModule,挂到已有 actor —— 无独立 `VoiceSessionGAgent`。attach target 经 `ForwardToModel.tool_choice_hint.voice_attach_target`(ADR-0026 取代了旧 target 编码)。
+1. 生命周期复用 actor activation、handler pipeline、state guard 和 event sourcing。
+2. transcript/control/tool-call 可以按 typed frame 进入 actor 语义,raw PCM 仍留在 volatile media stream。
+3. `/ws/voice` 的路由选择发生在 Host/Application 边界,VoicePresence foundation 包不反向依赖 ChatRouting。
 
-**Edge local tools**(ADR-0031):cloud voice session 可执行 LAN-only tool(`VoiceFunctionCallRequested` → `IVoiceToolInvoker` → `IAgentToolSource` → `SendToolResultAsync`)。
+## LAN-only tools 与凭证
 
-**凭证经 NyxID**(ADR-0033 proposed):移除静态 `OPENAI_API_KEY`,经 NyxID ephemeral broker;无 key 时 `/ws/voice` fail-closed `503`。
+ADR-0031 的短期路径是复用 NyxID service/node proxy:本地边缘服务把 Home Assistant/Frigate/ESP32 这类 LAN API 注册到 NyxID,模型通过已授权的 connected-service tool 间接调用。Aevatar 不保存本地服务目录,也不把 session/actor/user 到 NyxID token 的映射藏进进程内字典。
 
-**fail-closed**:所有端点在配置缺失时返回 `503`(`VoicePresenceEndpoints.cs` L186/247/256/273/281)。
-
----
+⚠️ ADR-0033 仍是 proposed。它描述的方向是 provider 凭证经 NyxID ephemeral broker,生产部署不持静态 OPENAI_API_KEY;但本章不把 proposed 状态写成 accepted current。静态 key 移除是否已完全落地、哪些部署仍允许本地直连 key,需要后续核验/决策。
 
 ## 验收
 
-1. Voice 是独立 actor 吗?(不是,是 EventModule capability,挂到已有 actor)
-2. voice 凭证从哪来?(NyxID ephemeral broker,非静态 key)
-3. cloud voice 怎么执行 LAN tool?(ADR-0031,经 IVoiceToolInvoker→IAgentToolSource)
-4. 配置缺失时端点返回什么?(503 fail-closed)
+1. Voice 是独立 VoiceSessionGAgent 吗?不是,是挂到已有 actor 的 EventModule capability。
+2. raw PCM 进入 actor event/readmodel 吗?不进入,它是 volatile media stream。
+3. LAN-only tools 怎么走?经 NyxID service/node proxy 与既有 tool surface,不建本地 token 映射。
 
 ⟦AI:AUTO-LOOP⟧

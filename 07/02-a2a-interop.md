@@ -1,41 +1,40 @@
-# A2A Interop:Agent-to-Agent 互操作
+# A2A Interop:历史设计与当前删除状态
 
-## 关键代码(事实源,以 ~/Code/aevatar 为准)
+## 事实源/设计抽象(以 ~/Code/aevatar 为准)
 
-- `docs/history/2026-03/maf-integration.md` 第 62-116 行:A2A = "Agent-to-Agent Protocol v0.3.3-preview";adapter 在 Host boundary 把 A2A Task ↔ EventEnvelope 转换;A2A task state 不做权威(actor state + event store 才是);组件表第 88-93 行;映射表第 97-103 行。
-- ⚠️ `src/Aevatar.Interop.A2A.{Abstractions,Application,Hosting}/` 在 HEAD 只剩空壳(`bin/`/`obj/`),源码在 `8bfd8605c`("iter38 cluster-038 A2A: 删 task facts process-local + orphan code",−2460 行)被删。历史实现可从 `git show 8bfd8605c^:` 恢复。
-
----
-
-## A2A 是什么
-
-A2A(Agent-to-Agent Protocol)是跨 Agent 系统互操作协议。aevatar 的 adapter 在 Host boundary 做转换:
-
-- A2A Task ↔ `EventEnvelope`(框架消息)
-- A2A task state **不做权威** —— actor state + event store 才是事实源
-- adapter 不让 A2A task facts 进进程内本地状态
-
-`docs/history/2026-03/maf-integration.md` 第 62-116 行记录了协议 v0.3.3-preview 的适配设计。
+- `docs/history/2026-03/maf-integration.md`:A2A v0.3.3-preview 的历史适配设计,位于 Host boundary。
+- `src/Aevatar.Interop.A2A.Abstractions/`:当前目录只剩空壳/构建残留。
+- `src/Aevatar.Interop.A2A.Hosting/`:当前目录只剩空壳/构建残留。
 
 ---
 
-## ⚠️ 当前 HEAD 状态:源码已删
+A2A 的历史设计目标是让外部 Agent-to-Agent task 在 Host boundary 被翻译成 aevatar 的运行时消息,而不是让 A2A task state 成为新的事实源。正确方向是:
 
-三个项目 `Aevatar.Interop.A2A.{Abstractions,Application,Hosting}/` 在当前 HEAD **只剩空壳**(build artifact)。源码在 commit `8bfd8605c`("删 task facts process-local + orphan code")被移除,原因是在 task facts 上引入了进程本地状态,违反"事实源唯一"不变量。
+| A2A 侧 | aevatar 侧 | 边界 |
+|---|---|---|
+| Agent card | Host 暴露能力说明 | 可发布信息,不是 actor state |
+| task send/get/cancel | EventEnvelope/actor command | 进入主干后由 actor/event store 承认事实 |
+| task state | actor state + event store/readmodel | A2A 本地 task store 不做权威 |
+| subscribe | SSE 观察 | 观察结果不能反推事实 |
 
-历史实现(可从 `git show 8bfd8605c^:` 恢复):
-- **Abstractions**:`IA2AAdapterService`(SendTask/GetTask/CancelTask/GetAgentCard)、`IA2ATaskStore`、`A2ATask`(TaskState: submitted/working/input-required/completed/canceled/failed/unknown)、`AgentCard`、`JsonRpc`
-- **Application**:`A2AAdapterService`、`InMemoryA2ATaskStore`
-- **Hosting**:`A2AEndpoints` —— `GET /.well-known/agent.json`、`POST /a2a`(JSON-RPC:tasks/send、tasks/get、tasks/cancel)、`GET /a2a/subscribe/{taskId}`(SSE)
+⚠️ 当前 HEAD 不提供可用 A2A 运行时。三个 A2A 项目源码已在 8bfd8605c 删除,目录只剩空壳或构建残留;本章不再把 IA2AAdapterService、JSON-RPC endpoints 或 in-memory task store 写成当前能力。
 
-> 本篇记录设计意图与历史实现。如需恢复,从 `8bfd8605c^` checkout。
+## 决策框
 
----
+维护者后续需要在三种路径里选一种,本 issue 不替它拍板:
+
+| 选项 | 含义 | 文档影响 |
+|---|---|---|
+| 删除本篇 | A2A 不再是目标态 | 07 章只保留一条历史索引 |
+| 标为历史已放弃 | 保留设计教训 | 本篇留在 07,但明确不可运行 |
+| 重新实现 | A2A 仍是产品目标 | 需要新的设计 issue,并重新证明 task state 不绕过 Actor + ES |
+
+在没有新授权前,读者应把 A2A 看成"历史方案和待决策项",不是集成教程。
 
 ## 验收
 
-1. A2A adapter 在哪一层?(Host boundary)
-2. A2A task state 是权威吗?(不是,actor state + event store 才是)
-3. 当前 HEAD 有 A2A 源码吗?(没有,在 8bfd8605c 被删)
+1. A2A adapter 应该在哪一层?Host boundary。
+2. A2A task state 是事实源吗?不是,actor state + event store/readmodel 才是。
+3. 当前 HEAD 有可运行 A2A 源码吗?没有,只剩空壳/构建残留。
 
 ⟦AI:AUTO-LOOP⟧

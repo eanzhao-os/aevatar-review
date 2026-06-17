@@ -1,54 +1,51 @@
-# Channel Runtime:多通道适配(Lark/Telegram)+ 凭证路由/边界/入站骨干
+# Channel Runtime:通道如何进入 Actor 主链
 
-## 关键代码(事实源,以 ~/Code/aevatar 为准)
+## 事实源/设计抽象(以 ~/Code/aevatar 为准)
 
-- `agents/Aevatar.GAgents.Channel.Runtime/`:`ChannelBotRegistrationGAgent.cs`、`ConversationPipelineTurnContext.cs`、`ConversationDispatchMiddleware.cs`、`Conversation/`、`Middleware/`、`ShardLeader/`、`UserBinding/`。
-- `agents/channels/Aevatar.GAgents.Channel.NyxIdRelay/`:`NyxIdRelayTransport.cs`、`ChannelCallbackEndpoints.cs`、`NyxIdRelayScopeResolver.cs`、`NyxLarkProvisioningService.cs`、`NyxTelegramProvisioningService.cs`、`NyxIdRelayConversationTypeMap.cs`。
-- `agents/platforms/Aevatar.GAgents.Platform.Lark/`:`LarkMessageComposer.cs`、`LarkChannelNativeMessageProducer.cs`、`LarkStreamingCardShell.cs`、`LarkPayloadRedactor.cs`;`agents/platforms/Aevatar.GAgents.Platform.Telegram/`:`TelegramMessageComposer.cs` 等(渲染/组合 only)。
-- `docs/adr/0008-channel-runtime-multi-token-routing.md`(superseded)、`docs/adr/0012-channel-runtime-credential-boundary.md`(accepted,L33 "ChannelRuntime is not a channel credential authority")、`docs/adr/0013-unified-channel-inbound-backbone.md`(accepted,L27-29 单一入站骨干)、`docs/adr/0014-interactive-reply-abstraction.md`(accepted,L34-39 per-turn collector)。
-- `docs/canon/aevatar-channel-architecture.md`(236KB RFC,active)。
+- `docs/adr/0012-channel-runtime-credential-boundary.md`:ChannelRuntime 不是凭证权威;生产路径收敛到 Lark/Telegram -> NyxID -> Aevatar。
+- `docs/adr/0013-unified-channel-inbound-backbone.md`:统一入站骨干是 transport adapter -> `ChatActivity` -> `ConversationGAgent` -> turn runner。
+- `docs/adr/0014-interactive-reply-abstraction.md`:交互回复是 turn-scoped collector + composer + relay dispatcher 的加法扩展。
 
 ---
 
-## 架构分层
+Channel Runtime 的主语不是"支持了几个平台",而是"外部 IM 如何不绕开 Actor + ES + CQRS 主链"。Lark/Telegram 的差异停在 transport/rendering 边界;进入业务主干后,它们都要变成同一种 ChatActivity。
 
-Channel Runtime 分三棵树(`agents/` 下,非 `src/`):
+```mermaid
+flowchart LR
+  platform[Lark / Telegram] --> nyx[NyxID channel relay]
+  nyx --> adapter[NyxIdRelay transport adapter]
+  adapter --> activity[ChatActivity]
+  activity --> conversation[ConversationGAgent]
+  conversation --> runner[ChannelConversationTurnRunner]
+  runner --> events[Committed events]
+  runner --> outbound[Outbound reply intent]
+  outbound --> composer[Platform composer]
+  composer --> nyx
+```
 
-| 树 | 职责 |
-|---|---|
-| `Channel.Runtime` | per-scope 配置 + 会话 pipeline GAgent |
-| `Channel.NyxIdRelay` | 平台中立的 transport adapter(NyxId 中继) |
-| `Platform.Lark` / `Platform.Telegram` | **渲染/组合 only**(不持凭证、不做路由) |
+![NyxID 凭证流转](../docs/assets/07-channel-nyxid-credentials.png)
 
-`aevatar.channels.slnf`(transport)+ `aevatar.platforms.slnf`(rendering)编码了这个分层切分。
+## 三个边界
 
----
+**Transport adapter** 只做认证、解析、规范化和投递。HTTP relay endpoint 是 shim,不在 endpoint 里编排对话、不直接造业务 actor,也不等待跨 actor 回复。
 
-## 凭证边界(ADR-0012)
+**Conversation actor** 是入站事实拥有者。去重、slash flow、workflow resume、agent-builder routing、turn completion 都必须穿过 ConversationGAgent,否则就会长出第二条通道业务链。
 
-`docs/adr/0012` 第 33 行明确:"ChannelRuntime is not a channel credential authority." 生产路径:`Lark → NyxID → Aevatar`(第 47 行)。direct-callback + Telegram-local-credential 路径已从支持契约移除(第 56-60 行)。
+**Platform renderer** 只把平台无关的 outbound intent 翻译成 Lark/Telegram 原生消息。交互卡片也是加法:新增 composer/producer/register,不是让 runtime 学会某个平台的卡片协议。
 
-> **不变量**:零长期 secret material + NyxID 是唯一凭证经纪。所有凭证(channel token、voice key、LLM key)经 per-request caller NyxID token,不走本地静态 secret。
+## 为什么 ChannelRuntime 不是凭证权威
 
----
+凭证权威单一化是安全边界,不是实现偏好。ChannelRuntime 只保留 route、identity、status、opaque handle 这类非 secret 事实;长期 bot token、滚动密钥、吊销和审计都留在 NyxID/secret store 侧。这样做有两个收益:
 
-## 统一入站骨干(ADR-0013)
+1. actor event/readmodel 不会沉淀长期 secret,历史事件也不需要因为密钥轮换而重写。
+2. 新平台必须先提供外部凭证经纪契约,不能靠"先把 token 塞进 ChannelRuntime"进入生产支持面。
 
-`docs/adr/0013` 第 27-29 行:单一入站 trunk `transport adapter → ChatActivity → ConversationGAgent → ChannelConversationTurnRunner`。Telegram 修正案(第 55-101 行):同 NyxIdRelay transport,`platform="telegram"`,`NyxIdRelayConversationTypeMap`(`private`→`DirectMessage`、`group`/`supergroup`→`Group`、`channel`→`Channel`)。
-
----
-
-## 交互回复抽象(ADR-0014)
-
-`docs/adr/0014` 第 34-39 行:per-turn `IInteractiveReplyCollector`(AsyncLocal)→ registry → composer → relay dispatcher。加一个平台的 card 支持是**加法**(composer + producer + register)。
-
----
+⚠️ Telegram direct-callback 和 local-credential 路径已从 ADR-0012 的支持契约移除;ADR-0013 的 Telegram 修正案把 Telegram 也放到同一 NyxID relay 骨干上。本篇按"有意收敛到 NyxID"解释,但是否还要恢复 direct-callback 兼容面需要维护者另行决策。
 
 ## 验收
 
-1. Channel Runtime 分几棵树?(Runtime/NyxIdRelay/Platform.Lark/Telegram)
-2. ChannelRuntime 是凭证权威吗?(不是,ADR-0012,凭证经 NyxID)
-3. 入站骨干是几条?(一条,trunk:adapter→ChatActivity→ConversationGAgent→TurnRunner)
-4. 加平台的 card 支持是加法还是改法?(加法,ADR-0014)
+1. ChannelRuntime 是凭证权威吗?不是,它只保存非 secret routing/identity/status/handle。
+2. 通道入站有几条业务骨干?一条:relay adapter -> ChatActivity -> ConversationGAgent -> turn runner。
+3. 平台代码负责什么?只负责 native rendering/composition,不拥有路由和凭证。
 
 ⟦AI:AUTO-LOOP⟧
