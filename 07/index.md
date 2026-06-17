@@ -22,4 +22,6 @@
 
 这一组章节的读法是从外到内:入口先把外部 payload 变成 actor 可处理的强类型消息;能力挂在已有 actor 生命周期或产品聚合上;观察面只读 readmodel 或 SSE,不反向成为事实源。
 
+本 block 只重写文档契约,不恢复 A2A、Inspector demo 或旧 demos 的已删源码。
+
 ⟦AI:AUTO-LOOP⟧
