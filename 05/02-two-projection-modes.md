@@ -20,8 +20,8 @@
 
 | 主链 | RuntimeMode | 消费什么 | 产出什么 |
 |---|---|---|---|
-| **Durable Materialization** | `DurableMaterialization`(`ProjectionRuntimeMode.cs:4`) | 只消费 **committed observation**(`CommittedStateEventPublished`,`ProjectionMaterializationScopeGAgentBase.cs:24-38`) | 持久 ReadModel(文档/图) |
-| **Session Observation** | `SessionObservation`(`ProjectionRuntimeMode.cs:5`) | 发布 **session event stream**(不做生命周期事实) | 实时输出(SSE/WS/AGUI live sink) |
+| **Durable Materialization** | `DurableMaterialization`(`ProjectionRuntimeMode.cs`) | 只消费 **committed observation**(`CommittedStateEventPublished`,`ProjectionMaterializationScopeGAgentBase.cs`) | 持久 ReadModel(文档/图) |
+| **Session Observation** | `SessionObservation`(`ProjectionRuntimeMode.cs`) | 发布 **session event stream**(不做生命周期事实) | 实时输出(SSE/WS/AGUI live sink) |
 
 **两者都以 scope actor 为唯一运行态事实源**(README 第 8 行),host 侧只留薄适配。
 
@@ -74,6 +74,10 @@ graph LR
 > **关键区分**:Durable 只消费 committed 事实;Session 消费运行时消息流(可含未提交)。Session **不做生命周期事实**(live sink 不当事实源)。
 
 ---
+
+
+!!! warning "设计待论证 / 已知缺口"
+    CommittedStateProjectionActivationHook 自激活幂等性未确认。详见附录 TODO List(08/04)。
 
 ## 验收
 

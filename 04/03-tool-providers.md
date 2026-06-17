@@ -33,28 +33,28 @@
 
 | # | 类 | 文件 | 领域 |
 |---|---|---|---|
-| 1 | `MCPAgentToolSource` | `Aevatar.AI.ToolProviders.MCP/MCPAgentToolSource.cs:11` | MCP servers |
-| 2 | `SkillsAgentToolSource` | `…/Skills/SkillsAgentToolSource.cs:19` | Skills |
-| 3 | `LarkAgentToolSource` | `…/Lark/LarkAgentToolSource.cs:9` | Lark |
-| 4 | `LarkWorkflowFileSubmitToolSource` | `…/Lark/LarkWorkflowFileSubmitToolSource.cs:11` | Lark workflow 文件 |
-| 5 | `WebAgentToolSource` | `…/Web/WebAgentToolSource.cs:11` | Web/搜索 |
-| 6 | `TelegramAgentToolSource` | `…/Telegram/TelegramAgentToolSource.cs:9` | Telegram |
-| 7 | `OrnnAgentToolSource` | `…/Ornn/OrnnAgentToolSource.cs:11` | Ornn |
-| 8 | `ChannelInteractiveReplyToolSource` | `…/Channel/ChannelInteractiveReplyToolSource.cs:9` | Channel 交互回复 |
-| 9 | `ChannelRegistrationToolSource` | `…/ChannelAdmin/ChannelRegistrationToolSource.cs:10` | Channel 注册 |
-| 10 | `ScriptingAgentToolSource` | `…/Scripting/ScriptingAgentToolSource.cs:15` | Scripting |
-| 11 | `ServiceInvokeAgentToolSource` | `…/ServiceInvoke/ServiceInvokeAgentToolSource.cs:10` | Service 调用 |
-| 12 | `WorkflowAgentToolSource` | `…/Workflow/WorkflowAgentToolSource.cs:14` | Workflow |
-| 13 | `BindingAgentToolSource` | `…/Binding/BindingAgentToolSource.cs:17` | Binding |
-| 14 | `ChronoStorageAgentToolSource` | `…/ChronoStorage/ChronoStorageAgentToolSource.cs:12` | Chrono storage |
-| 15 | `NyxIdAgentToolSource` | `…/NyxId/NyxIdAgentToolSource.cs:12` | NyxId |
-| 16 | `NyxIdConnectedServiceToolSource` | `…/NyxId/NyxIdConnectedServiceToolSource.cs:21` | NyxId 连接服务(per-user opt-in) |
-| 17 | `InvokeGAgentToolSource` | `…/AevatarInvocation/AevatarInvocationToolSources.cs:9` | 调 GAgent |
+| 1 | `MCPAgentToolSource` | `Aevatar.AI.ToolProviders.MCP/MCPAgentToolSource.cs` | MCP servers |
+| 2 | `SkillsAgentToolSource` | `…/Skills/SkillsAgentToolSource.cs` | Skills |
+| 3 | `LarkAgentToolSource` | `…/Lark/LarkAgentToolSource.cs` | Lark |
+| 4 | `LarkWorkflowFileSubmitToolSource` | `…/Lark/LarkWorkflowFileSubmitToolSource.cs` | Lark workflow 文件 |
+| 5 | `WebAgentToolSource` | `…/Web/WebAgentToolSource.cs` | Web/搜索 |
+| 6 | `TelegramAgentToolSource` | `…/Telegram/TelegramAgentToolSource.cs` | Telegram |
+| 7 | `OrnnAgentToolSource` | `…/Ornn/OrnnAgentToolSource.cs` | Ornn |
+| 8 | `ChannelInteractiveReplyToolSource` | `…/Channel/ChannelInteractiveReplyToolSource.cs` | Channel 交互回复 |
+| 9 | `ChannelRegistrationToolSource` | `…/ChannelAdmin/ChannelRegistrationToolSource.cs` | Channel 注册 |
+| 10 | `ScriptingAgentToolSource` | `…/Scripting/ScriptingAgentToolSource.cs` | Scripting |
+| 11 | `ServiceInvokeAgentToolSource` | `…/ServiceInvoke/ServiceInvokeAgentToolSource.cs` | Service 调用 |
+| 12 | `WorkflowAgentToolSource` | `…/Workflow/WorkflowAgentToolSource.cs` | Workflow |
+| 13 | `BindingAgentToolSource` | `…/Binding/BindingAgentToolSource.cs` | Binding |
+| 14 | `ChronoStorageAgentToolSource` | `…/ChronoStorage/ChronoStorageAgentToolSource.cs` | Chrono storage |
+| 15 | `NyxIdAgentToolSource` | `…/NyxId/NyxIdAgentToolSource.cs` | NyxId |
+| 16 | `NyxIdConnectedServiceToolSource` | `…/NyxId/NyxIdConnectedServiceToolSource.cs` | NyxId 连接服务(per-user opt-in) |
+| 17 | `InvokeGAgentToolSource` | `…/AevatarInvocation/AevatarInvocationToolSources.cs` | 调 GAgent |
 | 18 | `InvokeTeamToolSource` | 同上:22 | 调 team |
 | 19 | `StartWorkflowToolSource` | 同上:35 | 启动 workflow |
 | 20 | `ObserveRunToolSource` | 同上:48 | 观察 run |
 | 21 | `ReadWorkflowRunArtifactToolSource` | 同上:61 | 读 run artifact |
-| 22 | `AgentDeliveryTargetToolSource` | `…/AgentCatalog/AgentDeliveryTargetToolSource.cs:6` | Agent 投递目标 |
+| 22 | `AgentDeliveryTargetToolSource` | `…/AgentCatalog/AgentDeliveryTargetToolSource.cs` | Agent 投递目标 |
 
 ---
 
@@ -68,7 +68,7 @@
 
 | 集 | 内容 | 文件 |
 |---|---|---|
-| `workspace.default` | 16 sources(InvokeGAgent/Team/StartWorkflow/ObserveRun/ReadArtifact/ResponsesProvider/Channel×2/DeliveryTarget/NyxId/Lark/Telegram/ChronoStorage/Web/Skills/Ornn) | `MainnetHostBuilderExtensions.cs:268-288` |
+| `workspace.default` | 16 sources(InvokeGAgent/Team/StartWorkflow/ObserveRun/ReadArtifact/ResponsesProvider/Channel×2/DeliveryTarget/NyxId/Lark/Telegram/ChronoStorage/Web/Skills/Ornn) | `MainnetHostBuilderExtensions.cs` |
 | `lark.self_notify` | include `workspace.default` + Lark self-notify | 第 289-293 行 |
 | `nyxid.connected_services` | opt-in only(`NyxIdConnectedServiceToolSource`) | 第 297-300 行 |
 
@@ -80,7 +80,7 @@
 
 1. 工具审批的 Yield 模式怎么工作?(YieldApprovalHandler 立即 Yielded,actor 持 pending continuation)
 2. ToolApprovalMiddleware 为什么插最前?(安全策略不可绕过,第 16-17 行)
-3. `workspace.default` 含哪些?(16 个 source,MainnetHostBuilderExtensions.cs:268-288)
+3. `workspace.default` 含哪些?(16 个 source,MainnetHostBuilderExtensions.cs)
 4. tool_call 和 connector_call 区别?(前者 agent 工具系统;后者 workflow connector,role-model.md:265-268)
 
 ⟦AI:AUTO-LOOP⟧

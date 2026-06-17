@@ -25,7 +25,7 @@ workflow projection 有两类 projector(`ServiceCollectionExtensions.cs` 第 108
 | `WorkflowCatalogCurrentStateProjector` | current-state | `:10` | workflow binding 当前态 |
 | `WorkflowActorBindingProjector` | artifact | `:9` | binding artifact |
 
-> ⚠️ **Timeline/Graph 不再有独立 projector 类**。重构 `416108d7a` 删除了 `WorkflowRunTimelineArtifactProjector`/`WorkflowRunGraphArtifactProjector`(canon 文档引用已过期)。现在 timeline/graph 从单一 `WorkflowRunInsightReportDocument` artifact **派生**:`WorkflowRunGraphArtifactMaterializer.Materialize(report)`(`WorkflowRunGraphArtifactMaterializer.cs:8,16-26`)。
+> ⚠️ **Timeline/Graph 不再有独立 projector 类**。重构 `416108d7a` 删除了 `WorkflowRunTimelineArtifactProjector`/`WorkflowRunGraphArtifactProjector`(canon 文档引用已过期)。现在 timeline/graph 从单一 `WorkflowRunInsightReportDocument` artifact **派生**:`WorkflowRunGraphArtifactMaterializer.Materialize(report)`(`WorkflowRunGraphArtifactMaterializer.cs,16-26`)。
 
 ---
 

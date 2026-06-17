@@ -20,9 +20,9 @@
 
 | 契约 | 文件 | 操作 |
 |---|---|---|
-| `IProjectionDocumentWriter<TReadModel>` | `IProjectionDocumentWriter.cs:3-9` | upsert/delete |
+| `IProjectionDocumentWriter<TReadModel>` | `IProjectionDocumentWriter.cs` | upsert/delete |
 | `IProjectionDocumentReader<TReadModel,TKey>` | `IProjectionDocumentReader.cs` | 读 |
-| `IProjectionGraphStore` | `IProjectionGraphStore.cs:3-38` | ReplaceOwnerGraph/UpsertNode/UpsertEdge/Delete/List/Neighbors/Subgraph |
+| `IProjectionGraphStore` | `IProjectionGraphStore.cs` | ReplaceOwnerGraph/UpsertNode/UpsertEdge/Delete/List/Neighbors/Subgraph |
 
 `IProjectionStoreDispatcher`(`ProjectionStoreDispatcher.cs`)是路由权威(`cqrs-projection.md:111`)。
 
@@ -34,7 +34,7 @@
 |---|---|---|---|
 | **InMemory** | `Providers.InMemory/` | Document + Graph | dev/test(`README.md:1-20`) |
 | **Elasticsearch** | `Providers.Elasticsearch/` | Document only | 生产文档存储;schema-drift 权威 = augmented mapping fingerprint + alias 生命周期(`README.md:30-37`) |
-| **Neo4j** | `Providers.Neo4j/` | Graph only | 生产图存储(Uri/Username/Password/Database/MaxTraversalDepth,`Neo4jProjectionGraphStoreOptions.cs:3-22`) |
+| **Neo4j** | `Providers.Neo4j/` | Graph only | 生产图存储(Uri/Username/Password/Database/MaxTraversalDepth,`Neo4jProjectionGraphStoreOptions.cs`) |
 
 > ⚠️ **StateMirror 已移除**:目录 `Aevatar.CQRS.Projection.StateMirror/` 只剩 `bin/`/`obj/`(commit `da7944cf2` 移除)。不作为活跃 provider。
 

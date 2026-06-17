@@ -28,9 +28,9 @@
 
 | Provider | 文件 | 桥接 | 说明 |
 |---|---|---|---|
-| **MEAI** | `MEAILLMProvider.cs:26` | `Microsoft.Extensions.AI` 的 `IChatClient` | 通用桥接;`MEAILLMProviderFactory` 持 `ImmutableDictionary` + `Register`/`SetDefault` |
-| **NyxId** | `NyxIdLLMProvider.cs:16` | 每路由构造 delegate MEAI provider(`CreateDelegateProvider` 第 284 行 → `new MEAILLMProvider` 第 302 行) | NyxId 网关路由 |
-| **Tornado** | `TornadoLLMProvider.cs:26` | `LlmTornado` 的 `TornadoApi` | 第三方 SDK 桥接 |
+| **MEAI** | `MEAILLMProvider.cs` | `Microsoft.Extensions.AI` 的 `IChatClient` | 通用桥接;`MEAILLMProviderFactory` 持 `ImmutableDictionary` + `Register`/`SetDefault` |
+| **NyxId** | `NyxIdLLMProvider.cs` | 每路由构造 delegate MEAI provider(`CreateDelegateProvider` 第 284 行 → `new MEAILLMProvider` 第 302 行) | NyxId 网关路由 |
+| **Tornado** | `TornadoLLMProvider.cs` | `LlmTornado` 的 `TornadoApi` | 第三方 SDK 桥接 |
 
 NyxId 和 Tornado 最终都桥接到 MEAI 形态,保证 `RoleGAgent` 只依赖 `ILLMProvider`。
 

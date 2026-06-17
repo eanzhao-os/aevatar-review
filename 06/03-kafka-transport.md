@@ -26,7 +26,7 @@ README 第 101 行提到 MassTransit/Kafka,但 **MassTransit 是历史路径,已
 
 ## KafkaProvider:Kafka partition 与 Orleans queue 收敛
 
-`KafkaQueuePartitionMapper`(`KafkaQueuePartitionMapper.cs:10`)的核心设计:让 Kafka partition 绑定和 Orleans queue 所有权**收敛到一个 runtime slot**。
+`KafkaQueuePartitionMapper`(`KafkaQueuePartitionMapper.cs`)的核心设计:让 Kafka partition 绑定和 Orleans queue 所有权**收敛到一个 runtime slot**。
 
 映射规则(第 39-48 行,ADR-0003 第 82-88 行):
 ```
@@ -43,7 +43,7 @@ PartitionId = SHA256(StreamNamespace + "\n" + StreamId) % QueueCount
 
 ## 配置
 
-`KafkaProviderTransportOptions`(`KafkaProviderTransportOptions.cs:5-31`):
+`KafkaProviderTransportOptions`(`KafkaProviderTransportOptions.cs`):
 
 | 选项 | 默认 | 行号 |
 |---|---|---|
@@ -54,7 +54,7 @@ PartitionId = SHA256(StreamNamespace + "\n" + StreamId) % QueueCount
 | `ProducerMaxMessageBytes` | 10MB | 第 24 行 |
 | `ProducerCompressionType` | Gzip | 第 31 行 |
 
-启用:`AddAevatarFoundationRuntimeOrleansKafkaProviderTransport`(`ServiceCollectionExtensions.cs:12`)。config key `OrleansStreamBackend=KafkaProvider`(`AevatarOrleansRuntimeOptions.cs:6`)。
+启用:`AddAevatarFoundationRuntimeOrleansKafkaProviderTransport`(`ServiceCollectionExtensions.cs`)。config key `OrleansStreamBackend=KafkaProvider`(`AevatarOrleansRuntimeOptions.cs`)。
 
 ---
 

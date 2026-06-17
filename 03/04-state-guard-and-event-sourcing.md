@@ -44,6 +44,10 @@ handler 运行时有 writable scope,但权威状态仍来自领域事件。commi
 
 ---
 
+
+!!! warning "设计待论证 / 已知缺口"
+    RunManager:文档提到 latest-wins 但代码只有 AsyncLocalAgentContext。详见附录 TODO List(08/04)。
+
 ## 验收
 
 1. 状态为什么只能在事件处理期写?(StateGuard 用 AsyncLocal 闸门防止绕过 actor 串行语义)

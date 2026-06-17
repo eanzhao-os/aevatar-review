@@ -75,22 +75,22 @@ sequenceDiagram
 
 | 箭头 | 发生了什么 / 业务含义 | 代码落点 | 继续阅读 |
 |---|---|---|---|
-| `User → API: POST /api/chat` | HTTP SSE 入口;协议见 canon | `src/workflow/Aevatar.Workflow.Infrastructure/CapabilityApi/ChatEndpoints.cs:44` | `01/02-chat-api-and-sse.md` |
-| `API → App: ExecuteAsync` | HTTP 层只做协议出口,把请求交给 Application 编排 | `WorkflowChatRunInteractionService.cs:30` | `01/03-run-semantics.md` |
+| `User → API: POST /api/chat` | HTTP SSE 入口;协议见 canon | `src/workflow/Aevatar.Workflow.Infrastructure/CapabilityApi/ChatEndpoints.cs` | `01/02-chat-api-and-sse.md` |
+| `API → App: ExecuteAsync` | HTTP 层只做协议出口,把请求交给 Application 编排 | `WorkflowChatRunInteractionService.cs` | `01/03-run-semantics.md` |
 | `App 组装 envelope` | 把 prompt/workflow/source 组装成发给 actor 的 `EventEnvelope` | `WorkflowChatRequestEnvelopeFactory.cs` | `03/02-event-envelope-vs-state-event.md` |
-| `App → WF: definition` | 按 workflow 名寻址/创建 definition actor,复用已编译的 YAML | `src/workflow/Aevatar.Workflow.Core/WorkflowGAgent.cs:17` | `02/02-definition-and-run-actors.md` |
-| `App → Run: 派生 run actor` | 一次运行一个 run actor,`runId` 服务端生成 | `src/workflow/Aevatar.Workflow.Core/WorkflowRunGAgent.cs:36` | `01/03-run-semantics.md` |
-| `Run → Role: 创建子 actor` | 按 `roles` 创建 run-scoped role actor(AI 身份 + 能力授权) | `src/Aevatar.AI.Core/RoleGAgent.cs:33` | `04/01-role-gagent.md` |
+| `App → WF: definition` | 按 workflow 名寻址/创建 definition actor,复用已编译的 YAML | `src/workflow/Aevatar.Workflow.Core/WorkflowGAgent.cs` | `02/02-definition-and-run-actors.md` |
+| `App → Run: 派生 run actor` | 一次运行一个 run actor,`runId` 服务端生成 | `src/workflow/Aevatar.Workflow.Core/WorkflowRunGAgent.cs` | `01/03-run-semantics.md` |
+| `Run → Role: 创建子 actor` | 按 `roles` 创建 run-scoped role actor(AI 身份 + 能力授权) | `src/Aevatar.AI.Core/RoleGAgent.cs` | `04/01-role-gagent.md` |
 | `App → Run: ChatRequestEvent` | 请求进入 run actor 的 inbox(Actor 邮箱串行) | `WorkflowRunGAgent.cs`(ChatRequestEvent handler) | `03/01-agent-actor-runtime.md` |
 | `Run → Kernel: StartWorkflow` | 执行内核初始化 run state、写 input 变量、选入口 step | `src/workflow/Aevatar.Workflow.Core/Execution/WorkflowExecutionKernel.cs` | `02/03-execution-kernel.md` |
-| `Kernel → Role: llm_call` | 把 `llm_call` 步骤派给 role actor,包成 `ChatRequestEvent` | `RoleGAgent.cs:458`(ChatRequestEvent handler) | `02/04-step-modules-catalog.md` |
+| `Kernel → Role: llm_call` | 把 `llm_call` 步骤派给 role actor,包成 `ChatRequestEvent` | `RoleGAgent.cs`(ChatRequestEvent handler) | `02/04-step-modules-catalog.md` |
 | `Role → LLM: ChatStreamAsync` | role actor 流式调 LLM Provider(MEAI/NyxId/Tornado) | `RoleGAgent.cs`(ChatStreamAsync) | `04/02-llm-providers.md` |
-| `LLM → Role: tokens` | LLM 流式回 token;role 发 `TextMessageStart → Content* → End` | `RoleGAgent.cs:4-6`(注释说明 AG-UI 事件序列) | `04/01-role-gagent.md` |
-| `Role → Kernel: StepCompletedEvent` | 步骤完成事件回到 run actor;内核推进到下一步 | `WorkflowRunGAgent.cs:1006`(`On<StepCompletedEvent>`)、`:1224`(`ApplyStepCompleted` reducer) | `02/03-execution-kernel.md` |
+| `LLM → Role: tokens` | LLM 流式回 token;role 发 `TextMessageStart → Content* → End` | `RoleGAgent.cs`(注释说明 AG-UI 事件序列) | `04/01-role-gagent.md` |
+| `Role → Kernel: StepCompletedEvent` | 步骤完成事件回到 run actor;内核推进到下一步 | `WorkflowRunGAgent.cs`(`On<StepCompletedEvent>`)、`:1224`(`ApplyStepCompleted` reducer) | `02/03-execution-kernel.md` |
 | `Kernel → Store: PersistDomainEventAsync` | **只有显式持久化后**,领域事件才进 EventStore 成为事实 | `GAgentBase`(PersistDomainEventAsync);`docs/canon/architecture.md:69` | `03/04-state-guard-and-event-sourcing.md` |
 | `Kernel → Proj: 投影` | 同一条 committed envelope 流被投影为多个分支(SSE/报告/ReadModel) | `docs/canon/architecture.md:65`、`:161-169` | `05/01-projection-overview.md` |
 | `Run → App: WorkflowCompletedEvent` | run 收敛,通知 Application | `WorkflowRunGAgent.cs` | `01/03-run-semantics.md` |
-| `Proj → User: SSE 流` | 投影产出实时 SSE 帧 + 物化 ReadModel | `ChatSseResponseWriter.cs:45`;`WorkflowRunEventTypes.cs:3-19` | `00/03-quick-start.md`、`05/02-two-projection-modes.md` |
+| `Proj → User: SSE 流` | 投影产出实时 SSE 帧 + 物化 ReadModel | `ChatSseResponseWriter.cs`;`WorkflowRunEventTypes.cs` | `00/03-quick-start.md`、`05/02-two-projection-modes.md` |
 
 ---
 

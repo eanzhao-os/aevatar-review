@@ -18,30 +18,30 @@
 Foundation 三原语(`IActorRuntime`/`IActorDispatchPort`/`IEventPublisher`)在 Local 和 Orleans 是**同一抽象的两种实现**(`architecture.md:138`)。
 
 **Orleans 实现**:
-- `OrleansActorRuntime`(`OrleansActorRuntime.cs:12`):`GetGrain<IRuntimeActorGrain>(actorId)`(第 50/67 行)—— **Orleans virtual actor 保证全局单激活**
-- `OrleansActorDispatchPort`(`OrleansActorDispatchPort.cs:7`):`DispatchAsync` → grain → `_streams.GetStream(actorId).ProduceAsync(envelope)`(第 30 行)→ 邮箱串行 admission → `DispatchAdmission`
+- `OrleansActorRuntime`(`OrleansActorRuntime.cs`):`GetGrain<IRuntimeActorGrain>(actorId)`(第 50/67 行)—— **Orleans virtual actor 保证全局单激活**
+- `OrleansActorDispatchPort`(`OrleansActorDispatchPort.cs`):`DispatchAsync` → grain → `_streams.GetStream(actorId).ProduceAsync(envelope)`(第 30 行)→ 邮箱串行 admission → `DispatchAdmission`
 - `OrleansGrainEventPublisher`:`IEventPublisher`(经 stream publish)
 
 ---
 
 ## RuntimeActorGrain:实际激活
 
-`RuntimeActorGrain`(`RuntimeActorGrain.cs:25`)是 string-keyed grain(`IGrainWithStringKey`,`IRuntimeActorGrain.cs:5`)= 每 actorId 集群单激活。
+`RuntimeActorGrain`(`RuntimeActorGrain.cs`)是 string-keyed grain(`IGrainWithStringKey`,`IRuntimeActorGrain.cs`)= 每 actorId 集群单激活。
 
 - `[ImplicitStreamSubscription]`(第 25 行)+ `IPersistentState<RuntimeActorGrainState>`(第 27 行)
 - `OnActivateAsync`(第 55-77 行):从持久化 kind 解析 identity,绑定 agent
 - `HandleEnvelopeAsync`/`HandleEnvelopeAsyncCore`(第 170-292 行):**单线程 grain turn = 邮箱串行处理**;dedup(第 208-213 行)、routing(第 219-268 行)、`agent.HandleEventAsync`(第 274 行)
 - self-stream 订阅(第 477-501 行):`SubscribeSelfStreamAsync`/`OnSelfStreamEventAsync` 喂 mailbox
 
-`RuntimeActorGrainState`(`RuntimeActorGrainState.cs:6`,`[GenerateSerializer]`):`AgentId`[Id 0]、`ParentId`[Id 2]、`Children`[Id 3]、`Identity`[Id 7]。
+`RuntimeActorGrainState`(`RuntimeActorGrainState.cs`,`[GenerateSerializer]`):`AgentId`[Id 0]、`ParentId`[Id 2]、`Children`[Id 3]、`Identity`[Id 7]。
 
 ---
 
 ## 分布式拓扑存储
 
-- `IStreamTopologyGrain`(`IStreamTopologyGrain.cs:5`):分布式 Forward-topology grain(`IGrainWithStringKey`)
+- `IStreamTopologyGrain`(`IStreamTopologyGrain.cs`):分布式 Forward-topology grain(`IGrainWithStringKey`)
 - `OrleansDistributedStreamForwardingRegistry`:分布式 `IStreamForwardingRegistry`
-- `AddAevatarFoundationRuntimeOrleansStreaming()`(`ServiceCollectionExtensions.cs:11-15`):替换为 Orleans 分布式实现
+- `AddAevatarFoundationRuntimeOrleansStreaming()`(`ServiceCollectionExtensions.cs`):替换为 Orleans 分布式实现
 
 ---
 

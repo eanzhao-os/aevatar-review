@@ -49,9 +49,9 @@ maxRounds 耗尽 → 无工具 final call (ComposeFinalCallId, 第 211-260 行)
 
 | 中间件 | 接口 | Context 关键字段 |
 |---|---|---|
-| AgentRun | `IAgentRunMiddleware.cs:7-10` | UserMessage/AgentId/Result/Terminate/Items |
-| ToolCall | `IToolCallMiddleware.cs:10-13` | Tool/ArgumentsJson/Result/Receipt/PendingApproval/Terminate/TerminationKind(None/ApprovalDenied/ApprovalTimedOut/ApprovalPending/MiddlewareTerminated) |
-| LLMCall | `ILLMCallMiddleware.cs:9-12` | Request(可变)/Provider/Response/Terminate/IsStreaming |
+| AgentRun | `IAgentRunMiddleware.cs` | UserMessage/AgentId/Result/Terminate/Items |
+| ToolCall | `IToolCallMiddleware.cs` | Tool/ArgumentsJson/Result/Receipt/PendingApproval/Terminate/TerminationKind(None/ApprovalDenied/ApprovalTimedOut/ApprovalPending/MiddlewareTerminated) |
+| LLMCall | `ILLMCallMiddleware.cs` | Request(可变)/Provider/Response/Terminate/IsStreaming |
 
 每个 `InvokeAsync(context, Func<Task> next)` —— 标准 middleware 链。
 
@@ -67,6 +67,10 @@ maxRounds 耗尽 → 无工具 final call (ComposeFinalCallId, 第 211-260 行)
 `GenAIObservabilityMiddleware`(`GenAIObservabilityMiddleware.cs` 第 17-18 行)实现全部三个 middleware,自动埋点(含 `EnableSensitiveData` 开关,第 21 行控制是否记 input)。
 
 ---
+
+
+!!! warning "设计待论证 / 已知缺口"
+    DefaultMaxToolRounds = int.MaxValue 是无熔断 fallback(实际默认 40,见上游 aevatar#2210)。详见附录 TODO List(08/04)。
 
 ## 验收
 

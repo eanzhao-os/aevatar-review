@@ -17,14 +17,14 @@ Garnet(Redis 协议兼容)用于两件事:
 
 ### 1. IEventStore 持久化
 
-`GarnetEventStore`(`GarnetEventStore.cs:14`)实现 `IEventStore`。核心是 Lua 脚本做 OCC CAS(`AppendScript`,第 16-47 行):
+`GarnetEventStore`(`GarnetEventStore.cs`)实现 `IEventStore`。核心是 Lua 脚本做 OCC CAS(`AppendScript`,第 16-47 行):
 - CAS on `VersionKey`(乐观并发)
 - `ZADD` 到 sorted-set index(版本排序)
 - `HSET` 到 data hash(事件 payload)
 
 key layout(第 260-267 行):`{prefix}:{agentId}:version|index|data`,hash-tag `{agentId}` 保证 Redis-cluster slot 亲和。`AppendAsync`(第 90-148 行)版本不连续或 OCC 冲突抛 `EventStoreOptimisticConcurrencyException`。`DeleteEventsUpToAsync`(第 217-241 行)做 snapshot 压缩。
 
-DI:`AddGarnetEventStore`(`ServiceCollectionExtensions.cs:13`)注册 `IConnectionMultiplexer` + 替换 `IEventStore`。
+DI:`AddGarnetEventStore`(`ServiceCollectionExtensions.cs`)注册 `IConnectionMultiplexer` + 替换 `IEventStore`。
 
 ### 2. Orleans 聚类/membership/grain-state/reminder
 
