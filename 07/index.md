@@ -10,8 +10,11 @@
 
 07 章不把周边组件当项目树清单讲,而是回答一个问题:外部能力怎样接入 aevatar 主干。
 
+> 想先看「所有 input 入口是否统一」的横切总览,直接读 [10 Input 入口统一](10-input-ingress-unification.md):它把模型 API / 直聊 / 通道 / 语音 / Studio / Workflow 等入口列全,并按路由策略、动作词汇、工具骨干、命令骨架、投影链五层给出统一矩阵与剩余缺口。
+
 | 面 | 章节 | 主干接入职责 | 当前状态 |
 |---|---|---|---|
+| 横切总览 | [10 Input 入口统一](10-input-ingress-unification.md) | 全部 input 入口清单 + 五层统一矩阵 + 彻底统一还差什么 | 现役;语音工具循环 / Workflow chat 第二前门为主要缺口 |
 | 入口面 | [01 Channel](01-channels.md) | Lark/Telegram 经 NyxID relay 规范化成 `ChatActivity`,进入 `ConversationGAgent` 与 turn runner | 现役;Telegram direct-callback/local credential 已出支持契约,见 01 的 ⚠️ |
 | 入口面 | [08 Lark 全链路](08-lark-end-to-end.md) | 沿一条 Lark 消息走完 relay → `ChatActivity` → `ConversationGAgent` → run actor → `ToolCallLoop` → relay 回复 | 现役;run actor = `AgentRunGAgent`,`RoleGAgent` 不在此热路径 |
 | 入口面 | [03 ChatRouting](03-chat-routing.md) | `ChatRoutePolicyGAgent` 持配置,入口同步调用无状态 resolver,再进入模型/tool 执行 | 现役;不是 router actor |
