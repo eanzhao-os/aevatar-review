@@ -64,6 +64,8 @@
   - 关键代码:`src/workflow/extensions/Aevatar.Workflow.Extensions.Maker/`、`demos/Aevatar.Demos.Maker/`、`docs/canon/overview.md §4`、`docs/adr/0006-multi-agent-evolution.md`
 - ⬜ 02/07-connectors.md — Connector(HTTP/CLI/MCP)配置与 `connector_call` 执行;role connector allowlist
   - 关键代码:`docs/canon/connector.md`、`docs/canon/role-model.md`、`src/Aevatar.Configuration/README.md`
+- ✅ `02/08-saga-durable-execution.md`(SCOPE_EXTEND 亮点,非原始 01–07 清单)— saga 补偿 + dead-letter + 持久挂起 = 长在 agent 编排上的 durable execution;两阶段账本 / `OutcomeUncertain` 跳过 / ADR-0034 漂移
+  - 事实源脊柱:`src/workflow/Aevatar.Workflow.Core/workflow_state.proto`、`src/workflow/Aevatar.Workflow.Core/WorkflowRunGAgent.cs`、`docs/adr/0034-workflow-saga-compensation-protocol.md`
 
 ### 03 · 运行内核(Foundation)★ 重点
 
@@ -77,6 +79,8 @@
 - ⬜ 03/06-local-runtime-deep-dive.md — `LocalActorRuntime` / `LocalActor`(邮箱串行)/ `LocalActorPublisher` 的实现,为什么 InMemory 仅限开发测试
 - ✅ `03/07-stream-actor-gagent-facts.md`(SCOPE_EXTEND,非原始 01–06 清单)— Stream × Actor × GAgent 三者关系与逐条事实清单:收口 03 块,纠正"事件都在 stream / stream 都包在 actor 里"两个常见说法
   - 事实源脊柱:`OrleansGrainEventPublisher.cs`(发布全部落 `ProduceAsync`)、`RuntimeActorGrain.cs`(订阅自身 stream)、`IRuntimeActorGrain.cs`(非事件 RPC 面)、`GAgentBase.cs`(turn 内同步处理)、`ScopeGAgentEndpoints.cs` + `ProjectionSessionEventHub.cs`(actor 外订阅 stream 的反例)
+- ✅ `03/08-event-sourcing-dividends.md`(SCOPE_EXTEND 亮点,非原始 01–06 清单)— Event Sourcing 三重红利(唯一事实源 / 确定性重放 / 免费可观测性)+ `StateGuard` 写栅栏纪律
+  - 事实源脊柱:`src/Aevatar.Foundation.Abstractions/Persistence/IEventStore.cs`、`src/Aevatar.Foundation.Core/StateGuard.cs`、`src/Aevatar.Foundation.Core/EventSourcing/StateEventApplierBase.cs`
 
 ### 04 · AI 能力层
 
@@ -102,6 +106,8 @@
 - ⬜ 06/03-kafka-transport.md — 可选 `Transport=Kafka`(MassTransit/Kafka)插件,ADR-0003 的设计
 - ⬜ 06/04-garnet-clustering.md — 生产聚类用共享 Garnet 成员资格(ADR-0032)、Garnet 持久化实现
 - ⬜ 06/05-architecture-guards.md — `tools/ci/architecture_guards.sh` / `slow_test_guards.sh` 守卫什么、为什么"禁止 Workflow→Maker 反向依赖"这类规则是 CI 强制的
+- ✅ `06/06-credentials-zero-standing-secrets.md`(SCOPE_EXTEND 亮点,非原始 01–05 清单)— 零长期密钥:grain state 只存不透明 `BindingId`、触发期换短期票、持久回调零凭证守卫、长效 key 作用域收敛(唯一破口 = voice 静态 key 未 fail-closed)
+  - 事实源脊柱:`src/Aevatar.Foundation.Runtime.Implementations.Orleans/Grains/Callbacks/DurableCallbackEnvelopeCredentialGuard.cs`、`src/platform/Aevatar.GAgentService.Hosting/DependencyInjection/ServiceCollectionExtensions.cs`、`docs/adr/0018-per-user-nyxid-binding-via-oauth-broker.md`
 
 ### 07 · 周边
 

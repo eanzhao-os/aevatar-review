@@ -124,6 +124,7 @@ nav:
       - workflows/ 示例拆解: 02/05-workflows-walkthrough.md
       - Maker 插件边界: 02/06-maker-plugin.md
       - Connector: 02/07-connectors.md
+      - 亮点·saga + 持久执行: 02/08-saga-durable-execution.md
   - 03 运行内核:
       - 03/index.md
       - Agent/Actor/Runtime/Stream: 03/01-agent-actor-runtime.md
@@ -133,6 +134,7 @@ nav:
       - 路由与拓扑: 03/05-routing-and-topology.md
       - Local Runtime 深入: 03/06-local-runtime-deep-dive.md
       - Stream×Actor×GAgent 事实清单: 03/07-stream-actor-gagent-facts.md
+      - 亮点·Event Sourcing 三重红利: 03/08-event-sourcing-dividends.md
   - 04 AI 能力层:
       - 04/index.md
       - RoleGAgent: 04/01-role-gagent.md
@@ -152,6 +154,7 @@ nav:
       - Kafka Transport: 06/03-kafka-transport.md
       - Garnet 聚类: 06/04-garnet-clustering.md
       - 架构门禁: 06/05-architecture-guards.md
+      - 亮点·零长期密钥(凭证): 06/06-credentials-zero-standing-secrets.md
   - 07 周边:
       - 07/index.md
       - Input 入口统一: 07/10-input-ingress-unification.md

@@ -11,3 +11,4 @@
 | [05](05-workflows-walkthrough.md) | workflows/ 下 12 个示例逐个拆解 |
 | [06](06-maker-plugin.md) | Maker 插件边界 + 架构门禁 |
 | [07](07-connectors.md) | Connector(HTTP/CLI/MCP)+ role allowlist |
+| [08](08-saga-durable-execution.md) | 亮点:saga 补偿 + dead-letter + 持久挂起 = durable execution |
