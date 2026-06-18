@@ -93,7 +93,7 @@ flowchart LR
 
 1. 工具审批的 Yield 模式怎么工作?(`YieldApprovalHandler` 立即 `Yielded`,actor 持久化 pending continuation,后续 self-continuation 续跑)
 2. `ToolApprovalMiddleware` 排在第几位?(第二位,紧跟 `ToolCallCredentialPolicyMiddleware`;两者一起被钉在所有用户中间件之前)
-3. ToolSource 一共多少、怎么分?(26 个:21 个在 `src/Aevatar.AI.ToolProviders.*` 是 agent 通用能力,5 个在 `src/workflow/` 是 run 期工具)
+3. ToolSource 一共多少、怎么分?(26 个:21 个在 src/Aevatar.AI.ToolProviders.* 是 agent 通用能力,5 个在 `src/workflow/` 是 run 期工具)
 4. `tool_call` 和 `connector_call` 区别?(前者是 agent 工具系统;后者是 workflow connector,见 02/07)
 
 ⟦AI:AUTO-LOOP⟧
