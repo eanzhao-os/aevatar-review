@@ -170,3 +170,12 @@ nav:
       - Demo Cookbook: 08/03-demo-cookbook.md
       - 未来规划·战术 TODO: 08/04-todo-list.md
       - 未来规划·战略 结晶梯度路线图: 08/05-crystallization-roadmap.md
+  - 09 方案区:
+      - 09/index.md
+      - 方案 01·workflow 发布为 NyxID 服务:
+          - 09/01-workflow-as-nyxid-service/index.md
+          - 机制总览: 09/01-workflow-as-nyxid-service/01-mechanisms.md
+          - 发布路径: 09/01-workflow-as-nyxid-service/02-publish-path.md
+          - 注册与发现: 09/01-workflow-as-nyxid-service/03-register-and-discover.md
+          - 三个调用入口: 09/01-workflow-as-nyxid-service/04-calling.md
+          - 端到端方案: 09/01-workflow-as-nyxid-service/05-end-to-end-plan.md

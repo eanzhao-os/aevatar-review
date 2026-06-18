@@ -117,6 +117,19 @@
 - ⬜ 08/02-doc-index.md — 把 aevatar 仓库 `docs/canon` + `docs/adr` 的索引搬过来并加导读(不复制全文)
 - ⬜ 08/03-demo-cookbook.md — 可复现 demo 合集:Maker sample、CaseProjection、Workflow.Web、Cli、Inspector
 
+### 09 · 方案区(SCOPE_EXTEND,非原始 00–08 清单)
+
+> 收录跨 aevatar(必要时跨 `~/Code/NyxID` 等周边仓库)的可落地**设计方案**。每份方案是一个独立子区 `09/<NN>-<slug>/`(内含 `index.md` 概览 + 若干章),自带「事实源/设计抽象」脊柱、配图、诚实缺口标注。区索引 `09/index.md` 只做导航。新增方案:建子目录 + `mkdocs.yml`/本清单/区索引三处接线 + 跑 `scripts/check-md.sh`(子区章节已纳入校验)。
+
+**方案 01 · 把 Studio workflow 发布成 NyxID 可调用服务**(`09/01-workflow-as-nyxid-service/`)——跨 `~/Code/aevatar`(发布/调用)与 `~/Code/NyxID`(注册/发现/代理)。诚实标注:发布与代理两头现役,当中注册一跳手工,protobuf↔OpenAPI 与 scope_id 鉴权穿透为缺口。
+
+- ✅ 01-workflow-as-nyxid-service/index.md — 方案概览:两头真、当中手工 的一句话结论 + 导读
+- ✅ 01-workflow-as-nyxid-service/01-mechanisms.md — 两半机制总览,相遇于唯一 wire `POST /api/v1/proxy/s/{slug}/{path}`
+- ✅ 01-workflow-as-nyxid-service/02-publish-path.md — 发布路径:member-first bind(ADR-0016)`PUT .../members/{memberId}/binding` → Workflow 服务 + chat endpoint
+- ✅ 01-workflow-as-nyxid-service/03-register-and-discover.md — 让 NyxID 发现:`nyxid service add --custom`;⚠️ protobuf↔OpenAPI + scope_id 鉴权缺口 + external-exposure 仅本地指针
+- ✅ 01-workflow-as-nyxid-service/04-calling.md — 三入口同源:NyxID CLI / aevatar `NyxIdConnectedServiceToolSource`(`x-aevatar-tool`)/ 直连 REST·MCP
+- ✅ 01-workflow-as-nyxid-service/05-end-to-end-plan.md — 端到端 12 跳 + 落地清单 + 真实/手工/缺口矩阵 + target-state
+
 ---
 
 ## 进度看板
@@ -132,7 +145,8 @@
 | 06 分布式 | 5 | 5 | ✅ |
 | 07 周边 | 7 | 7 | ✅ |
 | 08 附录 | 3 | 3 | ✅ |
-| **合计** | **43** | **43** | ✅ |
+| 09 方案(SCOPE_EXTEND) | 5 | 5 | ✅ |
+| **合计** | **48** | **48** | ✅ |
 
 > 更新约定:每完成一篇,把对应行的 ⬜ 改成 ✅,并更新看板数字。
 

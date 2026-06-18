@@ -45,9 +45,13 @@ error_count() { [ -s "$errors_file" ] && wc -l <"$errors_file" | tr -d ' ' || ec
 
 # 确定要校验的章节文件集合。
 # 增量优先:git diff(工作区 vs HEAD)中的章节 .md;若无 diff 则回退到全部已存在章节。
+# 章节文件两种形态都纳入校验:
+#   平铺   NN/NN-slug.md                 (00-08 各块)
+#   方案子区 NN/NN-slug/NN-slug.md        (09 方案区:每份方案一个子目录)
+CHAPTER_RE='^[0-9]{2}/([0-9]{2}-[a-z0-9-]+/)?[0-9]{2}-[a-z0-9-]+\.md$'
 chapters_from_diff() {
-  git diff --name-only --diff-filter=AM HEAD -- '??/*.md' '??/??-*.md' 2>/dev/null \
-    | grep -E '^[0-9]{2}/[0-9]{2}-[a-z0-9-]+\.md$' || true
+  git diff --name-only --diff-filter=AM HEAD -- '??/*.md' '??/??-*.md' '??/*/*.md' 2>/dev/null \
+    | grep -E "$CHAPTER_RE" || true
 }
 
 chapters_all() {
@@ -55,7 +59,7 @@ chapters_all() {
   find . -path './.refactor-loop' -prune -o -path './.worktrees' -prune -o \
     -type f -name '[0-9][0-9]-*.md' -print 2>/dev/null \
     | sed 's|^\./||' \
-    | grep -E '^[0-9]{2}/[0-9]{2}-[a-z0-9-]+\.md$' || true
+    | grep -E "$CHAPTER_RE" || true
 }
 
 diff_out="$(chapters_from_diff)"
