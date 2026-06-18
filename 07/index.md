@@ -22,6 +22,8 @@
 | 能力面 | [04 Voice](04-voice-presence.md) | Voice 是挂到已有 actor 生命周期的 EventModule capability | 现役;ADR-0033 仍是 proposed,凭证落地状态见 04 的 ⚠️ |
 | 能力面 | [09 边缘×大脑全链路](09-voice-presence-edge-brain.md) | `voice-presence` 边缘把 provider/persona/工具/回合外包给 aevatar+NyxID,沿一次语音问答走完每一跳 | 现役;broker 代码已落 mainnet、prod 端到端可用,ADR-0033 头仍 proposed |
 | 能力面 | [05 Studio + Scripting](05-studio-and-scripting.md) | Studio 以 member/team 聚合组织产品事实;Scripting 挂成可发布能力 | 现役;旧 demos 只按历史素材处理,见 05 的 ⚠️ |
+| 数据面 | [11 文件全链路](11-file-handling-end-to-end.md) | 一个文件经 ingress 落进 `workflow-file://` artifact store 换成 `WorkflowFileRef`;主链路只流 ref,字节只在归一化/`document_extract`/多模态/`workflow_file_submit` 四个边界出现 | 现役;默认单机文件系统 store + 后台清理;无对象存储/独立 OCR |
+| 调度面 | [12 定时任务](12-scheduled-tasks.md) | 一个 `ScheduledDispatchGAgent`(Orleans Reminder 持久回调)同时承载 Lark 定时智能体与 Studio 定时工作流,两者只在 target/凭证上分叉 | 现役;Studio 工作流定时"能建、触发失败"的根因 = 触发期 NyxID 换票,见 12 |
 | 观察面 | [06 Console](06-console-web.md) | 前端只消费 API/SSE/readmodel,把运行事件归一化成 UI 事件 | 现役;不把前端文件行号当架构主体 |
 | 观察面 | [07 Observability](07-observability.md) | Tier1 查询 readmodel,Tier2 只消费 OTel live SSE 做动画 | 设计有效;Inspector demo 源码已删/空壳,见 07 的 ⚠️ |
 

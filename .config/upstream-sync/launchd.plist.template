@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  launchd plist 模板 —— upstream-sync watch loop
+  ────────────────────────────────────────────────
+  边界(consensus-loop SKILL.md):skill/agent 不得自动写/装/删 launchd plist。
+  本文件是模板,供 host operator 手动复制到 ~/Library/LaunchAgents/ 并手动 launchctl load。
+
+  安装步骤:
+    1. 把 YOUR_HOME 全部替换成你的家目录(运行: sed -i '' 's|YOUR_HOME|'"$HOME"'|g' 此文件)
+    2. cp 此文件 ~/Library/LaunchAgents/com.eanzhao.aevatar-review.upstream-sync.plist
+    3. launchctl load ~/Library/LaunchAgents/com.eanzhao.aevatar-review.upstream-sync.plist
+    4. launchctl start com.eanzhao.aevatar-review.upstream-sync   # 立即测一次
+    5. tail -f ~/Library/Logs/aevatar-review-upstream-sync.log
+
+  详细说明见 docs/upstream-sync.md。
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.eanzhao.aevatar-review.upstream-sync</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>YOUR_HOME/Code/aevatar-review/scripts/upstream-sync.sh</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>YOUR_HOME/Code/aevatar-review</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>CONSENSUS_RND_HOST_ENV</key>
+        <string>.config/consensus-rnd/host.env</string>
+        <key>HOME</key>
+        <string>YOUR_HOME</string>
+        <key>PATH</key>
+        <string>/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin</string>
+    </dict>
+
+    <!-- 每 900 秒(15 分钟)跑一次。文档同步场景的合理默认。-->
+    <key>StartInterval</key>
+    <integer>900</integer>
+
+    <key>StandardOutPath</key>
+    <string>YOUR_HOME/Library/Logs/aevatar-review-upstream-sync.log</string>
+    <key>StandardErrorPath</key>
+    <string>YOUR_HOME/Library/Logs/aevatar-review-upstream-sync.err.log</string>
+
+    <!-- 不在 load 时立即跑(避免开机/登录时刷一次);用 launchctl start 手动触发首次 -->
+    <key>RunAtLoad</key>
+    <false/>
+</dict>
+</plist>
