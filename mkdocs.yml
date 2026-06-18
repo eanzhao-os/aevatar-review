@@ -132,6 +132,7 @@ nav:
       - StateGuard + Event Sourcing: 03/04-state-guard-and-event-sourcing.md
       - 路由与拓扑: 03/05-routing-and-topology.md
       - Local Runtime 深入: 03/06-local-runtime-deep-dive.md
+      - Stream×Actor×GAgent 事实清单: 03/07-stream-actor-gagent-facts.md
   - 04 AI 能力层:
       - 04/index.md
       - RoleGAgent: 04/01-role-gagent.md

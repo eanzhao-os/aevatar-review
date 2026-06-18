@@ -75,6 +75,8 @@
 - ⬜ 03/04-state-guard-and-event-sourcing.md — `StateGuard`(`AsyncLocal` 限制状态只在事件处理期写)、`PersistDomainEventAsync`、`TransitionState` reducer、latest-wins `RunManager`
 - ⬜ 03/05-routing-and-topology.md — 拓扑事实收口到 runtime actor 自身(Local 的 `LocalActor` / Orleans 的 `RuntimeActorGrainState`);`DirectRoute` vs `PublicationRoute.topology` vs `PublicationRoute.observer`(只给 projection/live sink)
 - ⬜ 03/06-local-runtime-deep-dive.md — `LocalActorRuntime` / `LocalActor`(邮箱串行)/ `LocalActorPublisher` 的实现,为什么 InMemory 仅限开发测试
+- ✅ `03/07-stream-actor-gagent-facts.md`(SCOPE_EXTEND,非原始 01–06 清单)— Stream × Actor × GAgent 三者关系与逐条事实清单:收口 03 块,纠正"事件都在 stream / stream 都包在 actor 里"两个常见说法
+  - 事实源脊柱:`OrleansGrainEventPublisher.cs`(发布全部落 `ProduceAsync`)、`RuntimeActorGrain.cs`(订阅自身 stream)、`IRuntimeActorGrain.cs`(非事件 RPC 面)、`GAgentBase.cs`(turn 内同步处理)、`ScopeGAgentEndpoints.cs` + `ProjectionSessionEventHub.cs`(actor 外订阅 stream 的反例)
 
 ### 04 · AI 能力层
 
@@ -139,14 +141,14 @@
 | 00 序章 | 4 | 4 | ✅ |
 | 01 宿主与入口 | 3 | 3 | ✅ |
 | 02 编排层 | 7 | 7 | ✅ |
-| 03 内核 | 6 | 6 | ✅ |
+| 03 内核 | 7 | 7 | ✅ |
 | 04 AI 层 | 4 | 4 | ✅ |
 | 05 CQRS 读侧 | 4 | 4 | ✅ |
 | 06 分布式 | 5 | 5 | ✅ |
 | 07 周边 | 7 | 7 | ✅ |
 | 08 附录 | 3 | 3 | ✅ |
 | 09 方案(SCOPE_EXTEND) | 5 | 5 | ✅ |
-| **合计** | **48** | **48** | ✅ |
+| **合计** | **49** | **49** | ✅ |
 
 > 更新约定:每完成一篇,把对应行的 ⬜ 改成 ✅,并更新看板数字。
 
