@@ -41,7 +41,7 @@ sequenceDiagram
   CLI->>NYX: 9. GET /proxy/services · /catalog/{slug}/endpoints(发现)
   CLI->>NYX: 10. POST /api/v1/proxy/s/{slug}/api/scopes/.../invoke/chat
   NYX->>AEV: 11. 注入凭证 + approval/审计 后转发(⚠️ 凭证须带 scope_id claim)
-  AEV-->>CLI: 12. 202 + runId(或 :stream SSE);再 proxy .../runs/{runId} 观察
+  AEV-->>CLI: 12. 202 + runId(或 :stream SSE)；再 proxy .../runs/{runId} 观察
 ```
 
 ## 2. 落地清单(照着做就能跑通)

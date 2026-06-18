@@ -29,6 +29,19 @@ jobs:
       - name: Install MkDocs Material
         run: pip install mkdocs-material pymdown-extensions
 
+      # mermaid 在浏览器端渲染,mkdocs --strict 抓不到图的语法错误(会显示
+      # "Syntax error in text")。用真实 mermaid 引擎(mermaid-cli,固定 11.15.0
+      # = 站点 mermaid 大版本)解析每个 ```mermaid 块;失败则 build 失败 ⇒ deploy 跳过。
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install mermaid-cli (pinned to site mermaid 11.x)
+        run: npm i -g @mermaid-js/mermaid-cli@11.15.0
+
+      - name: Validate mermaid diagrams
+        run: python3 scripts/check-mermaid.py
+
       - name: Build site
         run: mkdocs build --strict --clean
 
