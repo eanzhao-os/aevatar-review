@@ -254,7 +254,8 @@ sequenceDiagram
     M->>P: SendToolResult(经 live-relay 找到当前会话 socket)
     P->>O: function_call_output + 续回合
     O-->>P: 「客厅灯已打开」回话音频
-    P-->>M-->>A: 二进制回话 PCM → 边缘 → 扬声器
+    P-->>M: 二进制回话 PCM
+    M-->>A: 下行 → 边缘 → 扬声器
 ```
 
 > 这里有一个 aevatar 侧的**载荷送达不变量**:工具结果必须送回**当前 live relay 的 provider session**(`IVoiceVolatileMediaStreamPort` 按 transport lease 索引),而不是新开一个空 socket——否则 `function_call_output` 落在一个没见过 `function_call`、音频也无处可去的会话上,模型「一直在查」却永不回话。这是生产里真实踩过并修掉的坑(见 [07/04](04-voice-presence.md) 的工具执行边界)。
