@@ -136,6 +136,12 @@ flowchart RL
 
 ⚠️ 当前事实是“已成功、且声明了补偿的 step”才会进入补偿 ledger；补偿按反向顺序串行执行，失败耗尽后进入 durable dead-letter 状态，而不是静默吞掉。
 
+两个容易漏的事实补充(已核对源码):
+
+- **ledger 是两阶段的**:补偿 ledger entry 有 `Provisional → Confirmed` 两态(`CompensableLedgerEntryStatus`)。dispatch 补偿时先记 `Provisional`,该补偿成功完成、cursor 前移后才算 `Confirmed`——这让 replay 时能正确区分“补偿已派发”和“补偿已完成”。
+- **`OutcomeUncertain` 故意不补偿**:终态 step 因 timeout 等被标 `OutcomeUncertain`(副作用是否发生不确定)时,**不进 ledger、不补偿**——盲目补偿一个可能根本没成功的 step 会造成更大破坏。这是合理但容易忽略的边界。
+- saga 状态枚举是 `WorkflowSagaStatus.CompensationDeadLetter`(单数);补偿协议**代码已全量落地**,但 ADR-0034 头仍是 `status: proposed`(canon 滞后,见 [08/04 P1-1](../08/04-todo-list.md))。
+
 ## stale completion 为什么重要
 
 每次 dispatch 都生成新的 `execution_id`。step completion 回来时，kernel 比对当前 step 的 execution id；不匹配说明这是旧派发、旧 timeout 或旧补偿的迟到消息，不能改写当前状态。这个保护让重试、timeout 和补偿可以共享同一条事件通道。

@@ -56,7 +56,7 @@ flowchart LR
     class AI,WF ai;
 ```
 
-**21 个在 `src/Aevatar.AI.ToolProviders.*`**:
+**21 个在 src/Aevatar.AI.ToolProviders.* 系列项目下**(各域一个 `.csproj`):
 
 - **调度类**(`AevatarInvocationToolSources.cs` 一个文件里 5 个):`InvokeGAgentToolSource` / `InvokeTeamToolSource` / `StartWorkflowToolSource` / `ObserveRunToolSource` / `ReadWorkflowRunArtifactToolSource`
 - **外部通道**:`MCPAgentToolSource`、`SkillsAgentToolSource`、`LarkAgentToolSource`、`TelegramAgentToolSource`、`WebAgentToolSource`、`OrnnAgentToolSource`
