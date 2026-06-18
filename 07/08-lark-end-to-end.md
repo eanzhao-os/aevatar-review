@@ -71,16 +71,16 @@ sequenceDiagram
 ```mermaid
 flowchart LR
     LARK["Lark 开放平台"]
-    subgraph EDGE["NyxID Relay · 边缘(凭证权威)"]
-        TOK[("Lark app_secret / bot token<br/>verification_token")]
+    subgraph EDGE["NyxID Relay 边缘 凭证权威"]
+        TOK["Lark app_secret / bot token<br/>verification_token"]
     end
-    subgraph AEV["aevatar 运行时 · 不持 Lark 凭证"]
+    subgraph AEV["aevatar 运行时 不持 Lark 凭证"]
         REG["ChannelBot 注册<br/>只存路由 / 身份 / 状态 handle"]
         REF["nyx_reply_credential_ref<br/>不透明句柄"]
-        SEC[("IAevatarSecretsStore<br/>relay-reply api key")]
+        SEC["IAevatarSecretsStore<br/>relay-reply api key"]
     end
-    LARK <-->|"持有并校验凭证"| TOK
-    EDGE -->|"规范化回调 + callback JWT"| REG
+    LARK -->|"凭证在此持有并校验"| TOK
+    TOK -->|"规范化回调 + callback JWT"| REG
     REG -.->|"引用"| REF
     REF -.->|"解引用"| SEC
 ```
