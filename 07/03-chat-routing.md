@@ -53,6 +53,23 @@ ADR-0026 把旧的 ForwardToGAgent、ForwardToTeam、ForwardToWorkflow 收敛为
 
 这样 routing 不再维护第二套调用方言。GAgent/team/workflow 的执行进入既有 tool-calling backbone,继续沿 actor/run/projection 主链产生事实和观察结果。
 
+```mermaid
+flowchart LR
+    subgraph Old["旧:三套调用方言"]
+        F1["ForwardToGAgent"]
+        F2["ForwardToTeam"]
+        F3["ForwardToWorkflow"]
+    end
+    subgraph New["新(ADR-0026):收敛为 2 个 wire action"]
+        R["Reject"]
+        M["ForwardToModel<br/>+ tool_set_ref / tool_choice_hint"]
+    end
+    Old -.->|"收敛"| New
+    M --> Tools["GAgent / team / workflow<br/>经既有 tool-calling backbone"]
+    classDef new fill:#dcfce7,stroke:#16a34a,color:#14532d;
+    class R,M new;
+```
+
 ## 验收
 
 1. ChatRouting 的配置权威是谁?ChatRoutePolicyGAgent。

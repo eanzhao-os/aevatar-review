@@ -10,6 +10,17 @@
 
 Console Web 是观察与操作台,不是新的事实源。它的职责是把 Studio/runtime/readmodel/API/SSE 组合成可操作界面:命令写回后端,查询读 readmodel/API,实时运行只订阅 SSE frame 并归一化成 UI 事件。
 
+```mermaid
+flowchart TB
+    Console["Console Web(观察 / 操作台)"]
+    Console -->|"命令写回"| Cmd["后端 command"]
+    Console -->|"查询读"| RM["readmodel / API(事实源)"]
+    Console -->|"实时只订阅"| SSE["SSE frame(观察流)"]
+    SSE -.->|"不是事实源"| RM
+    classDef truth fill:#dcfce7,stroke:#16a34a,color:#14532d;
+    class RM truth;
+```
+
 ## 技术栈意图
 
 | 选择 | 意图 |
@@ -29,6 +40,16 @@ Console Web 是观察与操作台,不是新的事实源。它的职责是把 Stu
 1. 打开 chat/team/draft run 等 stream。
 2. 用 shared AGUI normalizer 兼容 oneof-style、typed+nested、already-flat 三类帧。
 3. 把 typed runtime event 送入页面 accumulator/renderer。
+
+```mermaid
+flowchart LR
+    BE["后端 stream<br/>(Accept: text/event-stream)"]
+    BE --> N1["1 打开 chat/team/draft run stream"]
+    N1 --> N2["2 shared AGUI normalizer<br/>兼容 oneof / typed+nested / flat 三类帧"]
+    N2 --> N3["3 typed runtime event → 页面 accumulator/renderer"]
+    classDef fe fill:#dbeafe,stroke:#2563eb,color:#172554;
+    class N2 fe;
+```
 
 这意味着前端看到的是观察流,不是查询事实源。run 是否完成、readmodel 当前状态、Studio member/team 当前态,仍应以后端 query/readmodel 契约为准。
 

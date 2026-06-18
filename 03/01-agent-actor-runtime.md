@@ -22,6 +22,25 @@ Agent 是业务逻辑:它知道收到某种 payload 后要做什么。Actor 是�
 
 用一个请求来想会更直观:API 侧把消息交给 dispatch port;Runtime 找到目标 actor;actor 把消息放进自己的处理路径;Agent 里真正执行业务 handler。下面的 Stream 仍然参与投递,但读者不需要先理解所有 relay 细节,才能理解“这个消息最终进了哪个 actor”。
 
+```mermaid
+flowchart TB
+    API["API 侧:把消息交给 dispatch port"]
+    API --> RT["Runtime:寻址 / 激活目标 actor"]
+    RT --> AC["Actor:邮箱串行 + 父子拓扑 + 生命周期"]
+    AC --> AG["Agent:执行业务 handler"]
+    subgraph Base["Stream(消息传输骨架)"]
+        ST["produce / subscribe / relay envelope"]
+    end
+    RT -. "构建于其上" .-> ST
+    AC -. "构建于其上" .-> ST
+    classDef biz fill:#dbeafe,stroke:#2563eb,color:#172554;
+    classDef base fill:#f1f5f9,stroke:#64748b,color:#0f172a;
+    class API,RT,AC,AG biz;
+    class ST base;
+```
+
+把这四个词按"谁负责什么"摆成一条竖线就不容易混:**Agent** 回答"收到这个 payload 要做什么",**Actor** 回答"这个身份的消息怎样串行、它的父子是谁",**Runtime** 回答"目标 actor 在哪、怎么激活和投递",**Stream** 只回答"envelope 怎样被传输"。上层只对 `IActorRuntime` / `IActorDispatchPort` / `IEventPublisher` 说话,不直接碰 stream。
+
 ---
 
 ## Dispatch 不是完成保证

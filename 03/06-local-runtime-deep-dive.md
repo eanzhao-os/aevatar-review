@@ -44,6 +44,19 @@ LocalActor 收消息有两个入口。一个是自己的 stream subscription:dir
 
 这两个入口最后都落到同一个 mailbox,因此“从 stream 来”和“从 dispatch port 来”不会形成两套并发模型。它们只是入站来源不同,处理顺序仍由 actor mailbox 统一决定。
 
+```mermaid
+flowchart TB
+    SS["self stream subscription<br/>(direct / self / parent-children / forwarded observer)"]
+    DP["dispatch port admission<br/>(外部命令被 runtime 受理)"]
+    SS -->|"route 判断,匹配本 actor 才入队"| MB["同一个 single-reader mailbox"]
+    DP -->|"admission 入队"| MB
+    MB --> PR["逐条 await Agent.HandleEventAsync<br/>串行,无并发"]
+    classDef actor fill:#dbeafe,stroke:#2563eb,color:#172554;
+    class MB,PR actor;
+```
+
+两个入站来源汇到同一个 single-reader mailbox,是"串行语义"能成立的关键:无论消息从 stream relay 来还是从 dispatch port 来,都不会各开一条并发处理线;mailbox 是唯一的串行点。
+
 ---
 
 ## 为什么 InMemory 只能 dev/test

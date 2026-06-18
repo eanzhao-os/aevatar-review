@@ -35,6 +35,16 @@ ADR-0016 把 Studio 的唯一主语定为 member:
 | Invoke | 通过发布契约触发运行 |
 | Observe | 观察 run/readmodel/SSE 输出 |
 
+```mermaid
+flowchart LR
+    C["Create<br/>稳定 member identity"] --> B["Build<br/>编辑 workflow/script/gagent"]
+    B --> Bind["Bind<br/>发布 revision 到 published service"]
+    Bind --> I["Invoke<br/>经发布契约触发运行"]
+    I --> O["Observe<br/>run / readmodel / SSE"]
+    classDef m fill:#dbeafe,stroke:#2563eb,color:#172554;
+    class C,O m;
+```
+
 publishedServiceId 是 member 的契约面,不是用户手工挑选的主对象。workflow/script/gagent 是 implementation kind,不是并列的身份系统。
 
 ## team-first
