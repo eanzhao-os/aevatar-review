@@ -43,6 +43,19 @@ Event Sourcing commit 后,框架需要把已提交事实发给读侧。如果这
 
 拓扑不是一个额外 EventRouter 对象在外面维护。Local runtime 把 parent/children 放在 `LocalActor`;Orleans runtime 把 parent/children 放在 `RuntimeActorGrainState`。Link/Unlink 同时更新 runtime actor 自己的拓扑状态和 stream relay binding。
 
+```mermaid
+flowchart TB
+    LinkOp["Link / Unlink 一次操作"]
+    LinkOp --> T1["① 更新 runtime actor 自身拓扑状态"]
+    LinkOp --> T2["② 更新 stream relay binding"]
+    T1 --> LA["Local:LocalActor 内存字段<br/>_parentId + _childrenIds"]
+    T1 --> GS["Orleans:RuntimeActorGrainState<br/>持久化 ParentId + Children"]
+    classDef actor fill:#dbeafe,stroke:#2563eb,color:#172554;
+    class LA,GS actor;
+```
+
+注意一次 Link/Unlink 要同时落两处:**权威拓扑状态**(actor 自己持有)和**relay binding**(stream 层据此 fan-out)。前者是"谁是谁的父子"的事实,后者是"消息实际怎么转发"的执行;两者由 runtime 一起维护,避免上层或中间服务各存一份拓扑、然后对不上。
+
 这种收口方式让“谁是谁的 parent/children”跟 actor runtime 生命周期绑定,避免上层业务或中间服务各存一份拓扑事实。真正 fan-out 仍由 stream forwarding / relay binding 执行,但权威拓扑在 runtime actor 自身。
 
 ---
