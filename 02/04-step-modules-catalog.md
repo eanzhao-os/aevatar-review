@@ -117,6 +117,12 @@ flowchart TD
 
 ⚠️ 这意味着“模块被安装”不等于“YAML 里有一个同名 step”。读执行计划时要区分显式步骤图和隐式能力依赖。
 
+### 还有一层更隐蔽的隐式:默认 `assistant` 角色
+
+模块展开是“隐式加模块”;另有一处是“隐式加角色”。`WorkflowImplicitLlmRolePolicy` 在某个 step 需要 LLM、但 YAML 里没声明任何可用角色时,会**静默合成一个默认角色 `assistant`**(id 字面就是 `"assistant"`,name `Assistant`)。它和上面的 `llm_call` 注入是两回事:一个补模块,一个补角色,而且两者在 YAML 里都看不见。
+
+⚠️ 所以一段“只写了 llm_call、没写 roles”的 YAML 仍能跑——背后就是这个隐式 `assistant`。排查“我的角色 system_prompt 为什么没生效”时,先确认是不是落到了这个默认角色上。是否提供一个“显式模式”(关掉隐式展开 / 默认角色)是待决策项(见 [08/04 P2-1](../08/04-todo-list.md))。
+
 ## Core、扩展和插件的边界
 
 Core pack 提供通用 workflow 能力。Maker、Schedules 这类扩展通过自己的 `IWorkflowModulePack` 加入，不要求 Core 反向引用插件实现。

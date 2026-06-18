@@ -25,6 +25,12 @@
 
 ## 0. 本次重审结论摘要
 
+> 📝 **2026-06-18 review pass**:本表所有 `[doc]` 项已在解读仓库分支 `review/doc-revision-2026-06-18` 落地(strip-line-number debris 清理 + 事实订正 + 每章 ≥2 配图,全部经 `scripts/check-mermaid.py` 真引擎校验)。校核中发现并已修正的几处偏差:
+> - **ToolSource 实际 26 个**(非本表旧写的 25),21 个在 src/Aevatar.AI.ToolProviders.*、5 个在 `src/workflow/`;`AgentWorkflowToolSource` / `LarkWorkflowFileSubmitToolSource` **不存在**(应为 `WorkflowAgentToolSource` / `WorkflowFileSubmitToolSource`)。
+> - **P2-5** 生产其实 **fail-fast**(`EnforceInMemoryPolicy` 在 Production/DenyInMemory 时抛错),不是“静默退化成内存读模型”;05/03 已按此订正。
+> - **P0-3** 准确字段名是 `AIAgentConfig.MaxToolRounds`(=40),不是 `AIGAgentBase.MaxToolRounds`。
+> - saga 状态枚举是 `WorkflowSagaStatus.CompensationDeadLetter`(单数);`ToolApprovalMiddleware` 实际是链上第 2 位(`ToolCallCredentialPolicyMiddleware` 之后),非“最前”。
+
 把上一版 18 条(A1–A5 / B1–B5 / C1–C8)逐条对源码复核,结论:
 
 | 桶 | 结果 | 条目 |
@@ -99,7 +105,7 @@
 
 ### 4.3 文档计数 / 术语 / 措辞修正(本仓)
 
-- [ ] **ToolSource 计数**:04/03 写「22」,实际 **25** 个 `*ToolSource` 类(新增 `WorkflowDocumentExtractToolSource`/`HumanInteractionChannelToolSource`/`AgentWorkflowToolSource` 等)。 `[doc]`
+- [x] **ToolSource 计数**(已修):04/03 旧写「22」。**实际 26 个** `*ToolSource`:21 个在 src/Aevatar.AI.ToolProviders.*,5 个在 `src/workflow/`(`WorkflowDocumentExtractToolSource` / `WorkflowSpreadsheetExtractToolSource` / `WorkflowFileSubmitToolSource` / `WorkflowConnectedServiceResourceFetchToolSource` / `HumanInteractionChannelToolSource`)。注:`AgentWorkflowToolSource`、`LarkWorkflowFileSubmitToolSource` **不存在**。 `[doc]`
 - [ ] **补 FailoverLLMProvider**:`src/Aevatar.AI.Core/LLMProviders/FailoverLLMProviderFactory.cs`(primary→fallback,首个有效 chunk 前可中途切换)在 04/02 缺失,文档只讲了 Composite/Reloadable。 `[doc]`
 - [ ] **LiveSink 术语**:并无 `LiveSink` 类型;真实抽象是 `IEventSinkProjectionLifecyclePort` + `ProjectionSessionEventHub`。05/02 / 06/01 统一术语,便于读者 grep。 `[doc]`
 - [ ] **投影并发不是单线程**:实际是 OCC-retry(`EventStoreOptimisticConcurrencyException` 驱动重试),05/02 加一句避免误解。 `[doc]`
