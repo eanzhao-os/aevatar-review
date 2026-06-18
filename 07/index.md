@@ -17,6 +17,7 @@
 | 入口面 | [03 ChatRouting](03-chat-routing.md) | `ChatRoutePolicyGAgent` 持配置,入口同步调用无状态 resolver,再进入模型/tool 执行 | 现役;不是 router actor |
 | 历史/待决策 | [02 A2A](02-a2a-interop.md) | 历史设计是在 Host boundary 把 A2A task 映射到框架消息 | ⚠️ 源码已删/空壳,不按当前能力使用 |
 | 能力面 | [04 Voice](04-voice-presence.md) | Voice 是挂到已有 actor 生命周期的 EventModule capability | 现役;ADR-0033 仍是 proposed,凭证落地状态见 04 的 ⚠️ |
+| 能力面 | [09 边缘×大脑全链路](09-voice-presence-edge-brain.md) | `voice-presence` 边缘把 provider/persona/工具/回合外包给 aevatar+NyxID,沿一次语音问答走完每一跳 | 现役;broker 代码已落 mainnet、prod 端到端可用,ADR-0033 头仍 proposed |
 | 能力面 | [05 Studio + Scripting](05-studio-and-scripting.md) | Studio 以 member/team 聚合组织产品事实;Scripting 挂成可发布能力 | 现役;旧 demos 只按历史素材处理,见 05 的 ⚠️ |
 | 观察面 | [06 Console](06-console-web.md) | 前端只消费 API/SSE/readmodel,把运行事件归一化成 UI 事件 | 现役;不把前端文件行号当架构主体 |
 | 观察面 | [07 Observability](07-observability.md) | Tier1 查询 readmodel,Tier2 只消费 OTel live SSE 做动画 | 设计有效;Inspector demo 源码已删/空壳,见 07 的 ⚠️ |

@@ -44,16 +44,17 @@
 
 ```mermaid
 flowchart LR
-  subgraph OWNER["Owner actor(持 playbook · 派 run · 按版本记账 · 自提 diff)"]
-    direction LR
-  end
-  S["① 散文 skill<br/>(agent loop 解释)"] -->|结晶| H["② 混合<br/>(workflow 骨架 + agent 节点)"]
-  H -->|全结晶| W["③ 确定 workflow"]
-  W -. "世界变了 / 反复失败 → 自动降级" .-> H
-  H -. .-> S
-  OWNER -. "管理每类事务此刻的梯度档位" .-> S
-  OWNER -. .-> H
-  OWNER -. .-> W
+  OWNER["Owner actor<br/>持 playbook · 派 run · 按版本记账 · 自提 diff"]
+  S["① 散文 skill<br/>agent loop 解释"]
+  H["② 混合<br/>workflow 骨架 + agent 节点"]
+  W["③ 确定 workflow"]
+  S -->|"结晶"| H
+  H -->|"全结晶"| W
+  W -.->|"世界变了 / 反复失败 → 自动降级"| H
+  H -.->|"降级"| S
+  OWNER -.->|"管理每类事务此刻的梯度档位"| S
+  OWNER -.-> H
+  OWNER -.-> W
 ```
 
 **(1) Playbook —— 横跨梯度的一等版本化实体。** 不是"skill 或 workflow",而是一个被拥有的产物,
@@ -77,8 +78,8 @@ flowchart TD
   CE["committed event 流(轨迹语料)✅"] --> TR["trajectory readmodel ★<br/>后台 materializer / projection"]
   TR --> IND["JIT 编译器:induction ★<br/>从重复路径提候选片段"]
   IND --> SH["影子并跑 ★(harness)<br/>vote_agreement / evaluate 对比证据 ✅原语"]
-  SH -->|证据匹配 且 owner 能说清 why| PR["晋升<br/>ScriptEvolution promote ✅"]
-  SH -->|不匹配 / 隐式安全行为对不上| DROP["丢弃候选"]
+  SH -->|"证据匹配 且 owner 能说清 why"| PR["晋升<br/>ScriptEvolution promote ✅"]
+  SH -->|"不匹配 / 隐式安全行为对不上"| DROP["丢弃候选"]
   PR --> RUN["确定 workflow 上线"]
   RUN -->|反复失败 N 次| DEG["自动降级 ★(policy)<br/>DynamicWorkflow 换 YAML + on_error 回退 role 节点 ✅原语"]
   DEG --> ACC["回退 agent 节点兜底 + 记账"]
