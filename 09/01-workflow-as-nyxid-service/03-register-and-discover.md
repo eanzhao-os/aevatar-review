@@ -45,7 +45,7 @@ sequenceDiagram
   participant Nyx as NyxID
 
   Aev->>Aev: ① 已发布 workflow 服务(见 02),拿到 InvokePath
-  Admin->>Aev: ② 手写一份 aevatar invoke 的 OpenAPI<br/>servers=aevatar host;path=/api/scopes/.../invoke/chat;标 x-aevatar-tool
+  Admin->>Aev: ② 手写一份 aevatar invoke 的 OpenAPI<br/>servers=aevatar host、path=/api/scopes/.../invoke/chat、标 x-aevatar-tool
   Admin->>Nyx: ③a nyxid service add aevatar --custom<br/>--endpoint-url + --openapi-spec-url + --auth-method bearer + --credential-env
   Nyx-->>Admin: 返回 canonical slug + Proxy URL
   Admin->>Aev: ③b 可选 PUT /api/services/{serviceId}/external-exposure<br/>把 slug 写回 aevatar 作本地指针

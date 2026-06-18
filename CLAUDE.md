@@ -65,6 +65,12 @@
   标题层级 / 空文件 / 孤儿链接基本结构合规。
 - **TEST**:同上脚本 + 检查每篇章节是否含「事实源/设计抽象」入口(可回指
   `~/Code/aevatar` 的真实路径),且引用的源码文件真实存在。
+- **MERMAID**:`python3 scripts/check-mermaid.py` —— 用真实 mermaid 引擎(`mermaid-cli`,
+  pin 11.15.0 = 站点 mermaid 大版本)解析每个 ` ```mermaid ` 块。`mkdocs --strict` **抓不到**
+  图的语法错误(mermaid 在浏览器渲染,坏图只在页面显示 "Syntax error in text"),所以单列此 gate。
+  CI(`.github/workflows/docs.yml` build job)在 `mkdocs build` 前强制运行它,坏图 ⇒ 不部署。
+  本地需先 `npm i -g @mermaid-js/mermaid-cli@11.15.0`(或脚本回退到 `npx`)。
+  注意:sequenceDiagram 消息文本里**禁用 ASCII `;`**(会被当语句分隔符,用 `、`/`；` 代替)。
 
 ## 章节验收(对照各 issue 的「验收标准」)
 
