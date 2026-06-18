@@ -22,7 +22,7 @@
 | 能力面 | [04 Voice](04-voice-presence.md) | Voice 是挂到已有 actor 生命周期的 EventModule capability | 现役;ADR-0033 仍是 proposed,凭证落地状态见 04 的 ⚠️ |
 | 能力面 | [09 边缘×大脑全链路](09-voice-presence-edge-brain.md) | `voice-presence` 边缘把 provider/persona/工具/回合外包给 aevatar+NyxID,沿一次语音问答走完每一跳 | 现役;broker 代码已落 mainnet、prod 端到端可用,ADR-0033 头仍 proposed |
 | 能力面 | [05 Studio + Scripting](05-studio-and-scripting.md) | Studio 以 member/team 聚合组织产品事实;Scripting 挂成可发布能力 | 现役;旧 demos 只按历史素材处理,见 05 的 ⚠️ |
-| 观察面 | [06 Console](06-console-web.md) | 前端只消费 API/SSE/readmodel,把运行事件归一化成 UI 事件 | 现役;不把前端文件行号当架构主体 |
+| 观察面 | [06 Console](06-console-web.md) | 前端只消费命令 ACK、API/readmodel 与 SSE/ExecutionTrace,把运行事件归一化成 UI 展示 | 现役;不把前端文件行号当架构主体 |
 | 观察面 | [07 Observability](07-observability.md) | Tier1 查询 readmodel,Tier2 只消费 OTel live SSE 做动画 | 设计有效;Inspector demo 源码已删/空壳,见 07 的 ⚠️ |
 
 这一组章节的读法是从外到内:入口先把外部 payload 变成 actor 可处理的强类型消息;能力挂在已有 actor 生命周期或产品聚合上;观察面只读 readmodel 或 SSE,不反向成为事实源。
