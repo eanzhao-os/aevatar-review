@@ -13,7 +13,7 @@
 
 ---
 
-> **边界说明**:09 区域整体是 [SCOPE_EXTEND](../index.md) 新增(不在 [PLAN.md](../../PLAN.md) 原始 00–08 清单内)。本方案事实源跨两个只读仓库(`~/Code/aevatar` 与 `~/Code/NyxID`),NyxID 侧路径一律以 `~/Code/NyxID/` 前缀标注以示边界。
+> **边界说明**:09 区域整体是 [SCOPE_EXTEND](../index.md) 新增(不在仓库 `PLAN.md` 原始 00–08 清单内)。本方案事实源跨两个只读仓库(`~/Code/aevatar` 与 `~/Code/NyxID`),NyxID 侧路径一律以 `~/Code/NyxID/` 前缀标注以示边界。
 
 ## 一句话结论(先看这个,再读细节)
 
