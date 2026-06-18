@@ -29,7 +29,7 @@ sequenceDiagram
     participant CV as ConversationGAgent
     participant TR as TurnRunner
     participant RUN as AgentRunGAgent
-    participant LOOP as ToolCallLoop
+    participant TCL as ToolCallLoop
     U->>LK: @bot 发消息
     LK->>NYX: 事件回调（携 Lark 凭证）
     NYX->>EP: POST /api/webhooks/nyxid-relay
@@ -40,8 +40,8 @@ sequenceDiagram
     CV->>CV: 两层去重 JTI / activity.Id
     CV->>TR: 委派一回合
     TR->>RUN: 路由解析 + run dispatcher 派发
-    RUN->>LOOP: 驱动 LLM + 工具循环
-    LOOP-->>RUN: reply_with_interaction 中性意图
+    RUN->>TCL: 驱动 LLM + 工具循环
+    TCL-->>RUN: reply_with_interaction 中性意图
     RUN->>CV: LlmReplyReadyEvent（REPLY_PRODUCED）
     CV->>NYX: 经 relay 投递回复
     NYX->>LK: 渲染原生卡片
@@ -167,4 +167,4 @@ stateDiagram-v2
 
 > **读者可回答**:为什么 aevatar 不直连 Lark 而走 NyxID relay(§2 凭证边界)?一条 Lark 消息进来后,长命的谁、短命的谁、各拥有什么事实(§3/§4)?回复为什么要完成状态机、怎么做到幂等(§5)?Lark 热路径到底经不经过 `RoleGAgent`(§4 ⚠️)?
 
-⟦AI:AUTO-LOOP⟧
+⟦AI:AUTO-TCL⟧
