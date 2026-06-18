@@ -13,6 +13,7 @@
 | 面 | 章节 | 主干接入职责 | 当前状态 |
 |---|---|---|---|
 | 入口面 | [01 Channel](01-channels.md) | Lark/Telegram 经 NyxID relay 规范化成 `ChatActivity`,进入 `ConversationGAgent` 与 turn runner | 现役;Telegram direct-callback/local credential 已出支持契约,见 01 的 ⚠️ |
+| 入口面 | [08 Lark 全链路](08-lark-end-to-end.md) | 沿一条 Lark 消息走完 relay → `ChatActivity` → `ConversationGAgent` → run actor → `ToolCallLoop` → relay 回复 | 现役;run actor = `AgentRunGAgent`,`RoleGAgent` 不在此热路径 |
 | 入口面 | [03 ChatRouting](03-chat-routing.md) | `ChatRoutePolicyGAgent` 持配置,入口同步调用无状态 resolver,再进入模型/tool 执行 | 现役;不是 router actor |
 | 历史/待决策 | [02 A2A](02-a2a-interop.md) | 历史设计是在 Host boundary 把 A2A task 映射到框架消息 | ⚠️ 源码已删/空壳,不按当前能力使用 |
 | 能力面 | [04 Voice](04-voice-presence.md) | Voice 是挂到已有 actor 生命周期的 EventModule capability | 现役;ADR-0033 仍是 proposed,凭证落地状态见 04 的 ⚠️ |
