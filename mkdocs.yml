@@ -153,6 +153,7 @@ nav:
       - 架构门禁: 06/05-architecture-guards.md
   - 07 周边:
       - 07/index.md
+      - Input 入口统一: 07/10-input-ingress-unification.md
       - Channel Runtime: 07/01-channels.md
       - Lark Bot 全链路走查: 07/08-lark-end-to-end.md
       - A2A Interop: 07/02-a2a-interop.md
