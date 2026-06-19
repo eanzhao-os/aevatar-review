@@ -43,6 +43,23 @@ ADR-0023 的核心规则是:Tier1 是 truth,Tier2 是 decoration。Tier1 endpoin
 2. Bounded channel 是 live broadcaster,没有历史 replay 语义。
 3. 进程重启会丢 Tier2 记忆,但 readmodel 仍然是 ground truth。
 
+```mermaid
+flowchart LR
+    subgraph T1["Tier1 = truth"]
+        RM["readmodel / projection document store"]
+        RM --> Q["回答:actor / run / readmodel 当前状态"]
+    end
+    subgraph T2["Tier2 = decoration"]
+        OT["OTel activity(sampled, best-effort)"]
+        OT --> Anim["只做浏览器动画(live SSE)"]
+    end
+    T2 -.->|"不能当查询源:会丢帧 / 无 replay / 重启即忘"| T1
+    classDef truth fill:#dcfce7,stroke:#16a34a,color:#14532d;
+    classDef deco fill:#fef3c7,stroke:#d97706,color:#451a03;
+    class RM,Q truth;
+    class OT,Anim deco;
+```
+
 ⚠️ Inspector demo 源码当前已删/空壳;仍存活的是 ADR-0023 的边界规则和 guard scaffold。本章不把 demo 写成可运行当前能力,也不建议在本 issue 恢复已删源码。
 
 ## 验收

@@ -17,6 +17,17 @@ VoicePresence 的关键不是"多了 OpenAI/MiniCPM provider",而是语音流怎
 | VoicePresenceModule | 处理 transcript/control/tool-call lifecycle | EventModule capability,复用 actor 执行上下文 |
 | tool invoker | 把模型 function call 交给 IAgentToolSource | 不建进程本地 session -> token 映射 |
 
+```mermaid
+flowchart TB
+    WS["/ws/voice 入站"]
+    WS -->|"ChatRouting 得 typed attach target"| Actor["已有 voice-enabled 业务 actor"]
+    Actor --> VM["VoicePresenceModule(EventModule capability)"]
+    VM --> T1["transcript / control / tool-call<br/>→ typed frame 进 actor 语义"]
+    VM --> T2["raw PCM<br/>→ volatile media,不进 event store / readmodel"]
+    classDef vol fill:#fee2e2,stroke:#dc2626,color:#7f1d1d;
+    class T2 vol;
+```
+
 ## 为什么不是 `VoiceSessionGAgent`
 
 Voice 的稳定事实属于被 attach 的业务 actor:它知道 persona、tool catalog、turn lifecycle 和授权边界。另起 VoiceSessionGAgent 会把语音会话 ID、连接元数据、临时 provider 状态变成第二个事实拥有者,还会诱导 raw audio 或 volatile session 状态进入 Actor/Event/ReadModel 层。
@@ -31,7 +42,25 @@ Voice 的稳定事实属于被 attach 的业务 actor:它知道 persona、tool c
 
 ADR-0031 的短期路径是复用 NyxID service/node proxy:本地边缘服务把 Home Assistant/Frigate/ESP32 这类 LAN API 注册到 NyxID,模型通过已授权的 connected-service tool 间接调用。Aevatar 不保存本地服务目录,也不把 session/actor/user 到 NyxID token 的映射藏进进程内字典。
 
-⚠️ ADR-0033 仍是 proposed。它描述的方向是 provider 凭证经 NyxID ephemeral broker,生产部署不持静态 OPENAI_API_KEY;但本章不把 proposed 状态写成 accepted current。静态 key 移除是否已完全落地、哪些部署仍允许本地直连 key,需要后续核验/决策。
+> ⚠️ **凭证现状(已核对源码)+ provider 成熟度不对称**:ADR-0033 描述的 NyxID ephemeral broker **只覆盖 OpenAI realtime**,broker 代码(`NyxIdRealtimeProviderCredentialResolver`)已落地。但有两处要诚实标注:
+>
+> - **OpenAI 的静态 key 回退不按环境门禁**:`OpenAIRealtimeProvider` 在没有 resolver(或 resolver 返回空)时回退到静态 config key,而这条回退**没有 `IsProduction` 守卫**——只要部署设了 `OPENAI_API_KEY` env,静态路径就会激活,与 ADR-0018「零长期密钥」相悖(已登记 [08/04 P0-2](../08/04-todo-list.md))。
+> - **MiniCPM 没有 broker 路径**:`MiniCPMRealtimeProvider` 只读静态 config(Endpoint / ApiKey),无 per-session 凭证解析、无 NyxID。所以把 OpenAI / MiniCPM 并列时要注意:**两者凭证成熟度不对称**,broker 只到 OpenAI。
+>
+> ADR-0033 头仍是 proposed;本章不把 proposed 写成 accepted current。
+
+```mermaid
+flowchart TB
+    subgraph OpenAI["OpenAI realtime"]
+        OA["NyxIdRealtimeProviderCredentialResolver<br/>(ADR-0033 ephemeral broker)"]
+        OA -->|"无 resolver / 解析为空"| Fallback["回退静态 config key<br/>⚠️ 不按环境门禁"]
+    end
+    subgraph MiniCPM["MiniCPM realtime"]
+        MC["仅静态 config(Endpoint / ApiKey)<br/>无 NyxID broker 路径"]
+    end
+    classDef warn fill:#fee2e2,stroke:#dc2626,color:#7f1d1d;
+    class Fallback,MC warn;
+```
 
 ## 验收
 

@@ -167,6 +167,8 @@ nav:
       - Studio + Scripting: 07/05-studio-and-scripting.md
       - 前端控制台: 07/06-console-web.md
       - 可观测性: 07/07-observability.md
+      - 文件全链路走查: 07/11-file-handling-end-to-end.md
+      - 定时任务全链路走查: 07/12-scheduled-tasks.md
   - 08 附录:
       - 08/index.md
       - 术语表: 08/01-glossary.md
@@ -183,6 +185,12 @@ nav:
           - 注册与发现: 09/01-workflow-as-nyxid-service/03-register-and-discover.md
           - 三个调用入口: 09/01-workflow-as-nyxid-service/04-calling.md
           - 端到端方案: 09/01-workflow-as-nyxid-service/05-end-to-end-plan.md
+      - 方案 02·Ingress 工具所有权(自有工具不上线):
+          - 09/02-ingress-tool-ownership/index.md
+          - 泄漏链路与非对称所有权: 09/02-ingress-tool-ownership/01-leak-and-asymmetric-rule.md
+          - 两落点·codex 6 缺口·落地: 09/02-ingress-tool-ownership/02-fix-and-rollout.md
   - 10 已知问题:
       - 10/index.md
       - CLI 看不到 Lark bot 创建的 agent(scope 隔离): 10/01-cli-lark-scope-isolation.md
+      - shell 工具 vs aevatar 自有工具(codex 当 model): 10/02-codex-shell-vs-aevatar-tools.md
+      - 自有工具泄漏进客户端流(agentic 客户端当 model): 10/03-ingress-own-tool-stream-leak.md

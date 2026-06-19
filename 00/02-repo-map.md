@@ -10,6 +10,18 @@
 
 这和 `module-placement-map` 的顺序是一致的：先找事实拥有者，再找写入口，再找读侧，最后才看 provider/bootstrap。也就是说，项目地图不是从文件名前缀硬猜职责，而是从 actor/domain owner、Application command/query、Projection/readmodel、Infrastructure/provider、Host/bootstrap 这些位置来定位。
 
+```mermaid
+flowchart TB
+    SLNX["aevatar.slnx(全量工程索引)"]
+    SLNX --> F1["aevatar.foundation.slnf"]
+    SLNX --> F2["aevatar.cqrs.slnf"]
+    SLNX --> F3["aevatar.workflow.slnf"]
+    SLNX --> F4["aevatar.ai.slnf"]
+    SLNX --> F5["...共 9 个能力域 .slnf"]
+    classDef root fill:#dbeafe,stroke:#2563eb,color:#172554;
+    class SLNX root;
+```
+
 ## SolutionSliceTable
 
 | 工作面 | 当前项目数 | 主要覆盖 | 怎么用 |
@@ -34,7 +46,22 @@
 
 ## ProjectLayerMap
 
-下表覆盖当前 `src/` 下 98 个 `项目文件`。层级口径来自 `module-placement-map`：Stable primitives 只放跨能力域稳定原语；Capability core 拥有业务事实；Extension/plugin 扩展既有能力；Provider/adapter 包住外部系统或技术实现；Host/bootstrap 只做协议适配、DI 组合和运行参数配置。
+下表覆盖当前 `src/` 下 98 个 `.csproj`。层级口径来自 `module-placement-map`：Stable primitives 只放跨能力域稳定原语；Capability core 拥有业务事实；Extension/plugin 扩展既有能力；Provider/adapter 包住外部系统或技术实现；Host/bootstrap 只做协议适配、DI 组合和运行参数配置。
+
+```mermaid
+flowchart TB
+    L1["Stable primitives<br/>(跨能力域稳定原语)"]
+    L2["Capability core<br/>(拥有业务事实)"]
+    L3["Extension / plugin<br/>(扩展既有能力)"]
+    L4["Provider / adapter<br/>(包住外部系统/技术)"]
+    L5["Host / bootstrap<br/>(协议适配 + DI 组合)"]
+    L2 --> L1
+    L3 --> L2
+    L4 --> L2
+    L5 -.->|"组合装配"| L2
+    classDef core fill:#dcfce7,stroke:#16a34a,color:#14532d;
+    class L2 core;
+```
 
 | 项目 | 层 / 能力域 | 职责 | 依赖约束 |
 |---|---|---|---|

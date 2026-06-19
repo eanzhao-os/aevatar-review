@@ -28,6 +28,23 @@ Event Sourcing 的权威事实在另一层。只有 actor 在处理消息后显�
 
 典型路径是:actor 收到一个 runtime envelope,业务 handler 做判断,然后调用持久化领域事件的 API。提交成功后,框架把 committed events fold 回当前 state,再发布 committed-state observation,让 projection/live sink 看到“事实已经发生”。
 
+```mermaid
+flowchart LR
+    EE["EventEnvelope<br/>runtime 消息<br/>(command / signal / reply / 事件)"]
+    EE -->|"进 actor mailbox"| HD["业务 handler 判断"]
+    HD -->|"决定提交领域事件"| PD["PersistDomainEventAsync"]
+    PD -->|"append 成功"| SE["StateEvent 进 EventStore<br/>带版本的事实"]
+    SE --> FD["fold 回当前 state"]
+    SE --> OB["发布 committed-state observation"]
+    OB -.->|"只读观察,不进业务 inbox"| PJ["projection / live sink"]
+    classDef msg fill:#fef3c7,stroke:#d97706,color:#451a03;
+    classDef fact fill:#dcfce7,stroke:#16a34a,color:#14532d;
+    class EE,HD msg;
+    class SE,FD,OB fact;
+```
+
+图里的颜色就是这条边界:**黄色**是运行时消息层(envelope 在流动,但还不是事实),**绿色**才是事实层(`PersistDomainEventAsync` 成功之后)。同一份业务 payload,跨过 `PersistDomainEventAsync` 这一步之前和之后,权威性完全不同。
+
 这也是 Aevatar 和普通“消息总线 + mutable object”写法的关键区别。消息本身不等于事实;actor 的领域决定经过 `EventStore` 提交后,才成为可恢复、可投影、可审计的事实。
 
 <details>

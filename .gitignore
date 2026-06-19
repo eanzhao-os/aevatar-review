@@ -11,5 +11,8 @@
 .worktrees/
 .config/consensus-rnd/host.env
 
+# upstream-sync runtime state (last processed sha + filed issue ledger)
+.config/upstream-sync/state.json
+
 # mkdocs build output
 site/
