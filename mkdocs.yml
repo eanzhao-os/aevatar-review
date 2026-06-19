@@ -185,3 +185,4 @@ nav:
   - 10 已知问题:
       - 10/index.md
       - CLI 看不到 Lark bot 创建的 agent(scope 隔离): 10/01-cli-lark-scope-isolation.md
+      - shell 工具 vs aevatar 自有工具(codex 当 model): 10/02-codex-shell-vs-aevatar-tools.md
