@@ -11,3 +11,4 @@
 | [05](05-routing-and-topology.md) | 路由与拓扑 |
 | [06](06-local-runtime-deep-dive.md) | Local Runtime 深入 |
 | [07](07-stream-actor-gagent-facts.md) | Stream × Actor × GAgent:三者关系与事实清单 |
+| [08](08-event-sourcing-dividends.md) | 亮点:Event Sourcing 三重红利 + StateGuard 纪律 |
