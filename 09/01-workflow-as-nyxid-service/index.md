@@ -1,6 +1,6 @@
 # 方案 01 · 把 Studio workflow 发布成 NyxID 可调用服务
 
-> 这是 [09 方案区](../index.md) 下的**第一份方案**。09 是一个收录跨 aevatar × NyxID 设计方案的区域,本方案是其中一份独立单元(自带 5 章 + 本概览)。
+> 这是 [09 方案区](../index.md) 下的**第一份方案**。09 是一个收录跨 aevatar × NyxID 设计方案的区域,本方案是其中一份独立单元(自带 7 章 + 本概览:01–05 解读现状与缺口,06 给出 aevatar-only 自动化落地方案,07 是配套 ADR 草案)。
 
 ## 事实源/设计抽象(以 ~/Code/aevatar 为准)
 
@@ -34,6 +34,8 @@
 | [03 注册与发现](03-register-and-discover.md) | 怎么让 NyxID 发现这个服务 | ⚠️ 手工注册;协议形状不匹配 + 鉴权缺口 |
 | [04 三个调用入口](04-calling.md) | NyxID CLI / aevatar 自身 nyxid tools / 直连 REST·MCP 怎么调 | proxy 入口现役且三者同源 |
 | [05 端到端方案](05-end-to-end-plan.md) | 完整时序 + 落地清单 + 哪些是真的/手工的/缺口 | 落地步骤可执行;缺口登记到 TODO |
+| [06 自动注册落地方案](06-auto-registration-plan.md) | 怎么把"当中那一跳"从手工补成自动(aevatar-only) | 🎯 目标态方案;committed 钩子触发 + 真回执 + 自签 scope-JWT |
+| [07 ADR·自动注册到 NyxID](07-auto-registration-adr.md) | 决策与不变量:谁拥有、谁触发、谁签凭证、关不掉什么 | proposed 草案;落地时移植进 aevatar `docs/adr/` |
 
 ## 这条方案的设计正当性
 
