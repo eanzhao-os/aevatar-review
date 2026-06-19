@@ -189,6 +189,9 @@ nav:
           - 09/02-ingress-tool-ownership/index.md
           - 泄漏链路与非对称所有权: 09/02-ingress-tool-ownership/01-leak-and-asymmetric-rule.md
           - 两落点·codex 6 缺口·落地: 09/02-ingress-tool-ownership/02-fix-and-rollout.md
+      - 方案 03·一句话 provision 监控 workflow 并实时观测:
+          - 09/03-provision-and-observe-via-nyxid/index.md
+          - 全链路·大脑 reach C1 C2 + 6 条实测发现: 09/03-provision-and-observe-via-nyxid/01-end-to-end.md
   - 10 已知问题:
       - 10/index.md
       - CLI 看不到 Lark bot 创建的 agent(scope 隔离): 10/01-cli-lark-scope-isolation.md

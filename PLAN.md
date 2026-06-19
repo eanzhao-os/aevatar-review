@@ -144,6 +144,11 @@
 - ✅ 02-ingress-tool-ownership/01-leak-and-asymmetric-rule.md — 泄漏链路(流式渲染层)+ 为何是 additive 工具 + 非对称不变量 + 为何非纯服务端
 - ✅ 02-ingress-tool-ownership/02-fix-and-rollout.md — 两落点 + codex 6 缺口 + 里程碑27/5issue/验收 + 诚实缺口
 
+**方案 03 · CC/Codex 经 NyxID 一句话 provision 定时监控 workflow 并实时观测**(`09/03-provision-and-observe-via-nyxid/`)——三条已有主链各复用一次:入站无状态 LLM 网关当大脑、NyxID 下游 proxy 当管理面 reach、C1 `provision-workflow`(`c80c77929`+`c46824af1`)+ C2 只读 Observatory(`bd9975c8a`)。附 6 条 live 实测发现(mock 单测测不出)。
+
+- ✅ 03-provision-and-observe-via-nyxid/index.md — 方案概览:三链复用 + 一句话结论 + 设计正当性(读写分离 / 复用下游 / C1 异步化)
+- ✅ 03-provision-and-observe-via-nyxid/01-end-to-end.md — 四段全链路(大脑/reach/C1/C2)+ 6 条 live 实测发现逐条根因
+
 ---
 
 ## 进度看板
@@ -159,8 +164,8 @@
 | 06 分布式 | 5 | 5 | ✅ |
 | 07 周边 | 7 | 7 | ✅ |
 | 08 附录 | 3 | 3 | ✅ |
-| 09 方案(SCOPE_EXTEND) | 7 | 7 | ✅ |
-| **合计** | **51** | **51** | ✅ |
+| 09 方案(SCOPE_EXTEND) | 9 | 9 | ✅ |
+| **合计** | **53** | **53** | ✅ |
 
 > 更新约定:每完成一篇,把对应行的 ⬜ 改成 ✅,并更新看板数字。
 
