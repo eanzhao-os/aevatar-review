@@ -185,6 +185,8 @@ nav:
           - 注册与发现: 09/01-workflow-as-nyxid-service/03-register-and-discover.md
           - 三个调用入口: 09/01-workflow-as-nyxid-service/04-calling.md
           - 端到端方案: 09/01-workflow-as-nyxid-service/05-end-to-end-plan.md
+          - 自动注册落地方案: 09/01-workflow-as-nyxid-service/06-auto-registration-plan.md
+          - ADR·自动注册到 NyxID: 09/01-workflow-as-nyxid-service/07-auto-registration-adr.md
       - 方案 02·Ingress 工具所有权(自有工具不上线):
           - 09/02-ingress-tool-ownership/index.md
           - 泄漏链路与非对称所有权: 09/02-ingress-tool-ownership/01-leak-and-asymmetric-rule.md
