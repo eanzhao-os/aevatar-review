@@ -138,6 +138,12 @@
 - ✅ 01-workflow-as-nyxid-service/04-calling.md — 三入口同源:NyxID CLI / aevatar `NyxIdConnectedServiceToolSource`(`x-aevatar-tool`)/ 直连 REST·MCP
 - ✅ 01-workflow-as-nyxid-service/05-end-to-end-plan.md — 端到端 12 跳 + 落地清单 + 真实/手工/缺口矩阵 + target-state
 
+**方案 02 · Ingress 工具所有权:自有工具服务端执行、永不上线**(`09/02-ingress-tool-ownership/`)——把 aevatar 当 model 套进 agentic 客户端(codex/zcode)时,自有工具服务端执行 + 对客户端隐形,只有客户端声明的工具才转发。修复 [10/03](10/03-ingress-own-tool-stream-leak.md)(`aevatarAI/aevatar#2269`,里程碑 27)。已 codex 设计评审,6 缺口已并入。
+
+- ✅ 02-ingress-tool-ownership/index.md — 方案概览:非对称所有权 + 两落点 + ship Part1+2 一起
+- ✅ 02-ingress-tool-ownership/01-leak-and-asymmetric-rule.md — 泄漏链路(流式渲染层)+ 为何是 additive 工具 + 非对称不变量 + 为何非纯服务端
+- ✅ 02-ingress-tool-ownership/02-fix-and-rollout.md — 两落点 + codex 6 缺口 + 里程碑27/5issue/验收 + 诚实缺口
+
 ---
 
 ## 进度看板
@@ -153,8 +159,8 @@
 | 06 分布式 | 5 | 5 | ✅ |
 | 07 周边 | 7 | 7 | ✅ |
 | 08 附录 | 3 | 3 | ✅ |
-| 09 方案(SCOPE_EXTEND) | 5 | 5 | ✅ |
-| **合计** | **49** | **49** | ✅ |
+| 09 方案(SCOPE_EXTEND) | 7 | 7 | ✅ |
+| **合计** | **51** | **51** | ✅ |
 
 > 更新约定:每完成一篇,把对应行的 ⬜ 改成 ✅,并更新看板数字。
 

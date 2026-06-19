@@ -19,6 +19,7 @@
 | # | 方案 | 一句话 | 现状 |
 |---|---|---|---|
 | 01 | [把 Studio workflow 发布成 NyxID 可调用服务](01-workflow-as-nyxid-service/index.md) | aevatar 发布 published service + NyxID 当通用代理;CLI / aevatar nyxid tools / 直连三入口同源 | 两头现役,当中注册一跳手工;⚠️ protobuf↔OpenAPI + scope_id 鉴权缺口 |
+| 02 | [Ingress 工具所有权:自有工具服务端执行、永不上线](02-ingress-tool-ownership/index.md) | 非对称所有权修复 [10/03](../10/03-ingress-own-tool-stream-leak.md)(#2269):自有工具隐形、客户端声明的工具转发;两落点=流式只放 forwarded + typed `owned_tool_names` | 设计已 codex 评审(6 缺口已并入);⚠️ 未实现 |
 
 > 后续方案按 `09/<NN>-<slug>/` 追加(各自一个子区),并在上表登记一行。
 
