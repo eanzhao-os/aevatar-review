@@ -8,9 +8,9 @@
 
 - **入站当大脑(无状态 LLM 网关)**:`src/Aevatar.Mainnet.Host.Api/Messages/MessagesEndpoints.cs`(`/v1/messages` 明确是 stateless facade,非 agent 工具循环)、默认路由/模型唯一真相源 `src/Aevatar.AI.Abstractions/LLMProviders/LlmDefaults.cs`。
 - **C1 一次调用 provision**:`src/Aevatar.Studio.Hosting/Endpoints/StudioProvisioningEndpoints.cs`(`POST /api/scopes/{scopeId}/provision-workflow`,组合 member create + bind + invoke)、`src/Aevatar.Studio.Application/Studio/Services/StudioWorkflowProvisioningService.cs`(轮询绑定、容忍最终一致)。
-- **C2 平台级只读观测**:`src/workflow/Aevatar.Workflow.Infrastructure/CapabilityApi/WorkflowRunObservatoryEndpoints.cs`(scope 隔离 + OIDC PKCE + host 自带内联单页)、`src/workflow/Aevatar.Workflow.Application/Observatory/WorkflowRunObservatoryQueryService.cs`(复用 timeline/graph/current-state)。
+- **C2 平台级只读观测**:`src/workflow/Aevatar.Workflow.Infrastructure/CapabilityApi/WorkflowRunObservatoryEndpoints.cs`(默认 scope 隔离 + OIDC PKCE + host 自带内联单页;`45c1bd208` 起平台管理员可经 `IPlatformAdminAuthorizer` 显式跨 scope)、`src/workflow/Aevatar.Workflow.Application/Observatory/WorkflowRunObservatoryQueryService.cs`(复用 timeline/graph/current-state)。
 
-> **边界说明**:09 区域整体是 [SCOPE_EXTEND](../index.md)(不在仓库 `PLAN.md` 原始 00–08 清单内)。本方案所有论断**已于 2026-06-19 在 aevatar mainnet 上活体跑通**(C1 已上线 `c80c77929` + 修复 `c46824af1`,C2 已上线 `bd9975c8a`);第 5 节附录的每条「live 实测发现」都是 **mock 单测测不出、只有活体才暴露**的,逐条标注现象与根因。
+> **边界说明**:09 区域整体是 [SCOPE_EXTEND](../index.md)(不在仓库 `PLAN.md` 原始 00–08 清单内)。本方案核心链路**已于 2026-06-19 在 aevatar mainnet 上活体跑通**(C1 已上线 `c80c77929` + 修复 `c46824af1`,C2 已上线 `bd9975c8a`);C2 在 2026-06-20/21 又叠加了页面重写(`799ad7bf2`)与平台管理员跨 scope 视图(`45c1bd208`,按源码解读、未活体亲验,见 [01 §4.1/§6](01-end-to-end.md))。第 5 节附录的每条「live 实测发现」都是 **mock 单测测不出、只有活体才暴露**的,逐条标注现象与根因。
 
 ---
 
