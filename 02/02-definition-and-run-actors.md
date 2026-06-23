@@ -3,8 +3,8 @@
 ## 事实源/设计抽象(以 ~/Code/aevatar 为准)
 
 - `WorkflowGAgent`: definition actor 的绑定、编译和子 workflow 定义快照服务。
-- `WorkflowRunGAgent`: run actor 的状态宿主接口、运行状态和执行上下文入口。
-- `workflow-runtime`: workflow definition actor 与 run actor 的职责边界。
+- `WorkflowRunGAgent` 与 `SubWorkflowOrchestrator`: run actor 的状态宿主、委派子流程状态转换与嵌套调度。
+- `WorkflowCallLimitPolicy`: 子流程深度（限制 8）与并发（限制 64）的安全准入控制策略。
 
 ---
 
@@ -96,6 +96,34 @@ flowchart TD
 
 - definition 事实仍归 definition actor。
 - 子 run 的运行事实仍归自己的 run actor。
+
+### 嵌套子工作流调用的防爆仓与限流设计 (Recursion & Fanout Limits) ★
+
+在分布式 Actor 架构中，嵌套子工作流（Sub-workflow）极易引发级联调用灾难：无限递归（导致资源耗尽）以及过大的扇出并发（导致 Actor 集群过载雪崩）。
+
+Aevatar 的 `WorkflowRunGAgent` 通过 `SubWorkflowOrchestrator` 将子流程调度委托给限额策略 `WorkflowCallLimitPolicy` 来实施严密的保护：
+
+```mermaid
+flowchart TD
+    Req["子工作流调用请求 (workflow_call)"] --> Depth["ResolveChildDepth: Depth + 1"]
+    Depth --> CheckDepth{"Depth > MaxDepth (默认 8)?"}
+    CheckDepth -->|是| RejectD["拒绝并发布失败事件<br/>(workflow_call depth limit exceeded)"]
+    CheckDepth -->|否| Count["统计活动子流程数<br/>(Pending Invocations + Resolutions)"]
+    Count --> CheckCount{"Count >= MaxActive (默认 64)?"}
+    CheckCount -->|是| RejectC["拒绝并发布失败事件<br/>(workflow_call fanout limit exceeded)"]
+    CheckCount -->|否| Accept["准入通过: 阶段化推进子流程启动"]
+```
+
+1. **防止无限嵌套 (Depth Guard)**：
+   - 子流程深度由 `DefaultMaxDepth = 8` 默认限制。
+   - `WorkflowCallModule` 在抛出 `SubWorkflowInvokeRequestedEvent` 时，基于 `runtimeContext.Depth` 递增得到 `RequestedDepth`。
+   - `WorkflowCallLimitPolicy.Admit` 判定时，若检测到子流程深度超过阈值，立即拒绝准入并发布失败事件，强行截断无限环路。
+2. **防止并发暴涨 (Fan-out Guard)**：
+   - 默认限制一个父工作流同时派生的活动子工作流并发数 `DefaultMaxActiveSubWorkflows = 64`。
+   - 计算包含待调用（Pending Invocations）与定义解析中（Pending Definition Resolutions）的总数。一旦超出限制立即拦截，避免分布式节点被级联暴涨的 Actor 创建请求淹没。
+3. **两阶段防孤儿 Actor (Anti-Orphan Guard)**：
+   - 重构后的 `SubWorkflowOrchestrator` 遵循“先持久化状态，后产生副作用”原则：在去创建和启动子流程 Actor 之前，**必须先持久化 `PendingSubWorkflowInvocation` 领域事件**。
+   - 即使运行在此处崩溃，Actor 重启重放后仍能根据唯一的 `InvocationId` 幂等重试该调用，防止创建出脱离父工作流追踪的“孤儿 Actor”。
 
 ## 设计取舍
 
