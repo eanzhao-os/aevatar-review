@@ -9,7 +9,7 @@
 - **ingress port + 存储实现**:`.../Runs/WorkflowFileIngressPort.cs`(`IWorkflowFileIngressPort` + 三个伴生 port:read / ownership / cleanup)、`src/workflow/Aevatar.Workflow.Infrastructure/Runs/FileSystemWorkflowFileIngressPort.cs`(文件系统实现:每文件一目录 + SHA256 + TTL + owner 绑定 + 路径安全)、`.../Runs/WorkflowFileArtifactCleanupHostedService.cs`(后台周期清理)。
 - **抽取处理**:`.../Runs/WorkflowDocumentExtractToolSource.cs`(`document_extract` 工具:text / schema_bound_json 两种 kind,PDF/DOCX/文本走本地解析,图片走 LLM)。
 - **多模态(AI 层)**:`src/Aevatar.AI.Abstractions/LLMProviders/LLMRequest.cs`(`ContentPart` / `ContentPartKind`)、`src/Aevatar.AI.Abstractions/ContentPartProtoMapper.cs`。
-- **回传(port/adapter 分层)**:`.../Runs/WorkflowFileSubmitToolSource.cs`(`workflow_file_submit` 工具,泛化 + `IWorkflowConnectedServiceFileSubmitAdapter` 适配)、`src/Aevatar.AI.ToolProviders.Lark/LarkWorkflowFileSubmitAdapter.cs`(Lark drive/approval 上传 + 大小与媒体白名单)。
+- **回传(port/adapter 分层)**:`.../Runs/WorkflowFileSubmitToolSource.cs`(`workflow_file_submit` 工具,泛化 + `IWorkflowFileMultipartUploadPort` 接口实现)、`src/Aevatar.AI.ToolProviders.NyxId/NyxIdWorkflowFileMultipartUploadPort.cs`(NyxID 代理上传，支持 Lark 附件等场景)。
 
 > 本篇是 [08 Lark 全链路](08-lark-end-to-end.md) / [12 定时任务](12-scheduled-tasks.md) 的姊妹篇:那两篇讲"消息/定时怎么把活儿叫起来",本篇讲"一个文件怎么穿过这套 Actor + ES + CQRS 而不把字节灌进事实层"。运行报告类"artifact"是另一回事,见第 7 节消歧与 [05/04 Workflow 投影](../05/04-workflow-projection.md)。
 
@@ -280,40 +280,48 @@ flowchart LR
 
 ## 6. 出站:`workflow_file_submit`——把工件回传给外部服务
 
-回传走 `workflow_file_submit` 工具,它的结构刻意做成**泛化工具 + 服务适配器**两层:
+回传走 `workflow_file_submit` 工具，其设计采用 **泛化工具 (WorkflowFileSubmitTool) + 策略解析器 (Resolver) + 统一多部分表单端口 (MultipartUploadPort)** 的三层架构，以实现高扩展性的安全流式出站：
 
-- `WorkflowFileSubmitToolSource`(在 `Aevatar.Workflow.Infrastructure`)是**与具体服务无关**的工具壳:解析参数、要求 caller bearer、凭 ref 从 store 读字节、把目标路由给对应 adapter。
-- `IWorkflowConnectedServiceFileSubmitAdapter` 的实现(如 `LarkWorkflowFileSubmitAdapter`,在 `Aevatar.AI.ToolProviders.Lark`)才知道**某个具体服务**怎么传:目标名、输出字段、大小与媒体白名单。
+- `WorkflowFileSubmitTool`(由 `WorkflowFileSubmitToolSource` 注册)是**与外部 API 无关**的通用工具壳：解析参数、校验 caller token、描述元数据回校，并触发流式读取。
+- `IWorkflowFileMultipartUploadPolicyResolver` (实现如 `MainnetWorkflowFileMultipartUploadSafetyPolicyResolver`)解析并返回目标服务的安全控制策略，判断该请求的目标 URL (服务 slug、相对 path)和文件大小等是否在允许范围内。
+- `IWorkflowFileMultipartUploadPort` (实现如 `NyxIdWorkflowFileMultipartUploadPort`)定义真正的数据传输机制。生产态通过 NyxID API 代理发起真正的多部分表单 (`multipart/form-data`) 上传请求。
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Tool as "workflow_file_submit(泛化壳)"
+    participant Tool as "workflow_file_submit(泛化工具)"
     participant Store as "artifact store"
-    participant Adapter as "LarkWorkflowFileSubmitAdapter"
-    participant Lark as "Lark OpenAPI"
+    participant Resolver as "IWorkflowFileMultipartUploadPolicyResolver"
+    participant Port as "IWorkflowFileMultipartUploadPort"
+    participant Provider as "External Provider (via NyxId)"
 
     Tool->>Tool: 解析参数 + 校验 caller bearer
-    Note over Tool: 无 bearer → missing_bearer<br/>未注册目标 → invalid_target
-    Tool->>Store: DescribeAsync(ref) 回校 + 未过期
-    Tool->>Adapter: 选中 target(lark_drive_media / lark_approval_file)
-    Adapter->>Adapter: 校验大小 + mediaType 白名单
-    Adapter->>Store: OpenReadAsync 流式取字节
-    Adapter->>Lark: 上传
-    Lark-->>Adapter: file_token(drive)/ file_code(approval)
-    Adapter-->>Tool: 输出字段
+    Note over Tool: 无 bearer → missing_bearer
+    Tool->>Store: DescribeAsync(ref) 元数据回校
+    Tool->>Resolver: ResolveAsync(candidate, descriptor) 校验安全策略
+    Note over Resolver: 判断目标服务、路径与文件大小限额是否合规
+    Resolver-->>Tool: 返回 allowed 策略(包含大小限额与具体映射路径)
+    Tool->>Store: OpenReadAsync 现读文件字节流
+    Tool->>Port: UploadAsync(request, contentStream)
+    Port->>Provider: 代理发起安全多部分表单上传
+    Provider-->>Port: 返回 JSON 结果 (如 Lark 的 file_token)
+    Port-->>Tool: 凭 output_selector 解析提取输出码 (output_code)
+    Tool-->>Tool: 返回执行成功结果 (含 output_code)
 ```
 
-Lark adapter 暴露两个目标,边界各不相同:
+上传至外部服务（如 Lark Drive 或 审批附件）时，底层直接代理给 NyxID 网关实现，支持的目标配置和约束如下：
 
-| 目标 | 用途 | 输出字段 | 大小上限 | 媒体白名单(摘) |
-|---|---|---|---|---|
-| `lark_drive_media` | 传到 Lark Drive(供 doc/sheet/bitable 引用) | `file_token` | 20 MB | 图片/PDF/Office/CSV/文本 等 |
-| `lark_approval_file` | 审批附件 | `file_code` | 图片 10 MB / 其他 30 MB | 图片(JPEG/PNG)/ PDF/Office/文本 等 |
+| 目标 (Service Slug) | 用途 | 输出码提取目标 (Selector) | 大小限额 (MaxFileBytes) |
+|---|---|---|---|
+| `lark_drive_media` | 传到 Lark Drive (供文档/多维表格引用) | `data.file_token` 或 `file_token` | 20 MB |
+| `lark_approval_file` | 审批附件 | `file_code` | 图片 10 MB / 其他 30 MB |
 
 文件名上限 250 字符。
 
-**为什么是 port/adapter 两层,而不是直接写一个"Lark 上传工具"?** 因为"把工件交给外部服务"是个**通用动作**,而"Lark 的 drive/approval 各有上限和字段"是**服务私有知识**。把通用流程(校验凭证、回校 ref、流式读字节)留在泛化壳,把服务差异关进 adapter,新接一个外部服务只要再写一个 adapter——这正是 [07/01 Channel](01-channels.md) 同款的"统一骨干 + 可插适配"思路。同样,字节在 `OpenReadAsync` 处才流式取出直接上传,**不**经过 actor 状态或工具结果 JSON。
+**为什么是 Port + Policy 架构，而不是直接针对具体服务编写上传 Adapter？**
+因为“将工件以 multipart 表单上传给外部”是**通用的 HTTP 传输动作**，而“由谁代理、上传到哪个服务、允许什么大小”是**宿主安全策略与具体网关逻辑**。
+通过将通用流程（校验凭证、回校 ref、流式读字节）留在泛化壳，将安全策略限制归于 `PolicyResolver`，将通信细节关入 `MultipartUploadPort`，系统完美实现了职责分离：
+本地测试可以注入空/模拟的 resolver，而生产态只需通过配置注册相应的 upload path 安全策略。同样，文件字节也是在 `OpenReadAsync` 处直接流式流向外部，中间**绝不**灌入 Actor 的状态中。
 
 > 顺带厘清一个易错点:`invoice_ocr_approval.yaml` 虽然叫 "OCR approval",但它**不**用 `workflow_file_submit` 传附件——它经 `nyxid_proxy` 提交审批表单,并在契约允许时**省略**附件 widget(见该 YAML 顶部 TODO 注释)。所以它是第 5 节"入站视觉"的例子,不是本节"出站回传"的例子。
 
