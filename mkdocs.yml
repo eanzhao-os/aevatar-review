@@ -200,3 +200,7 @@ nav:
       - shell 工具 vs aevatar 自有工具(codex 当 model): 10/02-codex-shell-vs-aevatar-tools.md
       - 自有工具泄漏进客户端流(agentic 客户端当 model): 10/03-ingress-own-tool-stream-leak.md
       - /v1/responses off-actor LLM run 执行与流式观察(四层故障): 10/04-responses-llm-run-offactor-and-observation.md
+  - 11 Skills 能力层:
+      - 11/index.md
+      - 控制面家族·idea → schedule 客户端 REST: 11/01-aevatar-control-plane-skills.md
+      - 平台 skill 与 probe·authoring / fallback / 体检探针: 11/02-aevatar-platform-and-probe-skills.md
