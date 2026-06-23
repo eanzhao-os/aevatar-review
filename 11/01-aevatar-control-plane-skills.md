@@ -131,8 +131,8 @@ flowchart TD
 
 - **职责**:建一个 **schedule** 按 cron 触发已发布 service;preview / enable / disable / run-now / update / delete。先用 service-publisher 发布 service(需要其身份、endpoint、payload 类型)。
 - **关键端点**:`POST /api/schedules/preview`(先预览 cron 的下 N 次触发,引擎无隐式本地时区,必须给真 IANA `timezone`)、`POST /api/schedules`(建)、`/{scheduleId}:run-now` / `:enable` / `:disable`(注意动作用**冒号**不是斜杠)、`PUT` / `DELETE`。
-- **鉴权:首选 `scopeOwnerNyxId`(本块强调的关键)**。`serviceInvocation.auth` 二选一:
-    - **`scopeOwnerNyxId: { scope }`** —— 触发时从 scope **owner** 的 NyxID mint 凭证。`SKILL.md` 明令用这个:它不需要单独绑定的 subject,所以触发不会以 `NyxID binding not found for the scheduled subject` 失败。
+- **鉴权:`serviceInvocation.auth` 二选一**:
+    - **`scopeOwnerNyxId: { scope }`** —— 触发时从 scope **owner** 的 NyxID 重新 mint 凭证,owner-run 调度的正确选择。**前提:scope owner 已建立 NyxID owner(broker)binding**,否则建 schedule 直接 400(见下「启用 scope-owner 定时任务」)。
     - **`senderNyxId: { subject{platform, externalUserId, tenant?}, scope }`** —— 以某个外部 subject 身份触发,**仅当该 subject 已有持久 NyxID 绑定**时才用,否则触发期 mint 失败。
 
 ```mermaid
@@ -143,13 +143,23 @@ sequenceDiagram
     participant NYX as NyxID
     participant SVC as 目标 service
     SCH->>NYX: 用 scopeOwnerNyxId 在触发期 mint scope owner 凭证
-    NYX-->>SCH: 短期凭证 (无需预绑 subject)
+    NYX-->>SCH: 短期凭证 (前提:owner 已建 broker binding)
     SCH->>SVC: 以 scope owner 身份调用 endpoint
     SVC-->>SCH: run 接受 (异步执行)
     Note over SCH,SVC: :run-now 后必须回读 runs / observatory<br/>2xx = accepted 非 succeeded
 ```
 
-> **设计正当性**:为什么调度鉴权默认 `scopeOwnerNyxId` 而不是绑一个具体 subject?因为定时触发是**无人值守**的——触发时没有 live 请求带 token,凭证必须能在触发期重新 mint。绑定到 scope owner 让"谁拥有这个 scope"成为天然可重 mint 的身份,避免"绑了某个外部用户但他没持久绑定 → 触发期 mint 不出凭证 → 工作流没跑"这个坑(这正是 [07/12 定时任务](../07/12-scheduled-tasks.md) 沿 aevatar 源码讲的 Studio 定时"能建、触发失败"的根因)。
+### 启用 scope-owner 定时任务:建立 NyxID owner binding
+
+实测(2026-06-23):用 `~/.nyxid` 的 NyxID CLI token 能建 team / member / service 并 invoke(整条链已端到端验证),但**建 `scopeOwnerNyxId` 调度会 400**:
+
+> `Authenticated NyxID owner binding is required for scope owner schedule auth; complete or refresh NyxID login before creating a scope owner schedule.`
+
+- **为什么**:定时触发无人值守,服务端要在触发期**重新 mint** scope owner 的 NyxID 凭证,因此要求 owner 有一条服务端**外部身份绑定**记录。`ScheduledDispatchEndpoints.EnsureScopeOwnerNyxIdBindingExistsAsync` 从会话 claims 解析 owner subject,再用 `IExternalIdentityBindingQueryPort.ResolveAsync(subject)` 查这条绑定;查不到即上面的 400。纯 CLI token 不携带它。
+- **怎么建**:在 aevatar 控制台(studio web)用 NyxID **登录一次**——该 OAuth 流程会请求 `urn:nyxid:scope:broker_binding` scope(见 `GET /api/auth/nyxid/config`),登录完成即在服务端登记 owner binding;之后用同一身份建 `scopeOwnerNyxId` 调度即通过。token 过期后"刷新登录"重建绑定。
+- **另一道闸(与鉴权无关)**:目标用 `payloadJson` 时必须带 `revisionId`(或目标 service 有 active serving revision),否则 400 `payloadJson requires a revisionId`;取 `GET /api/scopes/{scopeId}/services` 里的 `defaultServingRevisionId` 填入。
+
+> **设计正当性**:为什么调度鉴权用 `scopeOwnerNyxId` 而不是绑一个具体外部 subject?因为定时触发是**无人值守**的——触发时没有 live 请求带 token,凭证必须能在触发期重新 mint。绑定到 scope owner 让"谁拥有这个 scope"成为天然可重 mint 的身份;代价是 owner 须先在控制台建立一次 broker binding(上面「启用」),但这比"为每个外部 subject 维护持久绑定"轻得多,也正对治 [07/12 定时任务](../07/12-scheduled-tasks.md) 沿 aevatar 源码讲的 Studio 定时"能建、触发失败"根因。
 
 ---
 
