@@ -169,6 +169,7 @@ nav:
       - 可观测性: 07/07-observability.md
       - 文件全链路走查: 07/11-file-handling-end-to-end.md
       - 定时任务全链路走查: 07/12-scheduled-tasks.md
+      - Lark Bot 注册与对接: 07/13-lark-bot-registration.md
   - 08 附录:
       - 08/index.md
       - 术语表: 08/01-glossary.md

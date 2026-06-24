@@ -8,7 +8,7 @@
 >
 > - **scope claim 瀑布**:`src/Aevatar.Authentication.Providers.NyxId/NyxIdClaimsTransformer.cs`(映射顺序 `scope_id → uid → sub → NameIdentifier → 任意 *_id`);标准 claim 常量 `src/Aevatar.Authentication.Abstractions/AevatarStandardClaimTypes.cs`。
 > - **scope 访问守卫(403 的出处)**:`src/Aevatar.Capabilities/AevatarScopeAccessGuard.cs`(单一 claimed scope 必须与 requested scope 严格相等,否则 `SCOPE_ACCESS_DENIED`);studio 侧同义校验见 `src/Aevatar.Studio.Hosting/Endpoints/StudioEndpoints.cs` 与 `src/Aevatar.Studio.Hosting/Controllers/ExecutionsController.cs`。
-> - **channel 注册自带独立 scope**:`src/Aevatar.AI.ToolProviders.ChannelAdmin/ChannelRegistrationTool.cs`(registration 记录里带 `scope_id`,与发起人个人 scope 不同)。
+> - **channel 注册来自 Connected Service**:`agents/Aevatar.GAgents.NyxidChat/NyxIdChatEndpoints.ConnectedServices.cs`(已绑定的通道作为 connected service 提供 `scope_id`,与发起人个人 scope 不同)。
 >
 > 核对基线:`feature/integrate @ efaee423d`;运行期证据采集自 mainnet(`aevatar-console-backend-api.aevatar.ai`)。下文出现的 subject / scope / bot 资源 UUID **均已脱敏**为占位符(`scope-A` / `scope-B` 等),只保留结构,不暴露真实账号标识。
 
@@ -93,7 +93,7 @@ flowchart TB
 
 ## 4. 根因三:Lark bot 注册自带独立 scope
 
-channel 注册记录(`ChannelRegistrationTool` 等)里带 `scope_id`,指向 bot 运行所在的 scope(`scope-B`),与发起绑定的个人 scope(`scope-A`)不同。bot 在对话里创建/驱动的 agent,都落在 `scope-B`。"把 NyxID 账号绑定到 bot"解决的是**让 bot 能代表你去调 NyxID 经纪的能力/工具**,并**不**把 bot 的 scope 并入你的个人 scope。
+channel 注册记录（由 NyxID 托管并经由 Connected Services 发现接口拉取）里包含 `scope_id`，指向 bot 运行所在的 scope (`scope-B`)，与发起人个人 scope (`scope-A`) 不同。bot 在对话里创建/驱动的 agent 均落在 `scope-B`。"把 NyxID 账号绑定到 bot"解决的是**让 bot 能代表你去调用 NyxID 经纪的能力/工具**，并**不**把 bot 的 scope 并入你的个人 scope。
 
 ## 5. 影响面
 
