@@ -22,7 +22,7 @@ Aevatar 的设计原则是**宿主中立、多租户隔离与零长期凭证 (Ze
 flowchart LR
     Lark["飞书开放平台<br/>(Lark Event Webhook)"] -->|裸加密事件| Nyx["NyxID Channel Bot Relay<br/>(渠道管理/解密/维护 AppSecret)"]
     Nyx -->|JWT 签名中继消息| Host["Aevatar Host API<br/>(/api/webhooks/nyxid-relay)"]
-    Host -->|无状态 Ingress 调度| Actor["ConversationGAgent<br/>(会话 Actor 串行执行)"]
+    Host -->|无状态 Ingress 调度| ConvActor["ConversationGAgent<br/>(会话 Actor 串行执行)"]
 ```
 
 在 Aevatar 侧，**没有任何飞书 AppSecret 的物理副本**。宿主通过拦截带有加密校验 JWT 的中继请求，只解析归一化后的无状态 Payload，消除了密钥泄露和接口适配的不确定性。
@@ -41,7 +41,7 @@ sequenceDiagram
     participant Endpoint as Aevatar Webhook
     participant Validator as NyxIdRelayAuthValidator
     participant Ingress as INyxIdRelayIngressPort
-    participant Actor as ConversationGAgent
+    participant ConvActor as ConversationGAgent
 
     Lark->>Nyx: 飞书推送消息事件 (携带 APP 校验)
     Nyx->>Nyx: 验证并解密飞书 Payload，将数据归一化
@@ -52,8 +52,8 @@ sequenceDiagram
     Validator-->>Endpoint: 返回 AuthResult (含 scopeId 和 token)
     Endpoint->>Endpoint: 归一化 Payload 为 ChatActivity
     Endpoint->>Ingress: AcceptAsync(ingressRequest)
-    Ingress->>Actor: 将 activity 作为 turn 请求分流至 Scoped Actor
-    Actor-->>Endpoint: 返回 Accepted (202)
+    Ingress->>ConvActor: 将 activity 作为 turn 请求分流至 Scoped Actor
+    ConvActor-->>Endpoint: 返回 Accepted (202)
     Endpoint-->>Nyx: HTTP 202 Accepted
     Nyx-->>Lark: 响应成功
 ```

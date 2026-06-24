@@ -106,10 +106,10 @@ Aevatar 的 `WorkflowRunGAgent` 通过 `SubWorkflowOrchestrator` 将子流程调
 ```mermaid
 flowchart TD
     Req["子工作流调用请求 (workflow_call)"] --> Depth["ResolveChildDepth: Depth + 1"]
-    Depth --> CheckDepth{"\"Depth > MaxDepth (默认 8)?\""}
+    Depth --> CheckDepth{Depth 大于限制 默认 8?}
     CheckDepth -->|是| RejectD["拒绝并发布失败事件<br/>(workflow_call depth limit exceeded)"]
     CheckDepth -->|否| Count["统计活动子流程数<br/>(Pending Invocations + Resolutions)"]
-    Count --> CheckCount{"\"Count >= MaxActive (默认 64)?\""}
+    Count --> CheckCount{活动子流程数 >= 限制 64?}
     CheckCount -->|是| RejectC["拒绝并发布失败事件<br/>(workflow_call fanout limit exceeded)"]
     CheckCount -->|否| Accept["准入通过: 阶段化推进子流程启动"]
 ```
