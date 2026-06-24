@@ -48,7 +48,7 @@ sequenceDiagram
     Nyx->>Nyx: 签发带有 scope_id 的 JWT 签名 (Callback Token)
     Nyx->>Endpoint: POST /api/webhooks/nyxid-relay
     Endpoint->>Validator: ValidateAsync(body, headers)
-    Note over Validator: 1. 验证 JWT 证书与签名是否合法<br/>2. 验证 JTI 唯一性防止重放攻击
+    Note over Validator: 1. 验证 JWT 证书与签名是否合法\n2. 验证 JTI 唯一性防止重放攻击
     Validator-->>Endpoint: 返回 AuthResult (含 scopeId 和 token)
     Endpoint->>Endpoint: 归一化 Payload 为 ChatActivity
     Endpoint->>Ingress: AcceptAsync(ingressRequest)
