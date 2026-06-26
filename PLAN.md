@@ -30,6 +30,7 @@
 09 方案区 ────────── 跨仓库设计与落地方案
 10 已知问题 ──────── 运行态与环境已知缺陷
 11 Skills 能力层 ─── 控制面与平台 fallback
+12 周复盘 ────────── 近 7 天碰到的问题索引
 ```
 
 ---
@@ -160,11 +161,22 @@
 - ✅ `10/02-codex-shell-vs-aevatar-tools.md` — shell 工具 vs aevatar 自有工具冲突
 - ✅ `10/03-ingress-own-tool-stream-leak.md` — 自有工具泄漏进客户端流的漏洞与修复
 - ✅ `10/04-responses-llm-run-offactor-and-observation.md` — off-actor 模式下 LLM 执行与四层故障分析
+- ✅ `10/05-lark-delivery-layer-failures.md` — Lark 投递层三类故障:回复错对象 / 截断残片 / 全哑 401
+- ✅ `10/06-lark-identity-and-authorization.md` — Lark 身份与授权:owner-vs-sender 调用身份 / 资源授权降级
+- ✅ `10/07-scheduled-task-not-firing.md` — 定时任务不触发:重激活跳拍 / Garnet 脑裂 / provision 凭证缺口
+- ✅ `10/08-observatory-read-side.md` — 观测台读侧:排序缺失 / ES 1000 字段爆表 / 节点卡进行中
+- ✅ `10/09-studio-console-three-traps.md` — Studio 控制台:binding 覆写致 500 / 对话失忆 / chip 溢出
+- ✅ `10/10-voice-cancel-race-and-reconnect.md` — 语音:打断 cancel 竞态被当致命 / `/ws/voice` 重连缺失
+- ✅ `10/11-nyxid-direct-llm-entry.md` — NyxID 直连 LLM 入口:chat/completions 收不到回复 / 不暴露服务工具
 
 ### 11 · Skills 能力层
 
 - ✅ `11/01-aevatar-control-plane-skills.md` — 控制面 Skills 体系与 schedule 客户端 REST
 - ✅ `11/02-aevatar-platform-and-probe-skills.md` — 平台 Skills 组合与 fallback 健康体检探针
+
+### 12 · 近 7 天问题复盘
+
+- ✅ `12/index.md` — 近 7 天(2026-06-19 → 06-26)问题复盘**索引**:按主题链到第 10 章各篇深度复盘 + 横切教训 + 状态总表。本页只做索引,不重复正文。
 
 ---
 
@@ -182,9 +194,10 @@
 | 07 周边 | 13 | 13 | ✅ |
 | 08 附录 | 5 | 5 | ✅ |
 | 09 方案区 | 13 | 13 | ✅ |
-| 10 已知问题 | 4 | 4 | ✅ |
+| 10 已知问题 | 11 | 11 | ✅ |
 | 11 Skills 能力层 | 2 | 2 | ✅ |
-| **合计** | **74** | **74** | ✅ |
+| 12 近 7 天问题复盘 | 1 | 1 | ✅ |
+| **合计** | **82** | **82** | ✅ |
 
 > 更新约定:每完成一篇,把对应行的 ⬜ 改成 ✅,并更新看板数字。
 

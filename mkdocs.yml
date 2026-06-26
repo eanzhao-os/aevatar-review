@@ -201,7 +201,15 @@ nav:
       - shell 工具 vs aevatar 自有工具(codex 当 model): 10/02-codex-shell-vs-aevatar-tools.md
       - 自有工具泄漏进客户端流(agentic 客户端当 model): 10/03-ingress-own-tool-stream-leak.md
       - /v1/responses off-actor LLM run 执行与流式观察(四层故障): 10/04-responses-llm-run-offactor-and-observation.md
+      - Lark 投递层三类故障·错对象/残片/全哑 401: 10/05-lark-delivery-layer-failures.md
+      - Lark 身份与授权·用谁调用/给谁授权: 10/06-lark-identity-and-authorization.md
+      - 定时任务为什么不触发·跳拍/脑裂/凭证: 10/07-scheduled-task-not-firing.md
+      - 观测台读侧·排序/字段爆表/节点卡进行中: 10/08-observatory-read-side.md
+      - Studio 控制台三坑·binding 500/失忆/chip 溢出: 10/09-studio-console-three-traps.md
+      - 语音·打断 cancel 竞态/重连缺失: 10/10-voice-cancel-race-and-reconnect.md
+      - NyxID 直连 LLM 入口·收不到回复/不暴露服务工具: 10/11-nyxid-direct-llm-entry.md
   - 11 Skills 能力层:
       - 11/index.md
       - 控制面家族·idea → schedule 客户端 REST: 11/01-aevatar-control-plane-skills.md
       - 平台 skill 与 probe·authoring / fallback / 体检探针: 11/02-aevatar-platform-and-probe-skills.md
+  - 12 近 7 天问题复盘: 12/index.md
