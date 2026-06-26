@@ -212,4 +212,6 @@ nav:
       - 11/index.md
       - 控制面家族·idea → schedule 客户端 REST: 11/01-aevatar-control-plane-skills.md
       - 平台 skill 与 probe·authoring / fallback / 体检探针: 11/02-aevatar-platform-and-probe-skills.md
-  - 12 近 7 天问题复盘: 12/index.md
+  - 12 问题复盘:
+      - 12/index.md
+      - 2026-06-22 → 06-26: 12/01-2026-06-22-to-06-26.md
