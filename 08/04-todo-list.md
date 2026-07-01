@@ -94,13 +94,13 @@
 | A1 | A2A Interop(3 项目) | ✅ 0 跟踪文件,仅 obj 残留 | `8bfd8605c`(见 07/02) |
 | A2 | Inspector demo | ✅ 已删;ADR-0023 + tier guard 仍在;console-web inspector 面板是另一套现役实现 | `40a36bbe2`(见 07/07) |
 | A3 | demos(Workflow/Cli/Maker/CaseProjection) | ✅ 全删;★**唯一存活 demo = `demos/lark-interaction-probe/`**(一个 YAML probe,非代码 demo) | `4a029981c`/`4ff5c2d1b`(见 08/03) |
-| A4 | StateMirror Projection | ✅ `src/Aevatar.CQRS.Projection.StateMirror` 现为**空目录**(连 bin/obj 都没了) | `da7944cf2`(见 05/03) |
+| A4 | StateMirror Projection | ✅ 历史目录 **src/Aevatar.CQRS.Projection.StateMirror** 现为**空目录**(已在源码库中移除) | `da7944cf2`(见 05/03) |
 | A5 | MassTransit transport | ✅ 三目录 0 .cs/.csproj,0 `PackageReference`;Kafka 是手写 `Confluent.Kafka` 藏在 Orleans `IQueueAdapter` 后 | 上游 [#2209](https://github.com/aevatarAI/aevatar/issues/2209) |
 | C7 | Telegram direct-callback | ✅ 收敛完成,无残留/坏代码;ADR-0013 修正案已把 Telegram 并入 NyxID relay 骨干 | 见 07/01 |
 
 ### 4.2 死代码清理(FI-007 删除优先)
 
-- [ ] 删除 `src/Aevatar.CQRS.Projection.StateMirror` 空目录。 `[code]`
+- [ ] 移除源码库中历史目录 **src/Aevatar.CQRS.Projection.StateMirror** 的残留。 `[code]`
 - [ ] 清掉 `Directory.Packages.props` 里残留的 MassTransit `PackageVersion` 条目(已零消费,仅靠 guard 挡 v9)。 `[code]`
 
 ### 4.3 文档计数 / 术语 / 措辞修正(本仓)

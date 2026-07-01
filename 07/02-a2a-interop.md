@@ -3,8 +3,8 @@
 ## 事实源/设计抽象(以 ~/Code/aevatar 为准)
 
 - `history/2026-03/maf-integration`:A2A v0.3.3-preview 的历史适配设计,位于 Host boundary。
-- `src/Aevatar.Interop.A2A.Abstractions/`:当前目录只剩空壳/构建残留。
-- `src/Aevatar.Interop.A2A.Hosting/`:当前目录只剩空壳/构建残留。
+- 历史目录 **src/Aevatar.Interop.A2A.Abstractions/**:当前目录已在源码库中清除。
+- 历史目录 **src/Aevatar.Interop.A2A.Hosting/**:当前目录已在源码库中清除。
 
 ---
 
