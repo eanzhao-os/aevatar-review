@@ -115,6 +115,7 @@ nav:
       - Mainnet vs Workflow Host: 01/01-hosts-and-composition.md
       - POST /api/chat 协议与 SSE: 01/02-chat-api-and-sse.md
       - Run 语义: 01/03-run-semantics.md
+      - 平台 Audit Trail: 01/04-platform-audit-trail.md
   - 02 编排层:
       - 02/index.md
       - Workflow YAML 语法: 02/01-yaml-grammar.md

@@ -55,6 +55,8 @@
   - 关键代码:`docs/canon/chat-api.md`、`docs/canon/llm-streaming.md`、`README.md` 关于 Sunset 的说明
 - ✅ `01/03-run-semantics.md` — Run 语义:`runId/sessionId` 服务端生成、不按 run 隔离事件流、终止事件收敛、`StartWorkflowEvent` 投影
   - 关键代码:README §"Run 语义"、`src/workflow/Aevatar.Workflow.Application/*`
+- ✅ `01/04-platform-audit-trail.md` — 平台 Audit Trail:append-only governance artifact、`/api/audit/trail` 查询、actor resolution、endpoint/tool/projection 三采集面与自动告警边界
+  - 事实源脊柱:`docs/canon/audit-trail.md`、`src/Aevatar.Audit.Hosting/AuditTrailEndpoints.cs`、`src/Aevatar.Audit.Abstractions/audit_messages.proto`
 
 ### 02 · 编排层(Workflow)★ 重点
 
@@ -186,7 +188,7 @@
 | 大块 | 篇数 | 完成 | 状态 |
 |---|---|---|---|
 | 00 序章 | 4 | 4 | ✅ |
-| 01 宿主与入口 | 3 | 3 | ✅ |
+| 01 宿主与入口 | 4 | 4 | ✅ |
 | 02 编排层 | 8 | 8 | ✅ |
 | 03 内核 | 8 | 8 | ✅ |
 | 04 AI 层 | 4 | 4 | ✅ |
@@ -198,7 +200,7 @@
 | 10 已知问题 | 11 | 11 | ✅ |
 | 11 Skills 能力层 | 2 | 2 | ✅ |
 | 12 问题复盘 | 1 | 1 | ✅ |
-| **合计** | **82** | **82** | ✅ |
+| **合计** | **83** | **83** | ✅ |
 
 > 更新约定:每完成一篇,把对应行的 ⬜ 改成 ✅,并更新看板数字。
 
