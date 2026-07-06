@@ -208,6 +208,7 @@ nav:
       - Studio 控制台三坑·binding 500/失忆/chip 溢出: 10/09-studio-console-three-traps.md
       - 语音·打断 cancel 竞态/重连缺失: 10/10-voice-cancel-race-and-reconnect.md
       - NyxID 直连 LLM 入口·收不到回复/不暴露服务工具: 10/11-nyxid-direct-llm-entry.md
+      - API 安全审计与加固·OAuth2/DPoP/脱敏/授权: 10/12-api-security-audit-and-hardening.md
   - 11 Skills 能力层:
       - 11/index.md
       - 控制面家族·idea → schedule 客户端 REST: 11/01-aevatar-control-plane-skills.md
