@@ -41,7 +41,7 @@
 | `docs/migration/2026-07-25-target-chapters.md` | 72 个目标章节的机器可读 Markdown 清单、状态、issue URL |
 | `docs/migration/2026-07-25-protected-worktree.md` | 每批开始时的受保护路径、状态、hash 和迁移意图 |
 | `docs/migration/2026-07-25-chapter-migration-ledger.md` | 每个旧 Markdown 文件的 `retain-rewrite/merge/split/promote-current/move-evolution/delete` 处置和新落点 |
-| `docs/migration/2026-07-25-old-retire-paths.txt` | 最终切换时可安全删除的 84 个旧 tracked 路径；不含将原位重写的 13 个块级 `index.md` |
+| `docs/migration/2026-07-25-old-retire-paths.txt` | 最终切换时可安全删除的 85 个旧 tracked 路径；不含将原位重写的 13 个块级 `index.md` |
 | `docs/migration/2026-07-25-issue-evidence-ledger.md` | 154 个 closed 与 126 个 open issues 的主题、分类、实现证据和文档落点 |
 | `docs/migration/2026-07-25-source-matrix.md` | 72 篇目标章节的 E1/E2/E3/E4/E5/E6 证据矩阵 |
 | `scripts/create_issues.py` | 从目标清单幂等创建或复用章节 issue；默认 dry-run，显式 `--create` 才写 GitHub |
@@ -210,9 +210,9 @@ Mandatory group destinations:
 | `11/*` | `04/03`, `04/05`, `11/*`, retired recipe in `12/03` if unsupported |
 | `12/*` | `12/01–02`, `12/04` |
 
-Expected design-freeze worktree count: `82` substantive files and `16` index files. If new files appear before execution, add and protect them rather than forcing this old count.
+Design-freeze worktree count was `82` substantive files and `16` index files. At execution baseline `bab63e8`, the Agent Key canary has entered HEAD, so the tracked count is now `82` substantive files and `16` index files. If new files appear after this execution baseline, add and protect them rather than forcing this count.
 
-Also create `docs/migration/2026-07-25-old-retire-paths.txt` from the 81 tracked old substantive chapters plus the three nested `09/*/index.md` files. Do not include the 13 block-level `00/index.md` through `12/index.md`; Task 19 rewrites those in place. Expected line count: `84`. The protected pre-HEAD canary—observed as index-added and absent from HEAD—is reviewed and deleted separately at Task 19.
+Also create `docs/migration/2026-07-25-old-retire-paths.txt` from the 82 tracked old substantive chapters plus the three nested `09/*/index.md` files. Do not include the 13 block-level `00/index.md` through `12/index.md`; Task 19 rewrites those in place. Expected line count: `85`. The canary `09/03-provision-and-observe-via-nyxid/02-scheduled-agent-key-production-canary.md` is now one of these tracked substantive paths; it still requires section-level `migrated-reviewed` evidence before deletion.
 
 - [ ] **Step 5: Add the failing frozen-upstream and issue-snapshot fixtures**
 
@@ -361,7 +361,7 @@ AEVATAR_SRC="$AEVATAR_FROZEN" bash scripts/check-md.sh --paths PATH...
 AEVATAR_SRC="$AEVATAR_FROZEN" bash scripts/check-md.sh --all [--allow-retiring]
 ```
 
-Substantive rules: valid frontmatter; one H1; sections matching `版本与结论`、`设计抽象与事实源`、`为什么`、`边界与演进`、`读完应能回答`; demo marker; at least two diagrams; 1–3 source-spine paths; all upstream paths and numeric line anchors valid. `--paths` allows old/new coexistence. `--all` reads 72 checked manifest rows and rejects missing targets. Default `--all` also rejects orphan substantive chapters. Temporary `--all --allow-retiring` permits only the exact 84 paths in `old-retire-paths.txt` plus the separately protected canary to coexist; it remains strict for targets and every other orphan. This flag is used only in Task 19 before deletion and is forbidden in CI/final verification.
+Substantive rules: valid frontmatter; one H1; sections matching `版本与结论`、`设计抽象与事实源`、`为什么`、`边界与演进`、`读完应能回答`; demo marker; at least two diagrams; 1–3 source-spine paths; all upstream paths and numeric line anchors valid. `--paths` allows old/new coexistence. `--all` reads 72 checked manifest rows and rejects missing targets. Default `--all` also rejects orphan substantive chapters. Temporary `--all --allow-retiring` permits only the exact 85 paths in `old-retire-paths.txt` to coexist; it remains strict for targets and every other orphan. This flag is used only in Task 19 before deletion and is forbidden in CI/final verification.
 
 - [ ] **Step 3: Implement `check-links.py` with planned-target support**
 
@@ -1217,7 +1217,7 @@ git commit --only -m "docs(13): record glossary and evidence indexes" -- docs/mi
 - Modify: `scripts/git-hooks/pre-push`
 - Modify: `.github/workflows/docs.yml`
 - Delete: every path listed in `docs/migration/2026-07-25-old-retire-paths.txt`
-- Delete: protected pre-HEAD `09/03-provision-and-observe-via-nyxid/02-scheduled-agent-key-production-canary.md` (observed as index-added and possibly later unstaged/untracked) only after its protected-ledger row is `migrated-reviewed`
+- Delete: tracked `09/03-provision-and-observe-via-nyxid/02-scheduled-agent-key-production-canary.md` through the 85-row retire list only after its protected/migration-ledger row is `migrated-reviewed`
 - Modify: migration/protected/target ledgers to final state
 
 **Interfaces:**
@@ -1231,7 +1231,7 @@ git commit --only -m "docs(13): record glossary and evidence indexes" -- docs/mi
 test "$(rg -c '^- \[x\] `[0-9]{2}/[0-9]{2}-[a-z0-9-]+\.md`' docs/migration/2026-07-25-target-chapters.md)" -eq 72
 ! rg '\| pending \|' docs/migration/2026-07-25-chapter-migration-ledger.md
 ! rg '\| protected \|.*\| (pending|unreviewed) \|' docs/migration/2026-07-25-protected-worktree.md
-test "$(wc -l < docs/migration/2026-07-25-old-retire-paths.txt | tr -d ' ')" -eq 84
+test "$(wc -l < docs/migration/2026-07-25-old-retire-paths.txt | tr -d ' ')" -eq 85
 AEVATAR_SRC="$AEVATAR_FROZEN" bash scripts/check-md.sh --all --allow-retiring
 python3 scripts/check-links.py --all --allow-planned
 ```
@@ -1327,7 +1327,7 @@ while IFS= read -r relpath; do
 done < docs/migration/2026-07-25-old-retire-paths.txt
 ```
 
-`-f` is permitted here only because the pre-delete gate proves every protected staged/unstaged version has been section-mapped and reviewed; it must never be used earlier to bypass a conflict. Delete the protected pre-HEAD canary only after its five fingerprints and `migrated-reviewed` status are checked again. Because it was observed as `A ` in the index, remove it from both index and worktree with `git rm -f -- 09/03-provision-and-observe-via-nyxid/02-scheduled-agent-key-production-canary.md` when `git ls-files --error-unmatch` succeeds; if it is no longer indexed but still exists, use `rm --` on that exact path. Do not delete block-level indexes rewritten in Step 2.
+`-f` is permitted here only because the pre-delete gate proves every protected staged/unstaged version has been section-mapped and reviewed; it must never be used earlier to bypass a conflict. The tracked canary is removed by the same retire-list loop only after its hashes and `migrated-reviewed` status are checked again. Do not delete block-level indexes rewritten in Step 2.
 
 - [ ] **Step 8: Run structural validation before commit**
 
@@ -1343,7 +1343,7 @@ Expected: all five commands exit 0. The Mermaid command may take several minutes
 
 - [ ] **Step 9: Verify staged scope and commit the atomic switch**
 
-Create a NUL-delimited switch pathspec containing exactly the 14 index pages, site/instruction/sync files, final ledgers, `docs/13`, and all 84 retire paths. Stage only those paths and deletions; never stage unrelated user files blindly. Inspect only that pathspec:
+Create a NUL-delimited switch pathspec containing exactly the 14 index pages, site/instruction/sync files, final ledgers, `docs/13`, and all 85 retire paths. Stage only those paths and deletions; never stage unrelated user files blindly. Inspect only that pathspec:
 
 ```bash
 switch_paths="$(mktemp)"
@@ -1354,13 +1354,13 @@ switch_paths="$(mktemp)"
 } > "$switch_paths"
 switch_path_args=()
 while IFS= read -r -d '' relpath; do switch_path_args+=("$relpath"); done < "$switch_paths"
-test "${#switch_path_args[@]}" -eq 113
+test "${#switch_path_args[@]}" -eq 114
 git add -A -- "${switch_path_args[@]}"
 git diff --cached --name-status -- "${switch_path_args[@]}"
 git diff --cached --check -- "${switch_path_args[@]}"
 ```
 
-The expected path-array count is 113: 14 indexes + 11 site/instruction/sync paths + 4 final ledgers + 84 retire paths. Expected diff: all retired paths deleted, 14 indexes active, site/config/ledger changes present, and no unexplained path in the switch array. Commit only that array so unrelated pre-existing staged changes stay staged:
+The expected path-array count is 114: 14 indexes + 11 site/instruction/sync paths + 4 final ledgers + 85 retire paths. Expected diff: all retired paths deleted, 14 indexes active, site/config/ledger changes present, and no unexplained path in the switch array. Commit only that array so unrelated pre-existing staged changes stay staged:
 
 ```bash
 git commit --only -m "docs: switch to the restructured aevatar review" -- "${switch_path_args[@]}"
