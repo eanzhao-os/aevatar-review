@@ -20,7 +20,7 @@
 |---|---|---|---|
 | 01 | [把 Studio workflow 发布成 NyxID 可调用服务](01-workflow-as-nyxid-service/index.md) | aevatar 发布 published service + NyxID 当通用代理;CLI / aevatar nyxid tools / 直连三入口同源 | 两头现役,当中注册一跳手工;⚠️ protobuf↔OpenAPI + scope_id 鉴权缺口 |
 | 02 | [Ingress 工具所有权:自有工具服务端执行、永不上线](02-ingress-tool-ownership/index.md) | 非对称所有权修复 [10/03](../10/03-ingress-own-tool-stream-leak.md)(#2269):自有工具隐形、客户端声明的工具转发;两落点=流式只放 forwarded + typed `owned_tool_names` | 设计已 codex 评审(6 缺口已并入);⚠️ 未实现 |
-| 03 | [CC/Codex 经 NyxID 一句话 provision 定时监控 workflow 并实时观测](03-provision-and-observe-via-nyxid/index.md) | 三条已有主链各复用一次:入站无状态 LLM 网关当大脑、NyxID 下游 proxy 当 reach、C1 `provision-workflow` + C2 只读 Observatory;附 6 条 live 实测发现 | C1(`c80c77929`+`c46824af1`)/ C2(`bd9975c8a`)均已上线;附录发现逐条标注 |
+| 03 | [NyxID 下的 C1 Provision、C2 观测与 Team Member Automation Agent Key 验证](03-provision-and-observe-via-nyxid/index.md) | C1 `provision-workflow` + C2 Observatory 主链;另含独立 canonical Member Automation Agent Key canary | C1/C2 已上线;Member Automation 功能/audit 已验证,但不代表 C1 credential 升级 |
 
 > 后续方案按 `09/<NN>-<slug>/` 追加(各自一个子区),并在上表登记一行。
 

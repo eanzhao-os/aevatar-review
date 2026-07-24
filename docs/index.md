@@ -2,7 +2,7 @@
 
 > 自顶向下读懂 Aevatar —— 一次请求的生命周期、Workflow YAML、Actor+Event 内核、CQRS 双投影、分布式目标态。
 
-本书是 [aevatar](https://github.com/aelf/aevatarAI) 的中文技术解读,**43 篇章节全部锚定 `~/Code/aevatar` 事实源**。每篇用少量高价值路径作为入口,正文用流程图、状态图、示例和边界论证讲清模型,不脑补、不泛泛而谈。
+本书是 [aevatar](https://github.com/aelf/aevatarAI) 的中文技术解读,**当前 PLAN 的 85 篇章节全部锚定 `~/Code/aevatar` 事实源**。每篇用少量高价值路径作为入口,正文用流程图、状态图、示例和边界论证讲清模型,不脑补、不泛泛而谈。
 
 ## 这本书讲什么
 
@@ -29,16 +29,20 @@ Aevatar 不是一个普通的 Agent 框架。它用 **Actor + Event Sourcing + C
 | 大块 | 篇数 | 内容 |
 |---|---|---|
 | [00 序章](00/index.md) | 4 | 定位 / 仓库地图 / Quick Start / 主线全景图 |
-| [01 宿主与入口](01/index.md) | 3 | Mainnet vs Workflow Host / chat API / Run 语义 |
-| [02 编排层](02/index.md) | 7 | YAML 语法 / def-run actor / Kernel / 30+ 模块 / 示例 / Maker / Connector |
-| [03 运行内核](03/index.md) | 6 | Agent/Actor/Runtime / EventEnvelope vs StateEvent / GAgentBase / StateGuard / 路由 / LocalRuntime |
+| [01 宿主与入口](01/index.md) | 4 | Mainnet vs Workflow Host / chat API / Run 语义 / Audit Trail |
+| [02 编排层](02/index.md) | 8 | YAML 语法 / def-run actor / Kernel / 模块 / 示例 / Maker / Connector / saga |
+| [03 运行内核](03/index.md) | 8 | Agent/Actor/Runtime / Envelope / GAgentBase / StateGuard / 路由 / LocalRuntime / 事实清单 |
 | [04 AI 能力层](04/index.md) | 4 | RoleGAgent / LLM Providers / Tool 体系 / ChatRuntime |
 | [05 CQRS 读侧](05/index.md) | 4 | Projection 总览 / 双投影链 / ReadModel 存储 / Workflow 投影 |
-| [06 分布式](06/index.md) | 5 | 当前 vs 目标 / Orleans / Kafka / Garnet / 架构门禁 |
-| [07 周边](07/index.md) | 7 | Channel / A2A / ChatRouting / Voice / Studio / 前端 / 可观测性 |
-| [08 附录](08/index.md) | 3 | 术语表 / 文档索引 / Demo Cookbook |
+| [06 分布式](06/index.md) | 6 | 当前 vs 目标 / Orleans / Kafka / Garnet / 架构门禁 / 凭证 |
+| [07 周边](07/index.md) | 13 | Channel / Lark / A2A / Voice / Studio / 文件 / 定时任务 / 前端 / 可观测性 |
+| [08 附录](08/index.md) | 5 | 术语表 / 文档索引 / Demo Cookbook / 战术与战略路线图 |
+| [09 方案区](09/index.md) | 14 | NyxID 服务发布 / 工具所有权 / provision 与 Agent Key 生产证据 |
+| [10 已知问题](10/index.md) | 12 | 已确认故障、边界、根因与修复状态 |
+| [11 Skills 能力层](11/index.md) | 2 | 控制面 skills / 平台与 probe skills |
+| [12 问题复盘](12/index.md) | 1 | 按主题聚合的周度问题复盘 |
 
-!!! tip "进度:43/43 全部完成 ✅"
+!!! tip "进度:85/85 全部完成"
 
 ## 事实源入口约定
 
@@ -49,4 +53,4 @@ Aevatar 不是一个普通的 Agent 框架。它用 **Actor + Event Sourcing + C
 
 ---
 
-*本书由 consensus-loop 驱动 43 个 GitHub issue 逐篇产出,每篇经 design-consensus → implement → review 全链路。*
+*本书由 consensus-loop、逐章 issue 与 SCOPE_EXTEND 持续演进;当前 PLAN 记录 85/85。*

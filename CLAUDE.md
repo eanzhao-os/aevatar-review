@@ -6,7 +6,7 @@
 
 ## 仓库性质
 
-- **产物**:纯 Markdown 文档(`XX/NN-name.md`),对照 `PLAN.md` 的 43 篇章节清单。
+- **产物**:纯 Markdown 文档(`XX/NN-name.md`),对照 `PLAN.md` 当前 85 篇章节清单。
 - **事实源唯一性**:所有关于 aevatar 内部的论断**必须**指向 `~/Code/aevatar` 下的真实
   `.cs` / `.yaml` / `docs/canon/*` / `docs/adr/*` 文件路径 + 行号锚点。禁止脑补、禁止
   泛泛而谈、禁止不引用源码就下结论。
@@ -26,9 +26,15 @@
 06/  分布式与生产态(Orleans / Garnet / Kafka)
 07/  周边(Channel / A2A / Voice / 前端)
 08/  附录(术语表 / 文档索引 / demo cookbook)
+09/  方案区(按独立 solution 子目录组织)
+10/  已知问题(复现 / 根因 / 影响 / 状态)
+11/  Skills 能力层
+12/  问题复盘
 ```
 
-每篇章节文件命名:`<block>/<NN>-<slug>.md`(对照 `PLAN.md` 章节清单)。
+普通章节文件命名为 `<block>/<NN>-<slug>.md`;方案区允许
+`09/<NN>-<slug>/index.md` 与同目录下的 `<NN>-<slug>.md`。所有合法路径以 `PLAN.md`
+和 `mkdocs.yml` 为准。
 
 ## 写作原则 v2(强制,见 issue #87)
 
@@ -40,10 +46,11 @@
 
 **事实源清单**:每篇开头用 1-2 句话说明"本设计链路涉及哪些抽象/职责",不贴文件行号表。
 
-### 原则 2:每段必须有图(每章 ≥ 2 张)
+### 原则 2:每段必须有图(普通章节每章 ≥ 2 张)
 
 - 时序图/流程图/状态机/分层 → **mermaid**(纯文本可 diff)
 - 复杂拓扑/数据流 → **手绘 PNG**(`docs/assets/<block>-<slug>.png`)
+- 仅承担导航/概览职责的 `index.md` 可不满足“两张图”,但其中的事实论断仍必须有事实源。
 
 禁止单纯文字描述一个本该用图的流程。
 
@@ -70,7 +77,8 @@
   图的语法错误(mermaid 在浏览器渲染,坏图只在页面显示 "Syntax error in text"),所以单列此 gate。
   CI(`.github/workflows/docs.yml` build job)在 `mkdocs build` 前强制运行它,坏图 ⇒ 不部署。
   本地需先 `npm i -g @mermaid-js/mermaid-cli@11.15.0`(或脚本回退到 `npx`)。
-  注意:sequenceDiagram 消息文本里**禁用 ASCII `;`**(会被当语句分隔符,用 `、`/`；` 代替)。
+  每个 Mermaid 块必须在首行写 `%%{init: ...}%%`;flowchart 标签统一用引号包裹。
+  `sequenceDiagram` 使用紧凑 sequence 配置,消息文本**禁用 ASCII `;`**(用 `、`/`；` 代替)。
 
 ## 章节验收(对照各 issue 的「验收标准」)
 

@@ -1,5 +1,5 @@
 site_name: Aevatar 结构化中文解读
-site_description: 自顶向下读懂 Aevatar —— 一次请求的生命周期、Workflow YAML、Actor+Event 内核、CQRS 双投影、分布式目标态。43 篇章节,全部锚定 ~/Code/aevatar 源码事实源。
+site_description: 自顶向下读懂 Aevatar —— 一次请求的生命周期、Workflow YAML、Actor+Event 内核、CQRS 双投影、分布式目标态。85 篇章节,全部锚定 ~/Code/aevatar 源码事实源。
 site_author: eanzhao
 site_url: https://eanzhao.github.io/aevatar-review/
 
@@ -155,7 +155,7 @@ nav:
       - Kafka Transport: 06/03-kafka-transport.md
       - Garnet 聚类: 06/04-garnet-clustering.md
       - 架构门禁: 06/05-architecture-guards.md
-      - 亮点·零长期密钥(凭证): 06/06-credentials-zero-standing-secrets.md
+      - Raw credential 不入事实层·凭证边界: 06/06-credentials-zero-standing-secrets.md
   - 07 周边:
       - 07/index.md
       - Input 入口统一: 07/10-input-ingress-unification.md
@@ -193,9 +193,10 @@ nav:
           - 09/02-ingress-tool-ownership/index.md
           - 泄漏链路与非对称所有权: 09/02-ingress-tool-ownership/01-leak-and-asymmetric-rule.md
           - 两落点·codex 6 缺口·落地: 09/02-ingress-tool-ownership/02-fix-and-rollout.md
-      - 方案 03·一句话 provision 监控 workflow 并实时观测:
+      - 方案 03·C1 Provision、C2 观测与 Team Member Automation Agent Key:
           - 09/03-provision-and-observe-via-nyxid/index.md
           - 全链路·大脑 reach C1 C2 + 6 条实测发现: 09/03-provision-and-observe-via-nyxid/01-end-to-end.md
+          - Studio Team Member Automation·Agent Key 生产闭环: 09/03-provision-and-observe-via-nyxid/02-scheduled-agent-key-production-canary.md
   - 10 已知问题:
       - 10/index.md
       - CLI 看不到 Lark bot 创建的 agent(scope 隔离): 10/01-cli-lark-scope-isolation.md
@@ -204,7 +205,7 @@ nav:
       - /v1/responses off-actor LLM run 执行与流式观察(四层故障): 10/04-responses-llm-run-offactor-and-observation.md
       - Lark 投递层三类故障·错对象/残片/全哑 401: 10/05-lark-delivery-layer-failures.md
       - Lark 身份与授权·用谁调用/给谁授权: 10/06-lark-identity-and-authorization.md
-      - 定时任务为什么不触发·跳拍/脑裂/凭证: 10/07-scheduled-task-not-firing.md
+      - 定时任务为什么不触发·跳拍/脑裂/历史双凭证: 10/07-scheduled-task-not-firing.md
       - 观测台读侧·排序/字段爆表/节点卡进行中: 10/08-observatory-read-side.md
       - Studio 控制台三坑·binding 500/失忆/chip 溢出: 10/09-studio-console-three-traps.md
       - 语音·打断 cancel 竞态/重连缺失: 10/10-voice-cancel-race-and-reconnect.md

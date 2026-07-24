@@ -1,196 +1,242 @@
-# 定时任务全链路:一个 cron 引擎、两类消费者,以及「Studio 触发失败 / Lark 正常」根因
+# 定时任务全链路:ScheduledDispatchGAgent、Team Member Automation 与 Agent Key
 
 ## 事实源/设计抽象(以 ~/Code/aevatar 为准)
 
-> 本篇把"用户口中的 ScheduleGAgent"拆成它真实对应的三个抽象,沿一次 cron 触发走完每一跳,并定位"在 Studio 上设的定时任务触发失败、在 Lark Bot 上设的能正常触发"的根因。下列是这条链路的**事实源脊柱**(非正文骨架),按"调度引擎 / Lark 消费者 / Studio 消费者 / 触发期换票"四段给出高价值锚点:
+> 本篇以当前实现为主,回答“定时配置由谁持有、到点后如何可靠触发、无人值守凭证如何存取、客户端怎样判断真正完成”。事实源集中在三个稳定边界:
 
-- **调度引擎(两者共用)**:`src/platform/Aevatar.GAgentService.Core/Schedules/ScheduledDispatchGAgent.cs`(cron 求值 + lease + 幂等 + 触发期分叉)、`src/Aevatar.Foundation.Runtime.Implementations.Orleans/Grains/Callbacks/RuntimeCallbackSchedulerGrain.cs`(Orleans Reminder 持久回调)、状态 proto `src/Aevatar.Foundation.Runtime/runtime_callback_scheduler_state.proto`、凭证守卫 `src/Aevatar.Foundation.Runtime.Implementations.Orleans/Grains/Callbacks/DurableCallbackEnvelopeCredentialGuard.cs`。
-- **Lark 消费者(正常)**:`agents/Aevatar.GAgents.Scheduled/SkillRunnerGAgent.cs`(`[GAgent("scheduled.skill-runner")]`)、`agents/Aevatar.GAgents.Scheduled/SkillRunnerCronSchedulePort.cs`(注册成 Envelope target)、`agents/Aevatar.GAgents.Authoring.Lark/ScheduledAgentApiKeyIssuer.cs`(创建期签发长效 key)、canon `docs/canon/scheduled-skill-runners.md`。
-- **Studio 消费者(失败)**:`src/workflow/Aevatar.Workflow.Application/Schedules/WorkflowScheduleConfigurationMapper.cs`(映射成 ServiceInvocation target + 身份)、`src/workflow/Aevatar.Workflow.Application/Schedules/WorkflowScheduleApplicationService.cs`。
-- **触发期换票(分叉点)**:`src/platform/Aevatar.GAgentService.Infrastructure/Schedules/ScheduledServiceInvocationDispatchPort.cs`(每次触发现换 NyxID token)、两个换票实现 `.../Application/Schedules/NoopScheduledServiceInvocationCredentialExchangePort.cs` 与 `.../Infrastructure/Schedules/NyxIdScheduledServiceInvocationCredentialExchangePort.cs`、装配 `src/platform/Aevatar.GAgentService.Hosting/DependencyInjection/ServiceCollectionExtensions.cs`。
+- `docs/canon/scheduled-skill-runners.md`:当前 Team Member Automation API、schedule/credential actor ownership、投影状态与已退役 runtime。
+- `docs/canon/workflow-runtime.md`:durable callback、typed target、幂等 fire、credential requirement 与 query/readmodel 边界。
+- `docs/adr/0041-scheduled-invocation-agent-key-credential-reference.md`、`docs/adr/0043-scheduled-credential-lifecycle-compensation.md`:Agent Key typed reference、Vault 与双轨补偿。
 
-> 本篇是 [01 Channel](01-channels.md) / [08 Lark 全链路](08-lark-end-to-end.md) 的姊妹篇:那两篇讲"一条消息怎么进来又回去",本篇讲"没有人发消息时,定时器怎么把活儿叫起来"。
+> 本篇是 [01 Channel](01-channels.md) / [08 Lark 全链路](08-lark-end-to-end.md) 的姊妹篇:那两篇讲“一条消息怎么进来又回去”,本篇讲“没有人发消息时,谁保存下一拍、谁拥有凭证事实、到点后怎样进入同一执行主链”。生产验证见 [Studio Team Member Automation 使用 Agent Key](../09/03-provision-and-observe-via-nyxid/02-scheduled-agent-key-production-canary.md)。
 
 ---
 
-## 0. 一句话主线
+## 0. 当前主线
 
-> **「ScheduleGAgent」不是一个类,而是三件东西**:`ScheduledDispatchGAgent`(统一 cron 引擎,本仓库口径下"定时任务"指的就是它)+ 底层 `RuntimeCallbackSchedulerGrain`(Orleans Reminder 持久回调)+ 两个不同的**消费者**(Lark 的 `SkillRunnerGAgent`、Studio 的 Workflow `chat` 服务调用)。两个入口在**创建期**长得几乎一样,但在**触发期**走了两条凭证完全不同的路:**Lark 用创建时就固化的长效 API key,Studio 每次触发都要现去 NyxID 换一张短期 token——换不到票,触发就失败。**
+> **当前 canonical Studio 定时资源是 Team Member Automation。** `ScheduledDispatchGAgent` 是 schedule 与 credential lifecycle 的唯一权威 actor;workflow/team service contract 负责执行;Projection Pipeline 把 committed current state 物化为查询副本。已删除的 `SkillRunnerGAgent` 不再是定时任务消费者。
 
 ```mermaid
-flowchart TB
-    subgraph CREATE["创建面(两个不同入口)"]
-        LARK["Lark Bot<br/>scheduled_agent_creator 工具"]
-        STUDIO["Studio 工作流定时<br/>WorkflowScheduleApplicationService"]
-    end
-    subgraph ENGINE["统一调度引擎(两者共用)"]
-        SDG["ScheduledDispatchGAgent<br/>gagent.service.scheduled-dispatch<br/>cron 求值 / lease / 幂等"]
-        RCS["RuntimeCallbackSchedulerGrain<br/>Orleans Reminder(持久)"]
-    end
-    SR["SkillRunnerGAgent<br/>scheduled.skill-runner<br/>用创建期固化的 nyx_api_key"]
-    WF["Workflow chat 调用<br/>需要 caller credential"]
-    OK["✅ 触发成功"]
-    FAIL["❌ 触发失败<br/>ScheduledDispatchFireFailedEvent"]
+%%{init: {"maxTextSize": 100000, "flowchart": {"useMaxWidth": false, "nodeSpacing": 10, "rankSpacing": 50}, "themeVariables": {"fontSize": "10px"}}}%%
+flowchart LR
+    O["Owner<br/>typed UserConfig + member authority"]
+    H["Studio Host<br/>canonical member automation API"]
+    APP["Application<br/>authorization + effect orchestration"]
+    A["ScheduledDispatchGAgent<br/>schedule + credential facts"]
+    C["Durable callback runtime<br/>wake-up only"]
+    D["Service dispatch<br/>borrowed credential handle"]
+    W["Workflow run<br/>late resolve per external call"]
+    P["Projection Pipeline<br/>committed current state"]
+    Q["Automation read model<br/>status + stateVersion"]
+    N["NyxID + Vault<br/>external credential effects"]
 
-    LARK --> SDG
-    STUDIO --> SDG
-    SDG --> RCS
-    RCS -->|"到点回投 ScheduledDispatchFireCommand"| SDG
-    SDG -->|"Envelope target"| SR
-    SDG -->|"ServiceInvocation target<br/>每次触发现换 token"| WF
-    SR --> OK
-    WF -->|"换票成功"| OK
-    WF -.->|"换票失败"| FAIL
+    O --> H
+    H --> APP
+    APP --> A
+    A --> C
+    C --> A
+    A --> D
+    D --> W
+    A --> P
+    P --> Q
+    APP <--> N
 ```
 
+这条主线刻意分开四类职责:
+
+1. **Host 只组合 HTTP**:校验 scope/team/member path,把请求交给 application port,不编排 credential saga。
+2. **Actor 拥有事实**:schedule definition、下一次 fire、授权状态、credential generation、删除与补偿 intent 都由 `ScheduledDispatchGAgent` 串行提交。
+3. **Adapter 执行副作用**:NyxID scope-plan/key 与 Vault store/revoke 是 effect,不能反过来定义 actor 状态。
+4. **Query 只读 read model**:`202 Accepted` 是投递收据;`active`、`revocation_pending`、删除后 not found 等结论必须由 committed state 的投影版本证明。
+
+为什么这样切?定时器、外部凭证系统和查询存储不能参加同一个数据库事务。让 actor 先保存 intent,再做可重试 effect,最后提交 outcome,网络中断后仍有唯一恢复点;若直接在 HTTP handler 串调用 NyxID/Vault,一次超时就无法区分“没执行”与“执行成功但响应丢失”。
+
 ---
 
-## 1. 一个 cron 引擎,两类消费者(为什么这么切)
+## 1. 资源身份与 API
 
-aevatar 没有为"定时智能体"和"定时工作流"各写一套定时器。两者都把自己**降维成一份 `ScheduledDispatchConfiguration`**,交给同一个 `IScheduledDispatchApplicationService`,最终落到同一个 actor:`ScheduledDispatchGAgent`(`src/platform/Aevatar.GAgentService.Core/Schedules/ScheduledDispatchGAgent.cs`,`[GAgent("gagent.service.scheduled-dispatch")]`)。
+canonical 资源路径完整表达所有权:
 
-这份配置只有一个有分歧的字段——**target descriptor**:
+```text
+/api/scopes/{scopeId}/teams/{teamId}/members/{memberId}/automations
+```
 
-| 维度 | Lark 定时智能体 | Studio 定时工作流 |
+持久 owner 是 `(scopeId, memberId)`;`teamId` 是每次操作都要验证的 containment guard。`scheduleId` 单独出现不构成权限,也不能用 `workflowId`、`publishedServiceId` 或路由位置猜 member 身份。
+
+| 操作 | 语义 | 完成证据 |
 |---|---|---|
-| 注册者 | `SkillRunnerCronSchedulePort`(`agents/Aevatar.GAgents.Scheduled/`) | `WorkflowScheduleConfigurationMapper`(`src/workflow/Aevatar.Workflow.Application/Schedules/`) |
-| `ScheduleKind` | `SkillRunner` | `Workflow` |
-| target 类型 | `Envelope` | `ServiceInvocation` |
-| 触发时投什么 | 一个**无凭证**的 `TriggerSkillRunnerExecutionCommand{Reason="schedule"}` | 一个 `ChatRequestEvent`(endpoint = `"chat"`)+ `Auth.SenderNyxId`**身份** |
-| 触发时凭证从哪来 | `SkillRunnerGAgent` state 里**创建期固化**的 `nyx_api_key` | **每次触发现换**:用存的身份去 NyxID 换 token |
+| `POST /preflight` | 从当前 read models 构建 typed authorization plan,不签发 key | 返回 exact plan、policy 与 `PermissionDigest` |
+| `POST` | 以已确认 plan 启动 create | `202` 后读取 projected `active` |
+| `PUT` / `reauthorize` | revalidate 后更新配置或替换 credential generation | 更高 `stateVersion` 与对应终态 |
+| `pause` / `resume` | 只控制是否 fire,不等同于 revoke/create key | projected `enabled` |
+| `run-now` | 对同一 schedule actor 发起 owner-scoped manual fire | run 终态 + schedule fire state |
+| `DELETE` | 提交 tombstone 与双轨 revocation intent | 双轨完成后 projected not found |
+| `retry-revocation` | 用 fresh bearer 重试原删除操作的 pending tracks | 原 operation identity 达到终态 |
 
-**为什么是"同一个引擎 + 不同 target",而不是两套定时器**:cron 求值、Orleans Reminder 持久化、lease 防重投、幂等键去重、跨重启恢复——这些是"定时"的硬骨头,与"定时叫起来的是智能体还是工作流"无关。把它们收口到 `ScheduledDispatchGAgent` 一处,消费者只需声明"到点了把这个 envelope 投给那个 actor"或"到点了调这个服务"。这正是仓库不动点 **FI-003/FI-005**(稳定核心小而可审计、边界优先于便利)的体现:定时是核心,凭证与目标是消费者各自的事实。
-
-代价正是本篇要讲的:**两类消费者在"触发期凭证"上做了不同选择,而这条差异恰好是 Studio 触发失败的根因**(见 §4)。
+浏览器不能提供或替换 `publishedServiceId`、grant identity、key ID、secret reference、raw key 或 credential expiry。服务端从 member binding、prepared revision、owner UserConfig 与授权 catalog 推导这些事实,避免一个 API 字段同时承担“名称查找”和“授权身份”两种语义。
 
 ---
 
-## 2. 调度引擎内核:durable callback + lease + 幂等 + 凭证守卫
+## 2. 到点触发为什么不会靠进程内 Timer
 
-`ScheduledDispatchGAgent` 自己不持有定时器,它把"到点叫我"这件事委托给底层 `RuntimeCallbackSchedulerGrain`(`src/Aevatar.Foundation.Runtime.Implementations.Orleans/Grains/Callbacks/RuntimeCallbackSchedulerGrain.cs`)——一个用 **Orleans Reminder** 做持久回调的 grain,状态落在 `runtime_callback_scheduler_state.proto` 描述的 grain state 里,进程重启不丢、到点重投。
+`ScheduledDispatchGAgent` 计算下一次 fire,但把“到点唤醒”委托给 runtime durable callback。callback 只携带最小 fire signal,不携带目标凭证;回调到达后重新进入 actor inbox,由 actor 校验 lease、幂等键与当前状态,再准备 typed target。
 
 ```mermaid
+%%{init: {"maxTextSize": 100000, "sequence": {"actorMargin": 28, "messageMargin": 18, "diagramMarginX": 10, "diagramMarginY": 10}, "themeVariables": {"fontSize": "10px"}}}%%
 sequenceDiagram
     autonumber
-    participant CRT as 创建面
-    participant SDG as ScheduledDispatchGAgent
-    participant RCS as RuntimeCallbackSchedulerGrain
-    participant TGT as 目标(SkillRunner / Workflow)
-    CRT->>SDG: EnsureAsync(cron, target)
-    SDG->>SDG: 求下一次 cron 时刻
-    SDG->>RCS: ScheduleSelfDurableTimeout(ScheduledDispatchFireCommand)
-    Note over RCS: 凭证守卫扫描 envelope<br/>本命令不带 *_token → 通过<br/>落 Orleans Reminder + 持久状态
-    RCS-->>SDG: lease(generation, slot_epoch)
-    SDG->>SDG: 落 NextFireScheduled 事件(记 lease)
-    RCS->>SDG: 到点:回投 ScheduledDispatchFireCommand
-    SDG->>SDG: 校验 lease + 幂等键(去重/防陈旧)
-    SDG->>TGT: 按 target 类型派发
-    TGT-->>SDG: 受理回执 / 异常
-    SDG->>SDG: Dispatched 或 FireFailed,并排下一次
+    participant API as Application
+    participant A as Schedule Actor
+    participant R as Durable Callback Runtime
+    participant D as Service Dispatch
+    participant W as Workflow
+    participant P as Projection
+    API->>A: ensure/update typed schedule
+    A->>A: commit schedule facts
+    A->>R: schedule self fire signal
+    Note over R: no bearer, raw key, or SecretReference
+    R-->>A: fire command + lease identity
+    A->>A: reconcile active state + lease + idempotency
+    A->>D: prepared workflow/team target
+    D->>W: borrowed credential ref + accepted dispatch
+    W-->>D: dispatch receipt
+    A->>A: commit dispatched/failed + next fire
+    A->>P: committed current state
 ```
 
-三个值得记住的设计点:
+三个不变量使它能跨重启工作:
 
-1. **durable callback 里永远不放凭证**。`ScheduledDispatchGAgent` 排下一次触发时,投给调度器的只是一个 `ScheduledDispatchFireCommand{ScheduledFireAt, Manual=false}`(`ActivateNextFireIntentAsync`)——**没有任何 token / 身份**。真正的目标 envelope 是**到点后在 actor turn 内**才现场构造的(`BuildDispatchEnvelopeAsync`)。这是被 **凭证守卫** `DurableCallbackEnvelopeCredentialGuard` 强制的:任何要持久化的 callback envelope 一旦带 `reply_token` / `nyx_user_access_token` / 任意 `*_token` 字段,直接 `throw InvalidOperationException`(集成测试 `test/Aevatar.Foundation.Runtime.Hosting.Tests/RuntimeCallbackSchedulerGrainCredentialGuardIntegrationTests.cs` 固化了这条:sanitized 的能落、带 token 的被拒)。**正当性**:Reminder 状态可能在库里躺很久,把短期凭证写进去等于"过期票 + 泄漏面",所以凭证必须在触发那一刻重新解析(FI-002/FI-004)。
+- **durable callback 只发信号**:callback/runtime 不读写 schedule 业务事实,更不能把 token 放进长期存储。
+- **lease 拒绝陈旧回调**:重挂、更新或恢复后,旧 generation/slot 的回调不能推进新 schedule。
+- **fire identity 幂等**:同一 `scheduleId + scheduledFireAt` 对应稳定幂等身份;重复投递不能制造第二次业务执行。
 
-   > ⚠️ **一个很容易踩的误判**:既然有这条凭证守卫,直觉会怀疑"Studio 的票被守卫拦了"。**不是**。守卫只看**持久化的 callback envelope**,而那永远是无凭证的 `ScheduledDispatchFireCommand`;Studio 的 token 是在**触发后、actor turn 内**才去换的,根本不经过守卫。真正的失败点在 §4。
-
-2. **lease(generation + slot_epoch)防陈旧重投**。每次排程返回一个 lease 并落进 state;到点回投时 `HandleFireAsync` 先比对 `MatchesNextFireLease`,对不上的(延迟/重复的旧 Reminder)直接丢弃。
-
-3. **幂等键去重**。按 `(scheduleId, scheduledFireAt)` 生成幂等键,已是终态(Dispatched/Failed)的同一次触发不再执行;触发成功后立刻排下一次。
+`run-now` 与 cron fire 都进入 schedule actor 的 manual/scheduled fire 语义并复用后续 dispatch。前者适合可控 canary,但它不证明 wall-clock cron 精度;后者额外覆盖 runtime 到点唤醒。两者都不能用 command ACK 冒充 workflow 完成。
 
 ---
 
-## 3. 消费者 A:Lark 定时智能体(SkillRunner)—— 为什么它能稳定触发
+## 3. Agent Key 从计划到运行
 
-Lark Bot 上"设个定时任务",走的是 `scheduled_agent_creator` 工具,落成一个 `SkillRunnerGAgent`(`agents/Aevatar.GAgents.Scheduled/SkillRunnerGAgent.cs`,`[GAgent("scheduled.skill-runner")]`)。关键在**创建期就把凭证固化下来**:
+### 3.1 三个 digest 各管一层
 
-- `ScheduledAgentApiKeyIssuer.IssueAsync`(`agents/Aevatar.GAgents.Authoring.Lark/`)在创建时向 NyxID 申一张**作用域收敛的长效 API key**(scopes `read write proxy`,按交付 slug / 失败通知 slug / ornn / LLM proxy 收敛),把 `FullKey` 写进 `SkillRunnerOutboundConfig.nyx_api_key`(proto `agents/Aevatar.GAgents.Scheduled/protos/skill_runner.proto`),固化进 `SkillRunnerState`。
-- `SkillRunnerCronSchedulePort.EnsureAsync` 把定时注册成 **`Envelope` target**:触发时投的 `TriggerSkillRunnerExecutionCommand{Reason="schedule"}` **不带任何凭证**(见 `SkillRunnerCronSchedulePort.cs` 的 `CreateConfiguration`)。
-- 到点后 `ScheduledDispatchGAgent` 对 `Envelope` target 直接 `IActorDispatchPort.DispatchAsync` 投给 `SkillRunnerGAgent`;后者执行 skill 时,**从自己 state 里读那张固化的 key** 去交付。
+| Digest | 来源 | 用途 |
+|---|---|---|
+| catalog `ContentDigest` | catalog actor | 绑定 owner-scoped catalog current state |
+| authorization `PermissionDigest` | Aevatar planner | 绑定 member、prepared revision、owner LLM selection 与授权证据 |
+| `normalized_grant_digest` | NyxID targeted scope-plan | 创建 key 时作为 `scope_plan_digest`,让 NyxID 对 exact grants 再校验 |
 
-**为什么这条路稳**:触发期**零外部依赖**——不查 NyxID、不换票、不依赖某个用户当下还登录着。创建时拿到一次授权就够用整个生命周期。代价是这张 key 长期有效(靠创建期作用域收敛 + 可吊销 `api_key_id` 来兜底)。
+preflight 只做一次纯 read-model planning,不刷新 catalog、不轮询 projection、也不调用 NyxID 创建 key。create/reauthorize 进入写侧后,actor 先提交 stable operation identity、mutation digest 与 deterministic effect locator;获得 fenced effect attempt 的 caller 才能请求 targeted scope-plan、创建 key并写 Vault。
 
----
-
-## 4. 消费者 B:Studio 定时工作流(Workflow ServiceInvocation)—— 为什么它触发失败
-
-Studio 上"给工作流设定时",走 `WorkflowScheduleApplicationService` → `WorkflowScheduleConfigurationMapper.ToScheduledDispatchConfiguration`(`src/workflow/Aevatar.Workflow.Application/Schedules/`)。它映射出的 target 与 Lark 截然不同:
-
-- target 类型是 **`ServiceInvocation`**,endpoint = `"chat"`,payload 是一个 `ChatRequestEvent`(把 workflow 的 prompt 包进去)。
-- 凭证位只存**身份**,不存 token:`Auth.SenderNyxId = { Subject(platform, tenant, externalUserId), Scope }`。mapper 强制要求这块非空(否则创建期就 `ArgumentException`)——**所以"能创建成功"恰恰说明身份是齐的,问题不在创建期**。
-
-到点后,`ScheduledDispatchGAgent` 对 `ServiceInvocation` target 不走普通派发,而是调 `_serviceInvocationDispatchPort.DispatchAsync(...)`,并对 `ScheduleKind==Workflow` 打开一个开关:`ProjectSenderNyxIdAccessTokenToWorkflowCallerCredential = true`(`DispatchPreparedTargetAsync`)。注意此时传下去的 `ToRuntimeAuth(...)` **只有身份、没有 token**。于是真正的换票发生在 `ScheduledServiceInvocationDispatchPort`(`src/platform/Aevatar.GAgentService.Infrastructure/Schedules/`):
+### 3.2 state 保存 locator,不保存 raw key
 
 ```mermaid
-flowchart TB
-    FIRE["ScheduledDispatchGAgent.HandleFireAsync(到点)"]
-    KIND{"target 类型?"}
-    FIRE --> KIND
-    KIND -->|"Envelope(Lark)"| LARKD["IActorDispatchPort.DispatchAsync → SkillRunnerGAgent"]
-    LARKD --> LKEY["用 state 固化的 nyx_api_key 执行"]
-    LKEY --> OK["✅ 正常触发"]
-    KIND -->|"ServiceInvocation(Studio)"| SVCD["ScheduledServiceInvocationDispatchPort"]
-    SVCD --> EXCH["IssueSenderNyxIdAsync(SenderNyxId 身份)<br/>每次触发现换 token"]
-    EXCH --> Q{"exchange.Succeeded?"}
-    Q -->|"是"| OK2["✅ 注入 Bearer token → 调 workflow chat"]
-    Q -->|"否"| BAD["❌ throw InvalidOperationException<br/>→ 被 HandleFireAsync 捕获<br/>→ ScheduledDispatchFireFailedEvent(LastError)"]
-    EXCH -.->|"换票实现是 Noop(host 没装 broker)"| BAD
-    EXCH -.->|"BindingNotFound / ScopeMismatch / Revoked / 空 token"| BAD
+%%{init: {"maxTextSize": 100000, "flowchart": {"useMaxWidth": false, "nodeSpacing": 10, "rankSpacing": 50}, "themeVariables": {"fontSize": "10px"}}}%%
+flowchart TD
+    B["Actor commits begin + effect locator"]
+    S["NyxID targeted scope-plan"]
+    K["NyxID issues dedicated key"]
+    V["Vault persists raw key"]
+    T["Actor commits typed locator<br/>SecretReference + api_key_id + expiry"]
+    R["Cron fire / run-now"]
+    D["Dispatch builds borrowed<br/>DurableCallerCredentialRef"]
+    W["Workflow inbox"]
+    X["Workflow credential resolver<br/>before each external call"]
+    L["LLM / tool / connector call"]
+    E["needs_authorization<br/>invalid schedule-owned evidence"]
+    F["Workflow external call fails<br/>no automatic schedule feedback"]
+
+    B --> S
+    S --> K
+    K --> V
+    V --> T
+    T --> R
+    R -->|"valid actor-owned evidence"| D
+    R -->|"missing, incomplete, expired"| E
+    D --> W
+    W --> X
+    X -->|"resolve borrowed reference"| V
+    V -->|"request-scoped secret"| X
+    X -->|"resolved"| L
+    X -->|"late resolution failed"| F
 ```
 
-换票一旦不成功,`ScheduledServiceInvocationDispatchPort` 直接 `throw InvalidOperationException`(`BuildInvocationRequestAsync` 里 `if (!exchange.Succeeded) throw ...`),这个异常被 `ScheduledDispatchGAgent.HandleFireAsync` 的 `catch` 接住,落成 `ScheduledDispatchFireFailedEvent`,体现为该定时任务的 `LastError` 和 `FailureCount++`。**任务还在、cron 还在排下一次,但每次触发都失败**——和用户观察到的现象完全吻合。
+raw key 的唯一持久化位置是 Vault。actor current state 只持 `ScheduledInvocationAgentKeyCredentialReferenceState`,也就是 `SecretReference + api_key_id + key_expires_at_unix_ms`;public automation view 不投影 secret reference,只暴露 credential source kind、expiry、generation、authorization status、revocation tracks 与权威 `stateVersion`。
 
-换票为什么会不成功?有两个相互独立的轴,都由代码事实支撑:
-
-**轴一:host 到底装没装换票能力。** 装配点 `ServiceCollectionExtensions.cs` 的 `AddScheduledCredentialExchangePort` 是条件注册:
-
-- 若容器里有 `INyxIdCapabilityBroker` → 装 `NyxIdScheduledServiceInvocationCredentialExchangePort`(真换票);
-- 否则 → 装 `NoopScheduledServiceInvocationCredentialExchangePort`,它的 `IssueSenderNyxIdAsync` **永远返回失败**:`"Scheduled service invocation sender NyxID credential exchange is not configured."`
-
-也就是说:**只要承载 Studio 工作流定时的 host 没注册 NyxID broker,所有 Workflow 定时触发 100% 失败,而 Lark 定时(走 Envelope,不换票)毫不受影响**——这正好能解释"同一套部署里 Lark 行、Studio 不行"。
-
-**轴二:就算装了真换票,身份能不能换到票。** `NyxIdScheduledServiceInvocationCredentialExchangePort` 拿存下的 `SenderNyxId` 身份去 `broker.IssueShortLivedAsync(subject, scope)`,以下情况都会落成失败 → 触发失败:
-
-- `BindingNotFoundException` → "NyxID binding was not found for the scheduled subject."
-- `BindingScopeMismatchException` → 该 binding 不覆盖定时请求的 scope。
-- `BindingRevokedException` → binding 已吊销。
-- 返回空 token / 其它异常 → "NyxID credential exchange failed."
-
-**为什么 Lark 用户几乎不会撞上轴二、Studio 用户容易撞上**:Lark 用户是经 NyxID relay 进来的(见 [08 Lark 全链路](08-lark-end-to-end.md)),天然有一条可换短期 token 的 NyxID binding;而 Studio 侧的登录身份未必绑定到能换票的 NyxID subject/scope——一旦身份与 binding 对不上(尤其 `tenant` 缺失的"tenantless"情形,mapper 里 `tenant` 是 optional、可空),换票就报 binding 类错误。git 历史也印证了这块是反复打补丁的高危区:`Add scheduled workflow NyxID token exchange` → `Fix scheduled workflow NyxID token dispatch` → `Fix scheduled workflow caller credential projection` → `Fix tenantless schedule auth and role dispatch`。
+为什么不在每次 fire 时重新换一张 short-lived token?canonical Team Member Automation 要在 owner 离线后继续工作。创建/reauthorize 时固定 exact grants;fire/dispatch 只传 borrowed typed handle,workflow 内每次真实外呼前再解析 Vault secret。actor-owned reference shape、expiry 或授权事实失效可以进入 `needs_authorization`;late Vault resolution failure 当前只会让 workflow 外呼 fail closed,没有证据表明它会自动反馈为 schedule 状态迁移。
 
 ---
 
-## 5. 根因总结 + 怎么定位
+## 4. ACK、状态与 read model
 
-**一句话根因**:Studio 定时(Workflow ServiceInvocation)在**每次触发**都依赖一次"用存的身份去 NyxID 现换短期 token"的操作;这一步在"后台无人值守 + host 未装 broker / 身份无可用 binding / scope/tenant 对不上"时失败,异常被吞成 `FireFailed`。Lark 定时(SkillRunner Envelope)在**创建期**就把长效 key 固化进 state,触发期零换票、零外部依赖,所以照常跑。
+mutation endpoint 返回的 `202 Accepted` 只说明 command/effect 已受理。客户端必须继续读取 canonical detail/list,并用更高的 authoritative `stateVersion` 判断 materialization 是否追上。
 
-| 对照项 | Lark 定时智能体(✅) | Studio 定时工作流(❌) |
+| `authorizationStatus` | 含义 |
+|---|---|
+| `provisioning_pending` | 首次 credential effect 已开始,尚未提交 active generation |
+| `active` | credential generation 可用;是否触发仍由 `enabled` 决定 |
+| `needs_authorization` | owner/service/policy/digest/expiry/credential evidence 已不可用 |
+| `replacement_pending` | reauthorize 已开始,新 generation 尚未终结 |
+| `deleting` | tombstone/revocation intent 正在提交或执行 |
+| `revocation_pending` | 至少一个外部 track 未完成,资源必须继续可查询 |
+| `failed` | lifecycle operation 以稳定 error code 失败 |
+
+这套读写分离避免三种伪完成:
+
+- create `202` 不能冒充 key 已存入 Vault;
+- workflow dispatch receipt 不能冒充 workflow/run read model 已完成;
+- delete `202` 不能冒充 NyxID key 与 Vault secret 都已撤销。
+
+---
+
+## 5. 删除为什么必须先留 tombstone
+
+删除跨 NyxID 与 Vault 两个独立外部系统。actor 先提交 tombstone/revocation intent,随后执行两条 track,再把各自 outcome 提交回 actor。track 的公开值是 `NotRequired / Pending / Completed / Failed`;存在 Agent Key 时,两条 track 都到 `Completed` 后,projection 才能让 detail 变成 not found。
+
+任何 track 失败都要保留 `revocation_pending` 事实。重试使用 fresh bearer,但必须复用原 delete `operationId`/`idempotencyKey`;换一组 ID 会把同一次补偿伪装成第二次删除。历史数据若缺 exact secret reference,必须保持 blocked 并走受控 admin repair,不能猜 Vault 坐标或把 track 标成无需执行。
+
+这种设计看起来比“删除成功就立刻 404”更慢,但语义更诚实:资源暂时仍可见,正是为了告诉操作者外部凭证尚未完全失效。
+
+---
+
+## 6. 三条 schedule surface 不能混成一条
+
+这一段区分当前产品 surface 与已退役 runtime:
+
+1. **`SkillRunnerGAgent` runtime 已删除。** `ISkillRunnerCronSchedulePort`、`TriggerSkillRunnerExecutionCommand` 与 `ScheduledDispatchScheduleKind.SkillRunner` 只能出现在历史清理说明或测试里,不得再作为创建、路由或查询入口。
+2. **one-call `/api/scopes/{scopeId}/provision-workflow` 仍使用 fire-time exchange。** 它只保存 `SenderNyxId`,不保存带 `BindingId` 的 `CallerAuthority`;每次 fire 由 dispatch 换一张短票,写入 `WorkflowCallerDurableBearerToken` Vault reference,再交给 workflow run 内各 consumer 解析并复用。host 未装 exchange、binding 不存在/已撤销、scope 不匹配或 Vault 不可用时,fire 会在 workflow dispatch 前失败。
+3. **caller-authority per-call re-mint 是另一种基础设施能力,不是当前 C1。** 只有 auth 带完整 `CallerAuthority + BindingId` 时,dispatch 才会传 authority-only reference,由每个 LLM/tool/connector consumer 独立 re-mint。canonical Team Member Automation 也不走这条分支:它使用 dedicated Agent Key borrowed handle。
+
+| 路径 | 当前定位 | Credential 语义 |
 |---|---|---|
-| target 类型 | `Envelope` | `ServiceInvocation`(endpoint=`chat`) |
-| 触发期凭证 | 创建期固化的 `nyx_api_key` | 每次触发现换 NyxID short-lived token |
-| 触发期外部依赖 | 无 | NyxID broker + 身份 binding + scope 匹配 |
-| 失败时表现 | —— | `ScheduledDispatchFireFailedEvent`,`LastError` 带换票错误 |
-| 失败的硬下限 | —— | host 装了 `Noop` 换票 → 必然失败 |
+| Team Member Automation | canonical Studio member 定时资源 | create/reauthorize 时 dedicated Agent Key + Vault-backed typed locator |
+| one-call `provision-workflow` | 独立的非阻塞 C1 provisioning 入口 | `SenderNyxId`;每 fire dispatch exchange 一张短票,run 内复用 |
+| caller-authority workflow | 基础设施能力,非当前 C1 contract | `CallerAuthority + BindingId`;每个外呼 independently re-mint |
+| retired SkillRunner | 历史清理状态 | 不得新建或路由 |
 
-**怎么在你的环境里坐实是哪一种**(按成本从低到高):
-
-1. **读 `LastError`**:查这条定时任务的 fire 记录 / `ScheduledDispatchFireFailedEvent`。
-   - 文案含 *"...credential exchange is not configured."* → **轴一**:host 没装 NyxID broker,装上即可。
-   - 文案含 *"binding was not found / does not grant the requested schedule scope / was revoked"* → **轴二**:Studio 创建定时时落下的 `SenderNyxId`(platform/tenant/externalUserId/scope)没有可换票的 NyxID binding;对齐身份/scope(或为该 subject 建 binding)。
-2. **核对 host 装配**:承载 Workflow 定时的 host 是否注册了 `INyxIdCapabilityBroker`(见 `ServiceCollectionExtensions.cs`)。
-3. **对比创建期落库**:同一身份在 Lark 入站(有 binding)与 Studio 登录(可能无 binding)下,`SenderNyxId` 是否一致、`tenant` 是否为空。
-
-> 本仓库是只读解读仓,不改 `~/Code/aevatar`;上面是定位路径与设计依据,具体修复(补 broker 装配 / 对齐身份 binding / 让换票失败的报错透传到 Studio 前端而非静默 `FireFailed`)属于源码仓的工作。
+旧故障的真正教训不是“所有 schedule 都应该把 raw key 放进 state”,而是**无人值守授权必须有明确 owner、稳定 typed locator、可重试 lifecycle 和可观察终态**。当前主链实现的是这四点。
 
 ---
 
-## 6. ⚠️ 边界与诚实标注
+## 7. 验证一条 Team Member Automation
 
-- **凭证守卫不是 Studio 失败的原因**(§2 已纠正)。守卫只管"别把 token 写进持久 Reminder",而 Studio 的换票在触发后的 actor turn 内,绕开守卫。把两者混为一谈会误修。
-- **「ScheduleGAgent」是俗称**:代码里没有这个类名;它对应 `ScheduledDispatchGAgent`(引擎)+ `SkillRunnerGAgent`(Lark 消费者)+ Workflow `chat` 调用(Studio 消费者)。
-- **本篇未亲验的环节**:Studio 前端 → `WorkflowScheduleApplicationService` 之间那段 HTTP 端点如何把当前登录态填进 `Auth.SenderNyxId`,我只确认了"mapper 强制要求它非空、否则创建期就报错",因此把失败点定位在触发期换票而非创建期校验(这与"能建、触发才失败"的现象一致)。若需精确到"Studio 落的 subject 到底长什么样",需再追该端点。
-- **高危演进区**:Workflow 定时的 token exchange / caller credential projection 是 git 历史里反复修的地方(`193c1b6` / `db9c384` / `c3ea4f7` / `c61446a` 等),阅读源码时以当前 HEAD 为准,不要照搬被取代的旧实现。
-- **当前态 vs 目标态**:换票失败目前是**静默**地变成 `FireFailed`(只进 `LastError`),Studio 用户不一定能直接看到原因——这是体验缺口,登记为后续可改进项。
+按证据强度从弱到强检查:
 
-> **读者可回答**:为什么 aevatar 用一个 `ScheduledDispatchGAgent` 同时承载定时智能体和定时工作流(§1)?定时回调为什么坚持"不在持久 envelope 里放凭证"、凭证守卫到底守什么(§2)?Lark 定时为什么不换票、Studio 定时为什么每次都要换票(§3/§4)?同一套部署里"Lark 行、Studio 不行"的两条独立原因分别是什么、怎么从 `LastError` 区分(§4/§5)?
+1. preflight 返回唯一 exact `UserService.id` grant,两个 wildcard 为 false,owner LLM 五字段一致。
+2. create `202` 后,projected row 到 `active`,credential source 为 `scheduled_invocation_agent_key`,recurring `enabled` 与请求一致。
+3. exact NyxID key 在执行前 active 且 `last_used_at` 为空;`run-now` 或 cron fire 完成后,同一 key 的 `last_used_at` 变为非空。
+4. schedule `stateVersion` 推进,run 输出包含本次唯一 marker;不能只看 LLM 文案。
+5. delete 后两条 revocation track 均终结;detail not found、exact key inactive/absent、automation inventory 为零。
+6. 最后再清理 revision、member、draft 与 Team,避免先删 owner 导致 pending credential 无法恢复。
+
+完整生产门禁、证据等级与失败恢复表见 [09/03/02](../09/03-provision-and-observe-via-nyxid/02-scheduled-agent-key-production-canary.md)。
+
+---
+
+## 8. 边界与读者检查
+
+- **Agent Key 功能验证不等于 cron 精度验证**:`run-now` 复用 schedule actor dispatch,但 recurring disabled 时没有覆盖 wall-clock callback。
+- **public view 不含 typed secret reference**:reference 在 actor-owned credential locator 内;read model 只投影查询所需的非敏感状态。
+- **dispatch 不解密 Agent Key**:它传 borrowed typed handle;workflow 的 LLM/tool/connector consumer 在每次外呼前 late resolve,避免把 secret 扩散进 dispatch envelope。
+- **不是所有 Workflow-kind schedule 都自动采用 Agent Key**:以具体 API/owner contract 为准,尤其不要把 `provision-workflow` 与 canonical member automation 混为一谈。
+- **query 不做 priming/replay**:看不到新版本时诚实等待 projection,不能在 GET 路径同步重放 actor 事件补结果。
+
+> **读者可回答**:schedule、credential lifecycle、外部 effect 与 read model 分别由谁拥有?为什么 durable callback 不能带凭证?`202`、`active`、run completion、`last_used_at` 与 `6202` 各证明哪一层?当前 C1 fire-time exchange、caller-authority per-call re-mint 与 canonical Member Automation Agent Key 有什么边界?

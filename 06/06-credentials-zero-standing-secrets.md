@@ -1,42 +1,51 @@
-# 零长期密钥:aevatar 的凭证与信任边界
+# Raw credential 不入事实层:aevatar 的凭证与信任边界
 
-> 本篇是 06 分布式与生产态的**亮点收口**:普通 Agent 框架要么把 provider API key 塞进 env/config,要么明文存用户 token;aevatar 走的是**零长期密钥**——grain state 里只存一个不透明的 `BindingId`,用的那一刻才去 NyxID broker 换短期 token,持久回调里一行凭证都不许写。本篇把散在 [07/08 Lark](../07/08-lark-end-to-end.md) / [07/09 voice](../07/09-voice-presence-edge-brain.md) / [07/01 Channel](../07/01-channels.md) 的凭证片段合成一张"信任边界全景",并诚实标注唯一一处 fail-closed 缺口(voice 静态 key)。
+> 本篇是 06 分布式与生产态的**凭证边界收口**。当前统一不变量不是“全系统没有长期 key”,而是 **raw credential 不进入 actor state、read model、durable callback、日志或 public API**。broker-bound surface 只持 subject/caller authority,在明确边界换短票;canonical Team Member Automation 持 Vault-backed typed locator,raw Agent Key 的唯一持久化位置是 Vault。
 
 ## 本篇涉及的设计抽象
 
-> 以下是本篇的**事实源脊柱**(以 `~/Code/aevatar` 为准,核对基线 `feature/integrate @ efaee423d`;非正文骨架):正文用设计语言论证,代码摘抄一律折叠。`agents/` 与 `test/` 路径属事实源,书写时不计入 aevatar 源码路径校验。
+> 以下是本篇的**事实源脊柱**(以 `~/Code/aevatar` 为准,当前 contract 核对基线 `origin/feature/integrate @ 4e0def2c231b7074209b852b855954b3db7d3e71`;非正文骨架)。早期 broker 设计来自 ADR-0018,但当前 schedule/Vault 结论只按这条包含 ADR-0041/0043 的稳定基线表述。
 
-- **信任边界(只存不透明句柄)**:`agents/Aevatar.GAgents.Channel.Identity.Abstractions/INyxIdCapabilityBroker.cs`(`IssueShortLivedAsync` + 三类绑定异常)、ADR `docs/adr/0018-per-user-nyxid-binding-via-oauth-broker.md`(`accepted`)。
-- **触发期换票 vs Noop fail-closed**:装配点 `src/platform/Aevatar.GAgentService.Hosting/DependencyInjection/ServiceCollectionExtensions.cs`、`src/platform/Aevatar.GAgentService.Infrastructure/Schedules/NyxIdScheduledServiceInvocationCredentialExchangePort.cs`、`src/platform/Aevatar.GAgentService.Application/Schedules/NoopScheduledServiceInvocationCredentialExchangePort.cs`。
-- **持久回调零凭证守卫**:`src/Aevatar.Foundation.Runtime.Implementations.Orleans/Grains/Callbacks/DurableCallbackEnvelopeCredentialGuard.cs`、集成测试 `test/Aevatar.Foundation.Runtime.Hosting.Tests/RuntimeCallbackSchedulerGrainCredentialGuardIntegrationTests.cs`。
-- **长效 key 作用域收敛**:`agents/Aevatar.GAgents.Authoring.Lark/ScheduledAgentApiKeyIssuer.cs`。
-- **诚实缺口(voice)**:`src/Aevatar.Foundation.VoicePresence.OpenAI/OpenAIRealtimeProvider.cs`、`src/Aevatar.Bootstrap.Extensions.AI/NyxIdRealtimeProviderCredentialResolver.cs`、`src/Aevatar.Foundation.VoicePresence.MiniCPM/MiniCPMRealtimeProvider.cs`、ADR `docs/adr/0033-voice-provider-nyxid-ephemeral-broker.md`(`proposed`)。
+- **broker-bound short-ticket issuance**:`INyxIdCapabilityBroker`、`StudioWorkflowProvisioningService`、`ScheduledServiceInvocationDispatchPort` 与 ADR `docs/adr/0018-per-user-nyxid-binding-via-oauth-broker.md`。
+- **Vault-backed Team Member Automation**:`docs/canon/scheduled-skill-runners.md`、`docs/adr/0041-scheduled-invocation-agent-key-credential-reference.md`、`docs/adr/0043-scheduled-credential-lifecycle-compensation.md`。
+- **raw credential exclusion 与已知 voice 例外**:`DurableCallbackEnvelopeCredentialGuard` 及其集成测试、OpenAI/MiniCPM voice credential resolver 边界。
 
 ---
 
 ## 一句话先把信任边界钉住
 
-> **信任边界画在 aevatar 进程的外面:NyxID 才是凭证的事实源;aevatar grain state 里只躺着一个不透明的 `BindingId`,没有任何 user secret。** 每次要代表某个用户去调外部服务,aevatar 都在**用的那一刻**拿 `BindingId` 对应的身份去 broker `IssueShortLivedAsync` 换一张短期 token,用完即弃;换不到票就**显式失败**,而不是退回某个长期密钥硬扛。
+> **凭证事实源在 aevatar 事实层之外。** broker-bound actor 只持 `SenderNyxId` 或带 `BindingId` 的 caller authority;Agent Key actor 只持 `SecretReference + api_key_id + expiry`。当前 C1 在每次 fire 的 dispatch 边界换一张短票,再以 Vault-backed run reference 交给 workflow;带完整 caller authority 的另一种基础设施路径才会把换票推迟到每个外呼。Agent Key 则在 workflow 消费边界 late resolve Vault。三者都不把 raw secret 写进 actor/readmodel/callback。
 
 ```mermaid
+%%{init: {"maxTextSize": 100000, "flowchart": {"useMaxWidth": false, "nodeSpacing": 10, "rankSpacing": 50}, "themeVariables": {"fontSize": "10px"}}}%%
 flowchart TB
-    subgraph EXT["凭证事实源 · 进程外"]
-        NYX["NyxID broker · OAuth+PKCE / RFC 8693 token-exchange"]
+    subgraph EXT["外部 credential owners"]
+        NYX["NyxID broker<br/>short-lived token exchange"]
+        VAULT["Vault<br/>raw credential material"]
     end
-    subgraph AEV["aevatar grain state · 只存不透明句柄"]
-        BID["BindingId · 无 user secret"]
+    subgraph FACT["Actor-owned facts · no raw secret"]
+        SUBJECT["SenderNyxId subject"]
+        AUTH["Caller authority + BindingId"]
+        LOC["SecretReference + api_key_id + expiry"]
     end
-    NYX -->|"绑定一次 · /init"| BID
-    USE["用的那一刻 · turn / 定时触发 / voice session"] -->|"IssueShortLivedAsync(subject, scope)"| NYX
-    NYX -->|"短期 token · 用完即弃"| USE
-    BID -.->|"只回答 我是谁"| USE
+    C1["one-call C1 schedule"] --> SUBJECT
+    SUBJECT -->|"每次 fire"| DISPATCH["Dispatch exchange"]
+    DISPATCH --> NYX
+    NYX -->|"一张 short-lived token"| TEMP["Vault-backed run credential ref"]
+    TEMP --> RUN["Workflow run<br/>外呼复用同一短票"]
+    OTHER["Caller-authority workflow"] --> AUTH
+    AUTH -->|"每个真实外呼"| NYX
+    TEAM["Team Member Automation"] --> LOC
+    LOC --> WF["Workflow consumer"]
+    WF -->|"late resolve before external call"| VAULT
+    VAULT -->|"resolved secret"| WF
 ```
 
 ---
 
-## 1. 信任边界:aevatar 只持有不透明 `BindingId`,不持有密钥
+## 1. Broker-bound surface:只持身份句柄,不持有 token
 
-整套姿态的接口契约写在 `INyxIdCapabilityBroker` 上,它把"换凭证"收成一个**只写**的能力面(发起绑定 / 吊销 / 签发短期 token),并在接口文档里把不变量讲死。
+subject re-mint 这条路径的接口契约写在 `INyxIdCapabilityBroker` 上,它把“换凭证”收成一个**只写**的能力面(发起绑定 / 吊销 / 签发短期 token),并在接口文档里把不变量讲死。
 
 <details>
 <summary><code>INyxIdCapabilityBroker</code>:契约里写明"不存长期密钥"</summary>
@@ -56,48 +65,44 @@ public interface INyxIdCapabilityBroker
     // 没有有效绑定 → BindingNotFoundException
     // NyxID 报 invalid_grant(已吊销) → BindingRevokedException
     // NyxID 报 invalid_scope(绑定不覆盖该 scope) → BindingScopeMismatchException
+    // token 不覆盖 required services → BindingServiceAccessMismatchException
     Task<CapabilityHandle> IssueShortLivedAsync(ExternalSubjectRef externalSubject, CapabilityScope scope, /*...*/);
 }
 ```
 </details>
 
-三类失败被做成**独立异常类型**(`BindingNotFoundException` / `BindingRevokedException` / `BindingScopeMismatchException`),让调用方能区别对待:绑定缺失可提示用户重跑 `/init`;接口注释还点明一条务实兜底——**普通 LLM 回合换不到用户票时,可以退回 bot-owner 凭证继续**(不是所有路径都强制 per-user)。ADR-0018(`accepted`)在 2026-04-30 的更新里进一步收紧:改用 **public client + PKCE**,连集群级 OAuth `client_secret` 都不再由 aevatar 持有。
+四类失败被做成**独立异常类型**(`BindingNotFoundException` / `BindingRevokedException` / `BindingScopeMismatchException` / `BindingServiceAccessMismatchException`),让调用方能区别未绑定、已吊销、scope 不足与 required UserService 资源不足。绑定缺失可提示用户重跑 `/init`;接口注释还点明一条务实兜底——**普通 LLM 回合换不到用户票时,可以退回 bot-owner 凭证继续**(不是所有路径都强制 per-user)。ADR-0018(`accepted`)在 2026-04-30 的更新里进一步收紧:改用 **public client + PKCE**,连集群级 OAuth `client_secret` 都不再由 aevatar 持有。
 
-**为什么是它,不是"把 token 存下来"**:存下来的长期凭证 = 一个随时间累积的泄漏面 + 一堆会过期/被吊销的死票。把事实源放在 NyxID、aevatar 只留不透明句柄,等于把"凭证生命周期管理"外包给专门的 broker,aevatar 侧的爆炸半径收敛到"一个可吊销的 BindingId"。这是 **FI-002**(host 事实由 host 注入,核心不硬编码具体凭证)与 **FI-004**(权威记录在 broker,不在进程内)的合流。
+**为什么是它,不是“把 token 存进 actor 长期事实”**:对 broker-bound surface,长期持久 token 会累积泄漏面与死票。actor 只留身份句柄,让每次授权都以当前 binding/scope 为准;C1 只在每个 fire 后把新短票临时放入 Vault,供该 run 解析复用。Agent Key 是另一种 owner contract,见 §4;它同样不把 raw key 放进事实层。
 
 ---
 
-## 2. 触发期换票 vs Noop:换不到票就 fail-closed
+## 2. Broker-bound schedule:区分 C1 fire-time exchange 与 per-call authority
 
-"用的那一刻才换票"在无人值守的**后台定时触发**场景最见真章。aevatar 把"会不会换票"做成**条件装配**:容器里有 `INyxIdCapabilityBroker` 才装真换票端口,否则装一个**永远返回失败**的 Noop。
+`SenderNyxId` 与 `CallerAuthority` 不是同一个字段,也不触发同一条时序。当前 one-call C1 `StudioWorkflowProvisioningService.BuildScheduleAuth` 只写 `SenderNyxId`;它不写带 `BindingId` 的 `CallerAuthority`。因此 workflow schedule 虽然启用 caller-credential projection,dispatch 仍会在**每次 fire**调用 `IssueNyxIdAsync` 换一张短票。
 
-<details>
-<summary>条件装配:有 broker 才换票,否则 fail-closed</summary>
-
-```csharp
-// src/platform/Aevatar.GAgentService.Hosting/DependencyInjection/ServiceCollectionExtensions.cs
-private static void AddScheduledCredentialExchangePort(this IServiceCollection services) =>
-    services.TryAddSingleton<IScheduledServiceInvocationCredentialExchangePort>(sp =>
-        sp.GetService<INyxIdCapabilityBroker>() is { } broker
-            ? new NyxIdScheduledServiceInvocationCredentialExchangePort(broker, /* logger */)  // 真换票
-            : new NoopScheduledServiceInvocationCredentialExchangePort());                      // 永远失败
-
-// src/platform/Aevatar.GAgentService.Application/Schedules/NoopScheduledServiceInvocationCredentialExchangePort.cs
-//   return Failure("Scheduled service invocation sender NyxID credential exchange is not configured.");
-```
-</details>
+换到的 raw token 不写入 schedule state 或 workflow envelope。dispatch 把它写入 Vault 的 `WorkflowCallerDurableBearerToken` purpose,再把 `DurableCallerCredentialRef(SourceKind=ScheduledDispatch)` 交给 workflow。run 内的 LLM/tool/connector consumer 会在各自外呼前解析这个 reference,但复用的是**同一张 fire-time token**,不是每次重新 mint。
 
 ```mermaid
+%%{init: {"maxTextSize": 100000, "flowchart": {"useMaxWidth": false, "nodeSpacing": 10, "rankSpacing": 50}, "themeVariables": {"fontSize": "10px"}}}%%
 flowchart TB
-    FIRE["定时到点 / 服务调用"] --> EX{"换票端口?"}
-    EX -->|"装了 NyxId 真换票"| ISSUE["IssueShortLivedAsync(身份, scope)"]
-    EX -->|"只装了 Noop · host 没 broker"| FAIL0["❌ 必然失败 · credential exchange is not configured"]
-    ISSUE --> Q{"换到票?"}
-    Q -->|"是"| OK["✅ 注入短期 Bearer → 调用"]
-    Q -->|"BindingNotFound / ScopeMismatch / Revoked / 空"| FAIL["❌ 失败 · 显式异常"]
+    FIRE["C1 scheduled fire"] --> D["Dispatch<br/>SenderNyxId"]
+    D --> N["NyxID broker<br/>IssueNyxIdAsync once"]
+    N -->|"short-lived token"| V["Vault<br/>WorkflowCallerDurableBearerToken"]
+    V --> REF["DurableCallerCredentialRef"]
+    REF --> W["Workflow inbox"]
+    W --> C1["LLM/tool/connector calls<br/>resolve and reuse same token"]
+    N -->|"missing/revoked/scope mismatch"| FAIL["fire fails before workflow dispatch"]
+
+    A["Auth with CallerAuthority + BindingId"] --> P["Dispatch passes authority-only ref"]
+    P --> C2["Each external-call consumer"]
+    C2 --> B["IWorkflowCallerAccessTokenProvider"]
+    B -->|"independent re-mint"| N
 ```
 
-**为什么 Noop 也要"显式失败"而不是回退长期 key**:这正是 fail-closed 的精神——**缺少换票能力时,宁可让操作明确失败、暴露配置缺口,也不偷偷启用一条长期凭证旁路**。它也解释了一个真实现象:经 NyxID relay 进来的入站身份(见 [07/01 Channel](../07/01-channels.md))天然有可换短期 token 的 binding,而某些后台/登录身份未必绑定到能换票的 NyxID subject/scope——一旦 host 没装 broker 或身份无可用 binding,这类触发就 100% 显式失败,而走固化长效 key 的路径(见 §4)不受影响。代价是体验缺口(失败目前偏静默),但**方向是对的**:没有票就不动,符合 **FI-005**(边界优先于便利)。
+所以当前 C1 是“一次 fire 一次 exchange”,即使 workflow 最终没有 credential-consuming call,dispatch 也已经换票。binding missing/revoked、scope mismatch、exchange provider 或 Vault 不可用都会在 workflow 入箱前 fail closed。
+
+基础设施另有一条 caller-authority 模式:当 auth 同时带完整 `CallerAuthority + BindingId` 时,dispatch 不换票,只传 authority-only reference,每个真实外呼再通过 `IWorkflowCallerAccessTokenProvider` 独立 re-mint。这个分支不能反推为当前 C1 contract。
 
 ---
 
@@ -126,54 +131,57 @@ private static bool IsRuntimeCredentialField(FieldDescriptor field)
 </details>
 
 ```mermaid
+%%{init: {"maxTextSize": 100000, "flowchart": {"useMaxWidth": false, "nodeSpacing": 10, "rankSpacing": 50}, "themeVariables": {"fontSize": "10px"}}}%%
 flowchart LR
     BUILD["排下一次触发 · 构造 callback envelope"] --> GUARD{"CredentialGuard 扫描字段 · *_token / reply_token / nyx_user_access_token"}
     GUARD -->|"带凭证字段"| THROW["❌ InvalidOperationException · 拒绝落库"]
     GUARD -->|"只含稳定 actor-owned 标识符"| PERSIST["✅ 落 Orleans Reminder · 可躺很久"]
-    PERSIST --> FIRE["到点:在 actor turn 内才现换短期凭证"]
+    PERSIST --> FIRE["到点:在 dispatch boundary<br/>解析当前 typed credential"]
 ```
 
 这条铁律由集成测试 `RuntimeCallbackSchedulerGrainCredentialGuardIntegrationTests` 钉死:带 `nyx_user_access_token` 的 Lark 卡片超时、带 `reply_token` 的 relay 超时都必须被拒,只有 sanitize 过的才放行。
 
-**为什么持久化的东西必须无凭证**:短期 token 的寿命以分钟计,Reminder 状态的寿命以天/月计——把前者写进后者,等于在库里埋一堆"出土即过期"的死票 + 一个长期泄漏面。所以凭证必须在**触发那一刻**、在 actor turn 内重新解析,而不是提前固化进持久状态。这是 **FI-002 / FI-004** 在持久层最干净的一次落地。
+**为什么 callback 必须无 raw credential**:短期 token 的寿命以分钟计,Reminder 状态的寿命以天/月计。callback 只需要稳定 fire identity;raw token/key 放进去既会过期又扩大泄漏面。这条守卫不禁止 schedule actor 持有 typed `SecretReference` locator:C1 的短票在 fire 后进入临时 Vault reference,Agent Key 的 raw secret 则始终只在 Vault,二者都由 workflow 在外呼前解析。
 
 ---
 
-## 4. 两种凭证策略:短期换票 vs 作用域收敛的长效 key
+## 4. 两条产品 surface:C1 fire-time short ticket vs Vault-backed Agent Key
 
-aevatar 并非教条地"只用短期 token"。它按场景选了两条策略,差别正是"触发期有没有外部依赖":
+aevatar 并非教条地“只用短期 token”。当前两条 schedule surface 采用不同契约,不能互相替代:
 
-| 维度 | 短期换票(默认) | 作用域收敛的长效 key |
+| 维度 | C1 fire-time short ticket | dedicated Agent Key |
 |---|---|---|
-| 谁用 | 在线 turn、后台服务调用、voice session | Lark 定时智能体(SkillRunner) |
-| 凭证 | 用时 `IssueShortLivedAsync` 现换,用完即弃 | 创建期签发一次,固化进 state |
-| 触发期外部依赖 | 需要 broker + 身份 binding + scope 匹配 | 无(零换票) |
-| 收敛手段 | scope 限定 + 短寿命 | **作用域收敛** + 可吊销 `api_key_id` |
+| 主要 schedule surface | one-call `/provision-workflow` | canonical Team Member Automation |
+| 持久事实 | `SenderNyxId` subject reference | `SecretReference + api_key_id + expiry` typed locator |
+| raw credential | 每次 fire 签发一张短票,写入临时 Vault reference;不进入 actor/readmodel/callback | 唯一持久化位置是 Vault,不进入 actor/readmodel |
+| runtime 依赖 | 每次 fire 都依赖 broker + binding + scope + Vault | 已提交授权事实;每次外呼前 late Vault resolution |
+| 收敛手段 | scope 限定 + 短寿命 | exact UserService grants + expiry + 可吊销 key ID |
 
-长效 key 这条由 `ScheduledAgentApiKeyIssuer` 实现:它在创建定时智能体时向 NyxID 申一张 `scopes = "read write proxy"` 的 key,但**把可达服务收敛**到必需集合(`RequiredSlugs`:主交付 slug、失败通知 slug、Ornn、owner 的 LLM 路由 slug),并保留 `api_key_id` 以便随时吊销。
+Team Member Automation 在 create/reauthorize 时先让 schedule actor 提交 effect locator,写侧再重读当前来源并重新校验 Aevatar authorization plan 与 `PermissionDigest`。校验通过后,issuer 用计划里的 exact service IDs 请求 NyxID targeted scope-plan;NyxID 返回的 `normalized_grant_digest` 才作为 key-create 的 `scope_plan_digest`。raw key 写入 Vault后,actor 只提交 typed locator。fire 时 dispatch adapter 只传 borrowed credential handle;workflow 的 LLM/tool/connector consumer 在每次真实外呼前 late resolve Vault secret。public read model 只投影 source kind、expiry、generation、状态和版本。
 
-**为什么允许长效 key**:无人值守的后台任务若每次触发都依赖"某用户此刻的 binding 还在、还能换票",会非常脆。给它一张**创建期就授权、作用域收敛、可吊销**的长效 key,换来触发期零外部依赖的稳定性——这是在"最小权限"与"可用性"之间的一次**显式取舍**,而不是图省事的默认。
+**为什么允许 Agent Key**:无人值守任务若每次触发都依赖“某用户此刻的 binding 还在、还能换票”,会非常脆。创建期 exact grant、Vault-backed locator、独立 NyxID/Vault 吊销 tracks 把可用性与最小权限同时建模;这不是把 raw key 固化进 actor state。旧 `SkillRunnerGAgent` 与其 raw-key state 模型已经退役,只可作为历史清理事实出现。
 
 ---
 
 ## 为什么是这样设计(正当性小结)
 
-- **为什么把凭证事实源放进程外、只留 `BindingId`?** 把生命周期管理外包给 broker,aevatar 侧爆炸半径收敛到一个可吊销句柄,符合 FI-002/FI-004。
-- **为什么换不到票宁可 fail-closed?** 偷偷回退长期凭证会把"零长期密钥"姿态在最隐蔽的后台路径上破掉;显式失败暴露缺口,符合 FI-005。
-- **为什么持久回调强制零凭证?** 短票寿命(分钟)与 Reminder 寿命(天/月)严重错配,固化即泄漏 + 死票;触发期现换才正确。
+- **为什么 C1 schedule 只留 subject?** 让每次 fire 重新按当前 binding/scope 换短票,而不是把旧 token 固化进 schedule state。
+- **为什么 caller-authority path 还要单独建模 `BindingId`?** 只有完整 authority 才能安全把 mint 推迟到每个 external-call consumer;`SenderNyxId` 不能冒充它。
+- **为什么 Agent Key path 只留 typed locator?** actor 要持有 credential lifecycle 事实,但 raw key 由 Vault 单独拥有;public read model 不投影 locator。
+- **为什么持久回调强制零 raw credential?** callback 只负责唤醒,不拥有授权或 secret;实际 credential 在更晚的消费边界解析。
 
 !!! warning "诚实缺口:voice 静态 key 未 fail-closed"
-    零长期密钥姿态目前有一处明确破口,登记在 [08/04 P0-2](../08/04-todo-list.md):**OpenAI voice 会回退静态 key,且不按环境门禁**。`OpenAIRealtimeProvider.ResolveEffectiveConfigAsync` 在无 credential resolver 时直接返回原始 config(含静态 key),换票拿到空 key 也返回原始 config;而 `NyxIdRealtimeProviderCredentialResolver` 拿不到 caller token 时只记警告、返回 null(不抛异常)——于是静默回退到 config 里的静态 `OPENAI_API_KEY`,与 ADR-0018「零长期密钥」相悖。修法:mainnet 加 fail-closed 守卫,生产检测到静态 key 直接拒启/告警,只在 dev 保留直连。另:`MiniCPMRealtimeProvider` 构造函数根本不接受 credential resolver,**无 NyxID broker 路径**,与 OpenAI 凭证成熟度不对等;ADR-0033 仍 `proposed`。
+    raw credential 不入事实层并不自动解决 host config secret。OpenAI voice 会在无 resolver 或 resolver 返回空时回退静态 config key,且不按环境门禁;MiniCPM 也没有同等 broker path。该缺口登记在 [08/04 P0-2](../08/04-todo-list.md),与 Vault-backed scheduled Agent Key 是不同 owner contract。
 
 ---
 
 ## 验收
 
-1. aevatar 的信任边界画在哪里、它的 grain state 里到底存什么?(画在进程外;只存不透明 `BindingId`,无 user secret)
-2. 三类绑定异常各对应什么失败、为什么要分开?(NotFound=未绑定/未同步、Revoked=invalid_grant、ScopeMismatch=invalid_scope;分开让调用方能分别提示/兜底)
-3. "换不到票就失败"的 Noop fail-closed 为什么不退回长期 key?(偷偷回退会在最隐蔽路径破掉零长期密钥姿态;显式失败暴露缺口)
-4. 持久回调为什么一行凭证都不能写、谁来强制?(短票寿命 vs Reminder 寿命错配;`DurableCallbackEnvelopeCredentialGuard` 扫描 `*_token` 即拒,集成测试钉死)
-5. 什么时候用短期换票、什么时候用作用域收敛的长效 key,取舍依据是什么?(在线/需 per-user 用短票;无人值守后台用长效 key 换触发期零依赖,以作用域收敛+可吊销兜底)
-6. 零长期密钥姿态目前的唯一破口在哪、怎么补?(voice 静态 key fallback 未 fail-closed;mainnet 加守卫拒启 + MiniCPM 补 broker 路径)
+1. aevatar 的信任边界画在哪里、actor state 可以存什么?(raw credential 的 owner 在 NyxID/Vault;state 可存 subject/`BindingId` 或 typed `SecretReference + api_key_id + expiry`,不能存 raw secret)
+2. 四类绑定异常各对应什么失败、为什么要分开?(NotFound=未绑定/未同步、Revoked=invalid_grant、ScopeMismatch=invalid_scope、ServiceAccessMismatch=required UserService 资源不足;分开让调用方能分别提示/兜底)
+3. 当前 C1 在哪里换票、一个 fire 换几张?(dispatch 每 fire 调一次 exchange;短票写入 Vault reference,run 内外呼解析并复用)
+4. 持久回调为什么不能写 raw credential、谁来强制?(`DurableCallbackEnvelopeCredentialGuard`;callback 只携带 stable fire identity)
+5. 两条 schedule surface 如何选 credential?(C1 保存 `SenderNyxId` 并在 fire-time exchange;canonical Member Automation 经 preflight/create 使用 Vault-backed Agent Key)
+6. 当前 voice 缺口是什么?(静态 config key fallback 未按生产环境 fail closed,且 MiniCPM broker 能力不对等)
 
 ⟦AI:AUTO-LOOP⟧

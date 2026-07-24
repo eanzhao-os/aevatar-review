@@ -18,6 +18,7 @@
 > **每个有副作用的步骤在派发时就被登记进 `compensable_ledger`(连同它的补偿步 id);一旦工作流整体失败,run actor 用 `compensation_cursor` 逆序把账本里的步骤一个个补偿回去;补偿也失败到耗尽,就把 `saga_status` 钉成 `CompensationDeadLetter` 终态、记下 `dead_letter_error` 并通知调用方/父工作流。** 整个 saga 状态由 **run actor 自持**(就在它自己的 event-sourced state 里),**没有外部 saga coordinator**——这正是 Actor + ES 地基"免费"换来的:补偿进度本身就是可重放的事实。
 
 ```mermaid
+%%{init: {"maxTextSize": 100000, "flowchart": {"useMaxWidth": false, "nodeSpacing": 10, "rankSpacing": 50}, "themeVariables": {"fontSize": "10px"}}}%%
 flowchart TB
     S1["step1 ✅ 有副作用 → 登记 ledger"] --> S2["step2 ✅ 有副作用 → 登记 ledger"]
     S2 --> S3["step3 ❌ 失败"]
@@ -55,6 +56,7 @@ flowchart TB
 补偿阶段是**有界**的:内核里有 `CompensationPhaseDeadlineMs`(5 分钟)和单步 `DefaultCompensationTimeoutMs`(30 秒),超时由 `HandleCompensationPhaseDeadlineFiredAsync` 收口,避免补偿阶段无限拖。补偿耗尽 / 超时 → `saga_status` 进 `CompensationDeadLetter` 终态,并通知调用方 / 父工作流,而不是静默卡死。
 
 ```mermaid
+%%{init: {"maxTextSize": 100000, "sequence": {"actorMargin": 28, "messageMargin": 18, "diagramMarginX": 10, "diagramMarginY": 10}, "themeVariables": {"fontSize": "10px"}}}%%
 sequenceDiagram
     autonumber
     participant K as ExecutionKernel
@@ -144,6 +146,7 @@ durable execution 的另一半是**长时间挂起后可靠 resume**。aevatar �
 这些挂起之所以"持久",靠的是底层 `RuntimeCallbackSchedulerGrain`——用 **Orleans Reminder** 做的持久回调,到点重投、进程重启不丢(同一套 Orleans 运行时语义见 [06/02 Orleans Runtime](../06/02-orleans-runtime.md))。
 
 ```mermaid
+%%{init: {"maxTextSize": 100000, "flowchart": {"useMaxWidth": false, "nodeSpacing": 10, "rankSpacing": 50}, "themeVariables": {"fontSize": "10px"}}}%%
 flowchart LR
     RUN["工作流跑到 human_approval / wait_signal"] --> SUS["挂起 · 注册 Orleans Reminder 持久回调"]
     SUS -.->|"几小时 / 几天 · 进程可重启"| WAKE["审批到 / 信号到 / 超时"]
@@ -152,7 +155,7 @@ flowchart LR
     GUARD -->|"已失效"| STOP["终止 / 走 on_error"]
 ```
 
-**为什么这是"长在 agent 编排上"的 durable execution**:Temporal / Restate 提供的是通用 durable workflow,但你得把 agent 逻辑塞进它的编程模型。aevatar 反过来——durable 能力(持久定时、可补偿事务、崩溃恢复)是 Actor + ES 地基自带的,**agent 编排(role / llm_call / tool_call)和 saga / 持久挂起共用同一套 run actor**。这就是 [08/05 结晶梯度路线图](../08/05-crystallization-roadmap.md) 说的竞争站位:不和 Temporal 拼通用 workflow,而是把 durable execution 直接做进 agent runtime。凭证在挂起/触发期怎么不被泄进持久状态,见 [06/06 零长期密钥](../06/06-credentials-zero-standing-secrets.md)。
+**为什么这是"长在 agent 编排上"的 durable execution**:Temporal / Restate 提供的是通用 durable workflow,但你得把 agent 逻辑塞进它的编程模型。aevatar 反过来——durable 能力(持久定时、可补偿事务、崩溃恢复)是 Actor + ES 地基自带的,**agent 编排(role / llm_call / tool_call)和 saga / 持久挂起共用同一套 run actor**。这就是 [08/05 结晶梯度路线图](../08/05-crystallization-roadmap.md) 说的竞争站位:不和 Temporal 拼通用 workflow,而是把 durable execution 直接做进 agent runtime。凭证在挂起/触发期怎么避免 raw secret 进入事实层,见 [06/06 凭证边界](../06/06-credentials-zero-standing-secrets.md)。
 
 ---
 

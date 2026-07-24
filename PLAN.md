@@ -114,7 +114,7 @@
 - ✅ `06/03-kafka-transport.md` — 可选 `Transport=Kafka`(MassTransit/Kafka)插件,ADR-0003 的设计
 - ✅ `06/04-garnet-clustering.md` — 生产聚类用共享 Garnet 成员资格(ADR-0032)、Garnet 持久化实现
 - ✅ `06/05-architecture-guards.md` — `tools/ci/architecture_guards.sh` / `slow_test_guards.sh` 守卫什么、为什么"禁止 Workflow→Maker 反向依赖"这类规则是 CI 强制的
-- ✅ `06/06-credentials-zero-standing-secrets.md` — 零长期密钥:grain state 只存不透明 `BindingId`、触发期换短期票、持久回调零凭证守卫、长效 key 作用域收敛
+- ✅ `06/06-credentials-zero-standing-secrets.md` — Raw credential 不入事实层:subject re-mint、Vault-backed typed locator 与 callback 守卫
   - 事实源脊柱:`src/Aevatar.Foundation.Runtime.Implementations.Orleans/Grains/Callbacks/DurableCallbackEnvelopeCredentialGuard.cs`、`src/platform/Aevatar.GAgentService.Hosting/DependencyInjection/ServiceCollectionExtensions.cs`、`docs/adr/0018-per-user-nyxid-binding-via-oauth-broker.md`
 
 ### 07 · 周边
@@ -130,7 +130,7 @@
 - ✅ `07/09-voice-presence-edge-brain.md` — voice-presence 边缘设备与 aevatar 大脑的双工交互与语音路由
 - ✅ `07/10-input-ingress-unification.md` — Input 入站统一规范与归一化逻辑
 - ✅ `07/11-file-handling-end-to-end.md` — 文件全链路走查: 字节不入 Actor 架构、Ingress、DocumentExtract 与 Submit 流程
-- ✅ `07/12-scheduled-tasks.md` — 定时任务全链路走查: 定时调度、Sagas 挂起与可靠触发机制
+- ✅ `07/12-scheduled-tasks.md` — 定时任务全链路: schedule actor、durable callback、Team Member Automation 与 Agent Key credential lifecycle
 - ✅ `07/13-lark-bot-registration.md` — Lark Bot 注册与对接：零凭证架构下的中继入站
 
 ### 08 · 附录
@@ -154,8 +154,9 @@
 - ✅ `09/02-ingress-tool-ownership/index.md` — 方案概览: 自有工具服务端执行与客户端隐形
 - ✅ `09/02-ingress-tool-ownership/01-leak-and-asymmetric-rule.md` — 非对称工具所有权与泄漏分析
 - ✅ `09/02-ingress-tool-ownership/02-fix-and-rollout.md` — 自有工具隔离两落点与修复计划
-- ✅ `09/03-provision-and-observe-via-nyxid/index.md` — 方案概览: 一句话 provision 与实时观测
+- ✅ `09/03-provision-and-observe-via-nyxid/index.md` — 方案概览: NyxID 下的 C1 Provision、C2 观测与 Team Member Automation Agent Key 验证
 - ✅ `09/03-provision-and-observe-via-nyxid/01-end-to-end.md` — 四段全链路与 6 条 live 实测发现根因
+- ✅ `09/03-provision-and-observe-via-nyxid/02-scheduled-agent-key-production-canary.md` — Studio Team Member Automation 使用 Agent Key 的生产证据闭环(#147)
 
 ### 10 · 已知问题
 
@@ -165,11 +166,12 @@
 - ✅ `10/04-responses-llm-run-offactor-and-observation.md` — off-actor 模式下 LLM 执行与四层故障分析
 - ✅ `10/05-lark-delivery-layer-failures.md` — Lark 投递层三类故障:回复错对象 / 截断残片 / 全哑 401
 - ✅ `10/06-lark-identity-and-authorization.md` — Lark 身份与授权:owner-vs-sender 调用身份 / 资源授权降级
-- ✅ `10/07-scheduled-task-not-firing.md` — 定时任务不触发:重激活跳拍 / Garnet 脑裂 / provision 凭证缺口
+- ✅ `10/07-scheduled-task-not-firing.md` — 定时任务不触发:重激活跳拍 / Garnet 脑裂 / 历史 provision 双凭证冲突
 - ✅ `10/08-observatory-read-side.md` — 观测台读侧:排序缺失 / ES 1000 字段爆表 / 节点卡进行中
 - ✅ `10/09-studio-console-three-traps.md` — Studio 控制台:binding 覆写致 500 / 对话失忆 / chip 溢出
 - ✅ `10/10-voice-cancel-race-and-reconnect.md` — 语音:打断 cancel 竞态被当致命 / `/ws/voice` 重连缺失
 - ✅ `10/11-nyxid-direct-llm-entry.md` — NyxID 直连 LLM 入口:chat/completions 收不到回复 / 不暴露服务工具
+- ✅ `10/12-api-security-audit-and-hardening.md` — API 安全审计与加固:OAuth2/DPoP/脱敏/授权
 
 ### 11 · Skills 能力层
 
@@ -196,11 +198,11 @@
 | 06 分布式 | 6 | 6 | ✅ |
 | 07 周边 | 13 | 13 | ✅ |
 | 08 附录 | 5 | 5 | ✅ |
-| 09 方案区 | 13 | 13 | ✅ |
-| 10 已知问题 | 11 | 11 | ✅ |
+| 09 方案区 | 14 | 14 | ✅ |
+| 10 已知问题 | 12 | 12 | ✅ |
 | 11 Skills 能力层 | 2 | 2 | ✅ |
 | 12 问题复盘 | 1 | 1 | ✅ |
-| **合计** | **83** | **83** | ✅ |
+| **合计** | **85** | **85** | ✅ |
 
 > 更新约定:每完成一篇,把对应行的 ⬜ 改成 ✅,并更新看板数字。
 
