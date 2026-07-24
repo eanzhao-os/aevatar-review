@@ -14,7 +14,7 @@
 
 `aevatar-review` 是 Aevatar 的结构化中文解读仓库，不是 Aevatar 源码仓库。所有关于 Aevatar 当前行为、协议、状态和生产边界的论断，必须能够回指只读事实源 `~/Code/aevatar` 中的代码、配置、proto、测试、canon 或 ADR。
 
-现有仓库已经从最初规划的 43 篇扩展到 83 篇实质章节、约 1.1 万行正文，但目录仍保留了演进过程中的多套分类：基础教程、当前设计、方案草案、已知问题和按周复盘处在平行层级。与此同时，上游在 2026-07-06 之后发生了密集演进，Conversation/Turn、ChatHistory、NyxIdChat、Agent Profile、WorkOrder、workflow capability admission、调度凭证、Audit lifecycle 和 managed Codex 等主题已经成为理解当前系统不可绕过的主链。
+现有 `PLAN.md` 的统计口径已经从最初规划的 43 篇扩展到 83 篇；按“排除所有 `index.md`”的文件口径，设计冻结时 HEAD 实际包含 81 篇实质章节，工作区另有 1 篇尚未提交的 Agent Key canary，共约 1.1 万行正文。目录仍保留了演进过程中的多套分类：基础教程、当前设计、方案草案、已知问题和按周复盘处在平行层级。与此同时，上游在 2026-07-06 之后发生了密集演进，Conversation/Turn、ChatHistory、NyxIdChat、Agent Profile、WorkOrder、workflow capability admission、调度凭证、Audit lifecycle 和 managed Codex 等主题已经成为理解当前系统不可绕过的主链。
 
 本次工作的目标不是逐文件机械刷新，而是：
 
