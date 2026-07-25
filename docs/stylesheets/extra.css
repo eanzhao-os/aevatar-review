@@ -1,0 +1,15 @@
+/* Keep every top-level chapter visible when Material renders desktop tabs. */
+@media screen and (min-width: 76.25em) {
+  .md-tabs {
+    overflow: visible;
+  }
+
+  .md-tabs__list {
+    flex-wrap: wrap;
+    overflow: visible;
+  }
+
+  .md-tabs__item {
+    flex-shrink: 0;
+  }
+}
