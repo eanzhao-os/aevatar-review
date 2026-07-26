@@ -10,7 +10,7 @@
 - **C1 一次调用 provision**:`src/Aevatar.Studio.Hosting/Endpoints/StudioProvisioningEndpoints.cs`(`POST /api/scopes/{scopeId}/provision-workflow`,成功统一 `202`)、`src/Aevatar.Studio.Application/Studio/Services/StudioWorkflowProvisioningService.cs`(admit → resolve/create member → accept bind → optional ensure schedule,不 poll、不 direct invoke)。
 - **C2 平台级只读观测**:`src/workflow/Aevatar.Workflow.Infrastructure/CapabilityApi/WorkflowRunObservatoryEndpoints.cs`(默认 scope 隔离 + OIDC PKCE + host 自带内联单页;`45c1bd208` 起平台管理员可经 `IPlatformAdminAuthorizer` 显式跨 scope)、`src/workflow/Aevatar.Workflow.Application/Observatory/WorkflowRunObservatoryQueryService.cs`(复用 timeline/graph/current-state)。
 
-> **边界说明**:09 区域整体是 [SCOPE_EXTEND](../index.md)(不在仓库 `PLAN.md` 原始 00–08 清单内)。2026-06-19 的 mainnet 活体执行验证了当时的 C1/C2 链并暴露 6 条问题;当前 C1 已演进为 `4e0def2` 的 non-blocking contract,本次只按源码重核,没有借 Agent Key canary 冒充 C1 复测。2026-07-24 完成的是独立 canonical Team Member Automation Agent Key audited canary(带一次性 provenance exception)与 operator-attested functional repeat,见 [02](02-scheduled-agent-key-production-canary.md)。
+> **边界说明**:09 区域整体是 [SCOPE_EXTEND](../index.md)(不在仓库 `PLAN.md` 原始 00–08 清单内)。2026-06-19 的 mainnet 活体执行验证了当时的 C1/C2 链并暴露 6 条问题;当前 C1 已演进为 `4e0def2` 的 non-blocking contract,本次只按源码重核,没有借 Agent Key canary 冒充 C1 复测。2026-07-24 完成的是独立 canonical Team Member Automation Agent Key audited canary(带一次性 provenance exception)与 operator-attested functional repeat;2026-07-26 又在 code-owned projection repair 后完成真实 wall-clock cron canary,见 [02](02-scheduled-agent-key-production-canary.md)。
 
 !!! warning "两条 schedule surface 不可混同"
     [02](02-scheduled-agent-key-production-canary.md)验证的是 canonical Team Member Automation `/members/{memberId}/automations`。C1 `/provision-workflow` 是独立入口,当前只保存 `SenderNyxId`;每次 fire 由 dispatch 换一张短票,写入临时 Vault reference 后交给 workflow run 复用。02 的 dedicated Agent Key 结论不覆盖 C1。
@@ -32,7 +32,7 @@
 | 章节 | 回答的问题 | 现状 |
 |---|---|---|
 | [01 全链路](01-end-to-end.md) | 四段主链(大脑 / reach / C1 provision / C2 观测)各复用了什么、怎么拼起来;附录区分 2026-06-19 live 现象与当前凭证重核 | 当前 C1 contract 按 `4e0def2` 重核;历史 live 证据不冒充当前 C1 canary |
-| [02 Scheduled Agent Key](02-scheduled-agent-key-production-canary.md) | 独立 canonical Member Automation 的 NyxID scope-plan、dedicated key、`last_used_at`、双轨吊销与恢复 | 首次功能/audit 闭环但 provenance 有 exception;新镜像仅 operator-attested repeat |
+| [02 Scheduled Agent Key](02-scheduled-agent-key-production-canary.md) | 独立 canonical Member Automation 的 NyxID scope-plan、dedicated key、`last_used_at`、真实 cron、双轨吊销与恢复 | 首次功能/audit 闭环但 provenance 有 exception;第三次真实 cron `manual=false` 与 Agent Key transition 已验证,`6202` 仍有 observability gap |
 
 ## 这条方案的设计正当性
 
