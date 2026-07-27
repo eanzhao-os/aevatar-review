@@ -20,6 +20,8 @@
 
 第三次执行运行在 source `c70f284908fd352cd64719349abae128ee8da0b2`、production tag `c70f2849`、image digest `sha256:22ee592d65a2974f73c2fb313f87dcc9f2321a6de574ee341a2986de1650836f` 上。执行前先通过 code-owned repair endpoint 恢复 Workspace/Catalog projection:运维没有手工修改 Elasticsearch/Garnet,也没有回写 actor 权威状态;受控 repair store 通过 optimistic-concurrency fence 删除错误 Elasticsearch read-model document,再由正式 projection/refresh 重建。真实 cron 在 `2026-07-26T04:22:00Z` 触发;`fireCount=1`、`failureCount=0`、`recentFires=1`、`manual=false`,workflow marker 成功,同一 key 的 `last_used_at` 从 `null` 变为 `2026-07-26T04:22:03.156+00:00`。
 
+2026-07-27 在 reminder 回归修复(revision 1106)上线后发起了第四次执行,它在**任何 mutation 之前**被强制前置探针挡下,没有产生功能证据,也没有创建任何资源。细节见 §6.1。
+
 | 问题 | 结论 | 证据等级 |
 |---|---|---|
 | canonical Member Automation 是否真的使用 Agent Key 调过 LLM? | 是 | 三次都观察到同一 exact key 的 `last_used_at` transition;第三次还同时观察到真实 cron 与成功 run |
@@ -246,6 +248,24 @@ wall-clock cron canary:       dcc4b9ecbc3e1eace9277d9c7a3a4314991ac1f2771e71683e
 | audited canary,provenance exception | `f1a18bac0c86df2dd5e1f1fd20bbe32e41c97330` / `sha256:cffd1aef30b1dff7ede81ebd780dced55a7697928703d9199b11e7d909d6cc75` | exact key `last_used_at`:空 → `2026-07-24T13:25:59.746+00:00`;run marker 成功;state version `8 → 10` | `6201` 精确 binding;`6202` NyxID/Vault `Completed/Completed`;terminal version `14`;404/key inactive/list 0/0 | 功能与 audit 闭环;release provenance 使用一次性 exception |
 | operator-attested functional repeat | `4e0def2c231b7074209b852b855954b3db7d3e71` / `sha256:dbaccff2cac9184fb65f8e71f7e6b22b86d7c09397e4c890a2f59143e7ebf796` | 报告记录 `lastUsedBefore=null`、run request `2026-07-24T15:48:35Z` 后 `last_used_at=2026-07-24T15:48:38.775Z`、state version `8 → 12`;operator 观察 run/marker 成功 | Pod stdout 没有 `6201/6202`;报告记录删除后 404、exact key inactive/absent、list 0/0 | operator 功能复测通过;非独立可复核 audited canary |
 | wall-clock cron canary after code-owned repair | `c70f284908fd352cd64719349abae128ee8da0b2` / `c70f2849` / `sha256:22ee592d65a2974f73c2fb313f87dcc9f2321a6de574ee341a2986de1650836f` | preview `2026-07-26T04:22:00Z`;pre-fire `0/0/[]`;post-fire `1/0/1`;`manual=false`;run/marker 成功;exact key `null → 2026-07-26T04:22:03.156+00:00`;state version `10 → 14` | `6201` 精确 binding;committed deletion visibility 达到 detail 404/list 0/0,exact key absent;`6202` 未观察到 | 真实 cron + Agent Key 功能闭环;revision retired、member/draft 404、Team archived;terminal state 已验证,但 operational audit 仍有缺口 |
+| 第四次:reminder 修复后重跑,**前置条件阻断** | `198fe84ec44e997ac3b4c45bff597cc5a5f6bcc5` / `198fe84e` / `sha256:f3c0fea51e2330bf32480b112f08777753e3e72d062aacbb1880eb22761dcec0`(revision 1106) | 未采集:canary 在**任何 mutation 之前**停止 | 不适用 | `FAIL`,`featureConclusion=not_evaluated`,`errorCode=PREREQUISITE_CODE_EXECUTE_UNAVAILABLE`;零资源创建,因此清理平凡完成 |
+
+### 6.1 第四次为什么没有产生功能证据
+
+第四次执行的目的是在 [10/07 §4](../../10/07-scheduled-task-not-firing.md) 的 reminder 修复上线后重跑一次完整 canary。它没有跑到 mutation:skill 的**强制前置探针**失败,于是按契约 fail closed。
+
+前置探针要求一次固定的 `code_execute` 调用(取可信 UTC 时钟 + 随机 suffix + marker)。生产上该工具稳定返回:
+
+```text
+status 401
+{"error":{"code":"UNAUTHENTICATED","message":"Unauthenticated: Missing or malformed Authorization: Bearer token"}}
+```
+
+同一账号下,NyxID 侧的 sandbox UserService 是 `active/connected/auto_connected`,且 `inject_delegation_token=true`、`delegation_token_scope=proxy:*`;失败发生在 Aevatar 的 `code_execute` 工具把请求送到 sandbox 时缺少可用 bearer。**这与本次修复的 Orleans reminder 回归无关**,是另一条独立的生产缺陷。
+
+为什么不绕过这个探针直接跑 canary?因为探针提供的是**可信时钟**。canary 的中心论断是"真实 cron 在 previewed 的那个 UTC 整分钟自动触发",这条论断只有在目标分钟由可信时钟推导时才成立;改用模型自述的时间会让"按时触发"退化成无法核实的自证。放宽一个 fail-closed 前置条件来换一份更弱的证据,正是本章 §7 明确禁止的做法。
+
+零资源创建这一点是被独立核对过的,不是从"skill 说它没创建"推出来的:执行后按 owner 读取 scope 内全部 Team,只有四次历史 canary 的 Team 且全部 `archived`;`studio-schedule-*` Agent Key 为空。因此这一行的结论是 `FAIL / not_evaluated`,**不是** `CLEANUP_INCOMPLETE` —— 没有任何资源处于未知或未终结状态。
 
 为什么必须区分第二、三行的证据缺口?因为下面三句话不是同一件事:
 
@@ -317,10 +337,14 @@ canonical Studio Team Member Automation 使用 Agent Key 的基本要求已经�
 - 删除会撤销 key 并清理 secret。第一次 audited canary 已记录双轨终态;第三次 terminal state 与 exact key 已闭环,但 `6202` 日志缺失必须保留为 observability gap;
 - projection version regression 可以通过 code-owned typed repair 恢复,不需要运维手工改库或回写 actor authority。
 
-剩余问题不在“定时任务能否使用 Agent Key”,而在三条治理能力:
+剩余问题不在“定时任务能否使用 Agent Key”,而在四条治理能力:
 
 1. 发布系统应产出 immutable full-SHA → image digest attestation,取消人工 provenance exception。
 2. 恢复并验证 `6202/StudioMemberAutomationRevocationCompleted` 在生产的 emission、collection、retention 与 canonical query;它是独立 operational correlation,不能成为第二个业务状态源。
 3. projection repair 应增加 signed inspection token / durable repair-request-ID provenance,并让 Catalog 非 canonical actor manifest 返回 typed `409`,而不是 sanitized `503`。
+4. `code_execute` 到 sandbox 的调用必须携带可用 bearer。它当前稳定 `401 UNAUTHENTICATED`,使任何依赖可信时钟的前置探针无法通过 —— 于是这条 canary 在生产上**暂时不可执行**。这不是 canary 的缺陷:契约要求的正是"前置条件不成立就在 mutation 前停下"。
+
+!!! warning "Responses 会话不保留跨轮上下文"
+    本次还核实了一件影响 skill 执行形态的事实:生产 `/v1/responses` 接受并回显 `previous_response_id`,但**不重放会话历史**(响应 `store=false`;第一轮存入的 token 在第二轮读取为 `NONE`)。因此 skill 的分阶段协议必须完全依赖它自己定义的 labelled checkpoint ledger —— 每一轮把已知字段完整输出,由调用方原样带回。skill 已经为此写明"lost-context continuation 只能从 ledger + owner-correct 读取恢复",所以这不是阻断项;但把 `previous_response_id` 当作会话记忆来用,会在第二阶段就丢掉全部资源身份。
 
 ⟦AI:AUTO-LOOP⟧
