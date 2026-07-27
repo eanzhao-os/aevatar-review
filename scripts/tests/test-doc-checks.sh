@@ -6,6 +6,7 @@
 #   issue-snapshot   snapshot-upstream-issues.py pagination/dedupe/escaping/count
 #   issue-replay     snapshot-upstream-issues.py historical state replay + boundaries
 #   issue-cli        create_issues.py manifest parsing and issue idempotency
+#   validators       check-md.sh / check-links.py / check-drift.sh contracts
 #   all              every suite above
 #
 # Every suite builds its own throwaway fixtures under a temporary directory and
@@ -402,6 +403,192 @@ MD
 }
 
 # --------------------------------------------------------------------------
+# validators
+# --------------------------------------------------------------------------
+
+make_chapter() {
+  # make_chapter <file> <status> <sha> <spine-lines> <diagrams> [extra]
+  local file="$1" status="$2" sha="$3" spine="$4" diagrams="$5"
+  mkdir -p "$(dirname "$file")"
+  {
+    printf -- '---\n'
+    printf 'status: %s\n' "$status"
+    printf 'upstream_commit: %s\n' "$sha"
+    printf 'verified_at: 2026-07-25\n'
+    printf -- '---\n\n'
+    printf '# 固定标题\n\n'
+    printf '> 版本与结论：本章描述 %s。\n\n' "$status"
+    printf '## 设计抽象与事实源\n\n'
+    printf '%b' "$spine"
+    printf '\n## 先建立模型\n\n'
+    printf '```mermaid\n%%%%{init: {"maxTextSize": 100000}}%%%%\nflowchart LR\n    A["a"] --> B["b"]\n```\n\n'
+    if [ "$diagrams" -ge 2 ]; then
+      printf '## 沿一条链路走读\n\n'
+      printf '```mermaid\n%%%%{init: {"maxTextSize": 100000}}%%%%\nsequenceDiagram\n    participant C as C\n    participant O as O\n    C->>O: cmd\n```\n\n'
+    fi
+    printf '## 为什么是它，不是别的\n\n说明取舍。\n\n'
+    printf '## 协议与状态深入\n\n说明协议。\n\n'
+    printf '## 最小示例\n\n> Demo status：`verified-static`\n\n'
+    printf '## 边界与演进\n\n说明边界。\n\n'
+    printf '## 读完应能回答\n\n1. 问题一？\n2. 问题二？\n3. 问题三？\n'
+  } > "$file"
+}
+
+test_validators() {
+  local tmp repo src
+  tmp="$(mktemp -d)"
+  repo="$tmp/repo"
+  src="$tmp/src"
+  mkdir -p "$repo/docs/migration" "$src/src/Aevatar.Foundation.Abstractions" "$src/docs/canon"
+  printf 'line1\nline2\nline3\n' > "$src/src/Aevatar.Foundation.Abstractions/IActorRuntime.cs"
+  printf 'canon\n' > "$src/docs/canon/overview.md"
+  printf '<Solution />\n' > "$src/aevatar.slnx"
+
+  local SHA=f02aa690bbebb9cabeac30a553d737486b0eb661
+  local BAD=0000000000000000000000000000000000000000
+
+  cat > "$repo/docs/migration/2026-07-25-target-chapters.md" <<MANIFEST
+# fixture manifest
+
+- [ ] \`00/01-good.md\` — status:current — issue:https://example.invalid/1
+- [ ] \`00/02-planned.md\` — status:current — issue:https://example.invalid/2
+MANIFEST
+  printf '01/01-old.md\n' > "$repo/docs/migration/2026-07-25-old-retire-paths.txt"
+
+  local GOOD_SPINE='- `src/Aevatar.Foundation.Abstractions/IActorRuntime.cs:2`：运行时查找与生命周期。\n'
+  local run="AEVATAR_SRC=$src bash $ROOT/scripts/check-md.sh --repo-root $repo"
+
+  # 1. a fully conforming chapter must pass
+  make_chapter "$repo/00/01-good.md" current "$SHA" "$GOOD_SPINE" 2
+  AEVATAR_SRC="$src" bash "$ROOT/scripts/check-md.sh" --repo-root "$repo" --paths 00/01-good.md > "$tmp/ok.log" 2>&1
+  assert_eq "0" "$?" "validators: conforming chapter must pass"
+
+  # 2. missing frontmatter
+  mkdir -p "$repo/probe"
+  printf '# 无 frontmatter\n\n正文。\n' > "$repo/probe/00-nofm.md"
+  AEVATAR_SRC="$src" bash "$ROOT/scripts/check-md.sh" --repo-root "$repo" --paths probe/00-nofm.md > "$tmp/nofm.log" 2>&1
+  assert_eq "1" "$?" "validators: missing frontmatter must fail"
+  assert_contains "$tmp/nofm.log" "frontmatter" "validators: frontmatter failure must be named"
+
+  # 3. invalid status
+  make_chapter "$repo/probe/01-badstatus.md" draft "$SHA" "$GOOD_SPINE" 2
+  AEVATAR_SRC="$src" bash "$ROOT/scripts/check-md.sh" --repo-root "$repo" --paths probe/01-badstatus.md > "$tmp/badstatus.log" 2>&1
+  assert_eq "1" "$?" "validators: invalid status must fail"
+  assert_contains "$tmp/badstatus.log" "status" "validators: status failure must be named"
+
+  # 4. wrong upstream_commit
+  make_chapter "$repo/probe/02-badsha.md" current "$BAD" "$GOOD_SPINE" 2
+  AEVATAR_SRC="$src" bash "$ROOT/scripts/check-md.sh" --repo-root "$repo" --paths probe/02-badsha.md > "$tmp/badsha.log" 2>&1
+  assert_eq "1" "$?" "validators: wrong upstream_commit must fail"
+  assert_contains "$tmp/badsha.log" "upstream_commit" "validators: baseline failure must be named"
+
+  # 5. only one diagram
+  make_chapter "$repo/probe/03-onediagram.md" current "$SHA" "$GOOD_SPINE" 1
+  AEVATAR_SRC="$src" bash "$ROOT/scripts/check-md.sh" --repo-root "$repo" --paths probe/03-onediagram.md > "$tmp/onediagram.log" 2>&1
+  assert_eq "1" "$?" "validators: single diagram must fail"
+  assert_contains "$tmp/onediagram.log" "diagram" "validators: diagram failure must be named"
+
+  # 6. four source-spine paths
+  local FOUR='- `src/Aevatar.Foundation.Abstractions/IActorRuntime.cs:1`：a。\n- `docs/canon/overview.md:1`：b。\n- `aevatar.slnx:1`：c。\n- `docs/canon/overview.md:1`：d。\n'
+  make_chapter "$repo/probe/04-fourspine.md" current "$SHA" "$FOUR" 2
+  AEVATAR_SRC="$src" bash "$ROOT/scripts/check-md.sh" --repo-root "$repo" --paths probe/04-fourspine.md > "$tmp/four.log" 2>&1
+  assert_eq "1" "$?" "validators: more than three spine paths must fail"
+  assert_contains "$tmp/four.log" "spine" "validators: spine-count failure must be named"
+
+  # 7. out-of-range source line anchor
+  local OOR='- `src/Aevatar.Foundation.Abstractions/IActorRuntime.cs:900`：越界锚点。\n'
+  make_chapter "$repo/probe/05-oorline.md" current "$SHA" "$OOR" 2
+  AEVATAR_SRC="$src" bash "$ROOT/scripts/check-md.sh" --repo-root "$repo" --paths probe/05-oorline.md > "$tmp/oor.log" 2>&1
+  assert_eq "1" "$?" "validators: out-of-range line anchor must fail"
+  assert_contains "$tmp/oor.log" "line" "validators: line-anchor failure must be named"
+
+  # 7b. multi-line and range anchors are validated element by element
+  local MULTI='- `src/Aevatar.Foundation.Abstractions/IActorRuntime.cs:1,3`：多行锚点。\n'
+  make_chapter "$repo/probe/05b-multiline.md" current "$SHA" "$MULTI" 2
+  AEVATAR_SRC="$src" bash "$ROOT/scripts/check-md.sh" --repo-root "$repo" --paths probe/05b-multiline.md > "$tmp/multi.log" 2>&1
+  assert_eq "0" "$?" "validators: valid multi-line anchor must pass"
+
+  local MULTIBAD='- `src/Aevatar.Foundation.Abstractions/IActorRuntime.cs:1,900`：一个越界。\n'
+  make_chapter "$repo/probe/05c-multibad.md" current "$SHA" "$MULTIBAD" 2
+  AEVATAR_SRC="$src" bash "$ROOT/scripts/check-md.sh" --repo-root "$repo" --paths probe/05c-multibad.md > "$tmp/multibad.log" 2>&1
+  assert_eq "1" "$?" "validators: one out-of-range element in a multi-line anchor must fail"
+  assert_contains "$tmp/multibad.log" "900" "validators: the offending element must be named"
+
+  # 8. nonexistent source path
+  local MISS='- `src/Nope/Missing.cs:1`：不存在。\n'
+  make_chapter "$repo/probe/06-misssrc.md" current "$SHA" "$MISS" 2
+  AEVATAR_SRC="$src" bash "$ROOT/scripts/check-md.sh" --repo-root "$repo" --paths probe/06-misssrc.md > "$tmp/misssrc.log" 2>&1
+  assert_eq "1" "$?" "validators: nonexistent source path must fail"
+
+  # 9. --all rejects a missing target chapter
+  AEVATAR_SRC="$src" bash "$ROOT/scripts/check-md.sh" --repo-root "$repo" --all > "$tmp/all.log" 2>&1
+  assert_eq "1" "$?" "validators: --all must fail while a target chapter is missing"
+  assert_contains "$tmp/all.log" "00/02-planned.md" "validators: --all must name the missing target"
+
+  # 10. --all rejects an orphan substantive chapter, --allow-retiring tolerates listed ones
+  make_chapter "$repo/00/02-planned.md" current "$SHA" "$GOOD_SPINE" 2
+  local b
+  for b in 00 01 02 03 04 05 06 07 08 09 10 11 12 13; do
+    mkdir -p "$repo/$b"
+    printf -- '---\nstatus: index\nupstream_commit: %s\nverified_at: 2026-07-25\n---\n\n# %s 导读\n\n阅读顺序。\n' "$SHA" "$b" > "$repo/$b/index.md"
+  done
+  rm -rf "$repo/probe"
+  make_chapter "$repo/01/01-old.md" current "$SHA" "$GOOD_SPINE" 2
+  AEVATAR_SRC="$src" bash "$ROOT/scripts/check-md.sh" --repo-root "$repo" --all > "$tmp/orphan.log" 2>&1
+  assert_eq "1" "$?" "validators: --all must reject an orphan substantive chapter"
+  assert_contains "$tmp/orphan.log" "01/01-old.md" "validators: orphan must be named"
+
+  AEVATAR_SRC="$src" bash "$ROOT/scripts/check-md.sh" --repo-root "$repo" --all --allow-retiring > "$tmp/retiring.log" 2>&1
+  assert_eq "0" "$?" "validators: --all --allow-retiring must tolerate listed retire paths"
+
+  # ---------------- check-links ----------------
+  printf -- '---\nstatus: current\nupstream_commit: %s\nverified_at: 2026-07-25\n---\n\n# 链接\n\n见 [good](../00/01-good.md) 与 [gone](../00/99-gone.md)。\n' "$SHA" > "$repo/01/02-links.md"
+  python3 "$ROOT/scripts/check-links.py" --repo-root "$repo" --paths 01/02-links.md > "$tmp/links.log" 2>&1
+  assert_eq "1" "$?" "validators: broken link must fail"
+  assert_contains "$tmp/links.log" "00/99-gone.md" "validators: broken link target must be named"
+
+  printf -- '---\nstatus: current\nupstream_commit: %s\nverified_at: 2026-07-25\n---\n\n# 计划\n\n见 [planned](../00/02-planned.md) 与 [frag](../00/01-good.md#不存在的小节)。\n' "$SHA" > "$repo/01/03-planned-link.md"
+  python3 "$ROOT/scripts/check-links.py" --repo-root "$repo" --paths 01/03-planned-link.md --allow-planned > "$tmp/frag.log" 2>&1
+  assert_eq "1" "$?" "validators: missing heading fragment must fail"
+  assert_contains "$tmp/frag.log" "不存在的小节" "validators: missing fragment must be named"
+
+  rm -f "$repo/00/02-planned.md"
+  printf -- '---\nstatus: current\nupstream_commit: %s\nverified_at: 2026-07-25\n---\n\n# 计划\n\n见 [planned](../00/02-planned.md)。\n' "$SHA" > "$repo/01/04-planned-only.md"
+  python3 "$ROOT/scripts/check-links.py" --repo-root "$repo" --paths 01/04-planned-only.md --allow-planned > "$tmp/planned.log" 2>&1
+  assert_eq "0" "$?" "validators: --allow-planned must accept a manifest target that is not written yet"
+  python3 "$ROOT/scripts/check-links.py" --repo-root "$repo" --paths 01/04-planned-only.md > "$tmp/planned2.log" 2>&1
+  assert_eq "1" "$?" "validators: without --allow-planned an unwritten target is a broken link"
+
+  # a link inside a fenced code block is not a link
+  printf -- '---\nstatus: current\nupstream_commit: %s\nverified_at: 2026-07-25\n---\n\n# 代码\n\n```\n[gone](../00/99-gone.md)\n```\n\n`[also](../00/98-gone.md)`\n' "$SHA" > "$repo/01/05-fenced.md"
+  python3 "$ROOT/scripts/check-links.py" --repo-root "$repo" --paths 01/05-fenced.md > "$tmp/fenced-link.log" 2>&1
+  assert_eq "0" "$?" "validators: links inside code spans/fences must be ignored"
+
+  # MkDocs exposes chapter blocks through docs/<block> symlinks, so a relative
+  # asset link must resolve against the site view, not the raw tree.
+  mkdir -p "$repo/docs/assets"
+  printf 'png\n' > "$repo/docs/assets/demo.png"
+  ( cd "$repo/docs" && ln -sf ../01 01 )
+  printf -- '---\nstatus: current\nupstream_commit: %s\nverified_at: 2026-07-25\n---\n\n# 资产\n\n![demo](../assets/demo.png)\n' "$SHA" > "$repo/01/06-asset.md"
+  python3 "$ROOT/scripts/check-links.py" --repo-root "$repo" --paths 01/06-asset.md > "$tmp/asset.log" 2>&1
+  assert_eq "0" "$?" "validators: asset link must resolve through the docs symlink view"
+
+  printf -- '---\nstatus: current\nupstream_commit: %s\nverified_at: 2026-07-25\n---\n\n# 资产\n\n![gone](../assets/missing.png)\n' "$SHA" > "$repo/01/07-asset-gone.md"
+  python3 "$ROOT/scripts/check-links.py" --repo-root "$repo" --paths 01/07-asset-gone.md > "$tmp/asset2.log" 2>&1
+  assert_eq "1" "$?" "validators: a genuinely missing asset must still fail"
+
+  # ---------------- check-drift ----------------
+  printf 'nav:\n  - 首页: index.md\n  - 01 旧: 01/01-old.md\n' > "$repo/mkdocs.yml"
+  printf '# README\n\n本书共 43 篇章节。\n' > "$repo/README.md"
+  bash "$ROOT/scripts/check-drift.sh" --repo-root "$repo" > "$tmp/drift.log" 2>&1
+  assert_eq "1" "$?" "validators: drift scan must fail on a retired path in active navigation"
+  assert_contains "$tmp/drift.log" "01/01-old.md" "validators: retired nav path must be named"
+  assert_contains "$tmp/drift.log" "43" "validators: stale chapter-count claim must be named"
+
+  rm -rf "$tmp"
+}
+
+# --------------------------------------------------------------------------
 
 run_suite() {
   case "$1" in
@@ -409,6 +596,7 @@ run_suite() {
     issue-snapshot)  test_issue_snapshot ;;
     issue-replay)    test_issue_replay ;;
     issue-cli)       test_issue_cli ;;
+    validators)      test_validators ;;
     *) printf 'unknown suite: %s\n' "$1" >&2; exit 2 ;;
   esac
   if [ "$FAILURES" -eq 0 ]; then
@@ -420,12 +608,12 @@ run_suite() {
 
 main() {
   if [ "$#" -ne 1 ]; then
-    printf 'usage: %s <frozen-upstream|issue-snapshot|issue-replay|issue-cli|all>\n' "$0" >&2
+    printf 'usage: %s <frozen-upstream|issue-snapshot|issue-replay|issue-cli|validators|all>\n' "$0" >&2
     exit 2
   fi
   if [ "$1" = "all" ]; then
     local rc=0
-    for suite in frozen-upstream issue-snapshot issue-replay issue-cli; do
+    for suite in frozen-upstream issue-snapshot issue-replay issue-cli validators; do
       FAILURES=0
       run_suite "$suite"
       [ "$FAILURES" -eq 0 ] || rc=1
