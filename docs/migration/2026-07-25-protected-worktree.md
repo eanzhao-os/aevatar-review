@@ -41,6 +41,19 @@
 | `.superpowers/brainstorm/.last-port` | `??` | user-existing | absent | absent | `withheld-sensitive-runtime` | 空 | 空 | 不迁移；skill-private 运行态 | `no-migration-runtime` |
 | `.superpowers/brainstorm/.last-token` | `??` | user-existing | absent | absent | `withheld-sensitive-runtime` | 空 | 空 | 不迁移；skill-private 会话令牌，禁止进入任何文档或提交 | `no-migration-runtime` |
 
+### 快照 A2：Task 2 期间新出现的工作区改动
+
+标准义务要求每个 Task 开始时重新枚举。下列改动在 Task 1 起始枚举时**不存在**，在 Task 2 执行期间出现，
+因此自动成为受保护输入：
+
+| 路径 | XY | owner | HEAD blob（前 12） | worktree SHA-256 | 迁移落点 | migration_status |
+|---|---|---|---|---|---|---|
+| `10/07-scheduled-task-not-firing.md` | ` M` | user-existing | `3d6a5f95ee31` | `c9cf3458f5b8d8c0b9c9f8b1f6a7c758470e7fcb09ddb1839780cdaba23e7192` | `09/02`、`12/04`（新增的第四类"reminder 收尾丢上下文"必须与既有三类根因分层保留，不得合并成一句） | `pending` |
+
+该文件的未提交改动新增了第四类"定时任务不触发"根因（一次性回调触发后收尾注销失败，tick 被 Orleans
+记为投递错误、物理 reminder 行不删除）。它是**尚未提交的用户内容**，不得被本任务提交、还原或覆盖；
+Task 14 与 Task 17 迁移 `09/02` 与 `12/04` 时必须重新取哈希并按节比对，确认这一类根因无损进入新结构。
+
 `.superpowers/sdd/` 由其自带的 `.gitignore`（内容为 `*`）完全忽略，因此不出现在 `git ls-files --others --exclude-standard`
 的输出中。它承载本轮 SDD 运行态（`progress.md`、`task-1-brief.md`、`task-1-report.md`），同样属于 `no-migration-runtime`：
 不进入任何 Task 提交，也不作为任何事实源。
