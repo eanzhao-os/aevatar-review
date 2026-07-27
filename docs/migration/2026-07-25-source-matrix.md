@@ -27,9 +27,9 @@ E1 列写入的是**已批准的脊柱候选**（来自计划主题表），实�
 
 | 目标章节 | status | E1 脊柱候选（冻结 SHA 上解析为 1–3 条 + 行号） | E2 canon/ADR | E3 生产证据 | E4 closed issues | E5 open issues | E6 历史 | verified |
 |---|---|---|---|---|---|---|---|---|
-| `00/01-reading-guide.md` | current | `README.md`; `docs/canon/overview.md`; `docs/canon/architecture.md` | — | — | — | — | — | pending |
-| `00/02-version-evidence-and-status.md` | current | `AGENTS.md`; `docs/canon/architecture.md`; `docs/adr/` status headers | — | — | — | — | — | pending |
-| `00/03-repository-map.md` | current | `aevatar.slnx`; `docs/canon/module-placement-map.md`; `AGENTS.md` | — | — | — | — | — | pending |
+| `00/01-reading-guide.md` | current | `docs/canon/overview.md:16`; `docs/canon/architecture.md:9`; `README.md:3` | — | — | — | — | — | resolved |
+| `00/02-version-evidence-and-status.md` | current | `AGENTS.md:34`; `AGENTS.md:39`; `docs/adr/0034-workflow-saga-compensation-protocol.md:3` | — | — | — | — | — | resolved |
+| `00/03-repository-map.md` | current | `aevatar.slnx:46`; `docs/canon/module-placement-map.md:32`; `AGENTS.md:4` | — | — | — | — | — | resolved |
 | `01/01-quick-start.md` | current | `src/Aevatar.Mainnet.Host.Api/README.md`; `src/workflow/Aevatar.Workflow.Host.Api/README.md`; `workflows/simple_qa.yaml` | — | — | #1948 | — | — | pending |
 | `01/02-hosts-and-composition.md` | current | `src/Aevatar.Mainnet.Host.Api/Hosting/MainnetHostBuilderExtensions.cs`; `src/Aevatar.Mainnet.Host.Api/Program.cs`; `docs/canon/overview.md` | — | — | — | — | — | pending |
 | `01/03-chat-conversation-turn-contract.md` | current | `docs/canon/chat-api.md`; `src/workflow/Aevatar.Workflow.Infrastructure/CapabilityApi/ChatEndpoints.cs`; `agents/Aevatar.GAgents.ChatHistory/chat_history_messages.proto` | — | — | #2834; #2920 | #2936 | — | pending |

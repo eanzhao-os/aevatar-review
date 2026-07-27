@@ -23,8 +23,8 @@
 
 | 旧路径 | owner | 处置 | 新落点 | status | 说明 |
 |---|---|---|---|---|---|
-| `00/01-what-is-aevatar.md` | tracked | merge | `00/01`、`00/02` | pending | 定位与对比重写为阅读路线与证据等级，不再作为独立「是什么」章 |
-| `00/02-repo-map.md` | tracked | retain-rewrite | `00/03` | pending | 项目数量必须从冻结基线重新生成，不沿用旧计数 |
+| `00/01-what-is-aevatar.md` | tracked | merge | `00/01`、`00/02` | migrated | 定位与对比重写为阅读路线与证据等级，不再作为独立「是什么」章 |
+| `00/02-repo-map.md` | tracked | retain-rewrite | `00/03` | migrated | 项目数量必须从冻结基线重新生成，不沿用旧计数 |
 | `00/03-quick-start.md` | tracked | retain-rewrite | `01/01` | pending | 上手路径迁入启动目录，端口与字段按冻结 Host 配置重新核验 |
 | `00/04-chat-request-lifecycle.md` | tracked | split | `01/03`、`01/04` | pending | 会话身份契约与流式生命周期拆成两章，避免 conversation/turn/run 混用 |
 | `00/index.md` | tracked | rewrite-in-place | `00/index.md` | n/a | Task 19 原位改写为块导读，不进入退役清单 |

@@ -20,9 +20,9 @@
 
 ## `00` 导读与基线（3）
 
-- [ ] `00/01-reading-guide.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/167
-- [ ] `00/02-version-evidence-and-status.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/168
-- [ ] `00/03-repository-map.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/169
+- [x] `00/01-reading-guide.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/167
+- [x] `00/02-version-evidence-and-status.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/168
+- [x] `00/03-repository-map.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/169
 
 ## `01` 启动与请求（4）
 
