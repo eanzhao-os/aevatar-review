@@ -26,10 +26,10 @@
 
 ## `01` 启动与请求（4）
 
-- [ ] `01/01-quick-start.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/170
-- [ ] `01/02-hosts-and-composition.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/171
-- [ ] `01/03-chat-conversation-turn-contract.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/172
-- [ ] `01/04-request-streaming-lifecycle.md` — status:mixed — issue:https://github.com/eanzhao-os/aevatar-review/issues/173
+- [x] `01/01-quick-start.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/170
+- [x] `01/02-hosts-and-composition.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/171
+- [x] `01/03-chat-conversation-turn-contract.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/172
+- [x] `01/04-request-streaming-lifecycle.md` — status:mixed — issue:https://github.com/eanzhao-os/aevatar-review/issues/173
 
 ## `02` Actor 运行内核（6）
 

@@ -25,12 +25,12 @@
 |---|---|---|---|---|---|
 | `00/01-what-is-aevatar.md` | tracked | merge | `00/01`、`00/02` | migrated | 定位与对比重写为阅读路线与证据等级，不再作为独立「是什么」章 |
 | `00/02-repo-map.md` | tracked | retain-rewrite | `00/03` | migrated | 项目数量必须从冻结基线重新生成，不沿用旧计数 |
-| `00/03-quick-start.md` | tracked | retain-rewrite | `01/01` | pending | 上手路径迁入启动目录，端口与字段按冻结 Host 配置重新核验 |
-| `00/04-chat-request-lifecycle.md` | tracked | split | `01/03`、`01/04` | pending | 会话身份契约与流式生命周期拆成两章，避免 conversation/turn/run 混用 |
+| `00/03-quick-start.md` | tracked | retain-rewrite | `01/01` | migrated | 上手路径迁入启动目录，端口与字段按冻结 Host 配置重新核验 |
+| `00/04-chat-request-lifecycle.md` | tracked | split | `01/03`、`01/04` | migrated | 会话身份契约与流式生命周期拆成两章，避免 conversation/turn/run 混用 |
 | `00/index.md` | tracked | rewrite-in-place | `00/index.md` | n/a | Task 19 原位改写为块导读，不进入退役清单 |
-| `01/01-hosts-and-composition.md` | tracked | retain-rewrite | `01/02` | pending | Host 只承担协议与组装，业务编排不下沉到 Host |
-| `01/02-chat-api-and-sse.md` | tracked | split | `01/03`、`01/04` | pending | API 契约与 SSE/AGUI 帧分层，dispatch receipt 与终态观察分开 |
-| `01/03-run-semantics.md` | tracked | merge | `01/04`、`12/05` | pending | 已落地语义并入生命周期章；未落地 reconnect 保证只进 12/05 |
+| `01/01-hosts-and-composition.md` | tracked | retain-rewrite | `01/02` | migrated | Host 只承担协议与组装，业务编排不下沉到 Host |
+| `01/02-chat-api-and-sse.md` | tracked | split | `01/03`、`01/04` | migrated | API 契约与 SSE/AGUI 帧分层，dispatch receipt 与终态观察分开 |
+| `01/03-run-semantics.md` | tracked | merge | `01/04`、`12/05` | migrated | 已落地语义并入生命周期章；未落地 reconnect 保证只进 12/05 |
 | `01/04-platform-audit-trail.md` | tracked | promote-current | `05/06` | pending | Audit 生命周期与导出提升为读侧正式章节 |
 | `01/index.md` | tracked | rewrite-in-place | `01/index.md` | n/a | Task 19 原位改写 |
 | `02/01-yaml-grammar.md` | tracked | retain-rewrite | `03/02` | pending | 以冻结 parser/validator 为准重述 schema 与准入阶段 |
