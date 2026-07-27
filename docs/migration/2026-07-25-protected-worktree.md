@@ -1,0 +1,82 @@
+# 受保护工作区与迁移输入账本（2026-07-25 冻结基线）
+
+> 上游事实基线：`f02aa690bbebb9cabeac30a553d737486b0eb661`（只读）
+>
+> 本仓库 Task 1 diff base：`da089e19be488caa02185a4af189207d57bc55d6`
+>
+> 首次枚举时间：Task 1 Step 3（执行会话开始时）
+
+## 1. 规则
+
+- 任务开始时**已经存在**的一切工作区改动（staged / unstaged / untracked），无论是否属于本次重构计划，
+  一律标记 `owner = user-existing` 并成为受保护输入。
+- 受保护输入**不得**被 `reset` / `stash` / `checkout` / `clean` / 整文件覆盖，也不得被顺手提交进任务提交。
+- 本账本只记录**非敏感指纹**：porcelain XY 状态、HEAD blob、index blob、worktree SHA-256、
+  staged/unstaged patch SHA-256。**禁止**把 patch 正文、secret、bearer 值、原始 key、密文或完整外部清单写入本文件。
+- 对本身就承载凭据的 skill-private 运行态文件，连指纹也不记录（列为 `withheld-sensitive-runtime`），
+  因为它们既不进入文档，也不需要迁移比对；记录哈希只会平白扩大暴露面。
+- 每个受保护输入必须有 `migration_status`：
+
+| `migration_status` | 含义 |
+|---|---|
+| `pending` | 尚未确定落点；Task 19 结构切换前必须清零 |
+| `unreviewed` | 已有落点但未经逐节比对；Task 19 结构切换前必须清零 |
+| `migrated-reviewed` | 已逐节比对并确认无损迁入新落点 |
+| `retained-as-is` | 文件本身继续存在于新结构，不需要迁移 |
+| `no-migration-runtime` | skill-private 运行态产物，不属于文档内容，不迁移也不提交 |
+
+## 2. 快照 A：Task 1 起始时的工作区改动
+
+命令来源：`git diff --cached --name-only -z`、`git diff --name-only -z`、
+`git ls-files --others --exclude-standard -z` 的并集（NUL 安全）。
+
+| 路径 | XY | owner | HEAD blob | index blob | worktree SHA-256 | staged patch SHA-256 | unstaged patch SHA-256 | 迁移落点 | migration_status |
+|---|---|---|---|---|---|---|---|---|---|
+| `CLAUDE_HANDOFF_PROMPT.md` | `??` | user-existing | absent | absent | `1a35dff2a425e7bd3e49a9b8bab1dfb491b72566278086498b08c3d71a9e28a7` | `e3b0c442…7852b855`（空） | `e3b0c442…7852b855`（空） | 不迁移；用户要求生成的交接材料，保持未跟踪原样 | `retained-as-is` |
+| `.superpowers/brainstorm/91971-1784922164/content/navigation-layout-options.html` | `??` | user-existing | absent | absent | `fe45c6df46864eda445567af0325dc22b3285d782969bd1c89d9114fefd03bc4` | 空 | 空 | 不迁移；导航方案的可视化对比稿，结论已固化进已批准设计 | `no-migration-runtime` |
+| `.superpowers/brainstorm/91971-1784922164/content/waiting-for-spec-review.html` | `??` | user-existing | absent | absent | `452e3c8412552fbdc7c1807bacbe8316317d6acb60bb25c266a0efbdd825d6fc` | 空 | 空 | 不迁移；brainstorm 会话页面 | `no-migration-runtime` |
+| `.superpowers/brainstorm/91971-1784922164/state/server-instance-id` | `??` | user-existing | absent | absent | `3fc6a6dfdc04eff30acb2b4bdcb19a60fd89e93428be32e20a720c9d18a578f2` | 空 | 空 | 不迁移；本地服务运行态 | `no-migration-runtime` |
+| `.superpowers/brainstorm/91971-1784922164/state/server-stopped` | `??` | user-existing | absent | absent | `009bab728df0d4fbdaeff438d4521bb68bbecefb86f0129497aa572377aea568` | 空 | 空 | 不迁移；本地服务运行态 | `no-migration-runtime` |
+| `.superpowers/brainstorm/91971-1784922164/state/server.pid` | `??` | user-existing | absent | absent | `765b3e5d0e6c98cdaf27e80c32f4e11d20f12fa9ef926641491b36df77599ad9` | 空 | 空 | 不迁移；本地服务运行态 | `no-migration-runtime` |
+| `.superpowers/brainstorm/.last-port` | `??` | user-existing | absent | absent | `withheld-sensitive-runtime` | 空 | 空 | 不迁移；skill-private 运行态 | `no-migration-runtime` |
+| `.superpowers/brainstorm/.last-token` | `??` | user-existing | absent | absent | `withheld-sensitive-runtime` | 空 | 空 | 不迁移；skill-private 会话令牌，禁止进入任何文档或提交 | `no-migration-runtime` |
+
+`.superpowers/sdd/` 由其自带的 `.gitignore`（内容为 `*`）完全忽略，因此不出现在 `git ls-files --others --exclude-standard`
+的输出中。它承载本轮 SDD 运行态（`progress.md`、`task-1-brief.md`、`task-1-report.md`），同样属于 `no-migration-runtime`：
+不进入任何 Task 提交，也不作为任何事实源。
+
+## 3. 快照 B：设计期已识别、当前已进入 HEAD 的受保护迁移输入
+
+设计 §9.3 列出的受保护文件在 `bab63e8` / `da089e1` 两个用户提交中已进入 HEAD，因此在本次执行基线上
+不再表现为 dirty 工作区条目，但它们**仍然是受保护迁移输入**：其事实、措辞意图与生产证据必须无损进入新结构，
+之后才允许由 Task 19 按退役清单删除。
+
+| 路径 | owner | HEAD blob（前 12） | 最近提交 | 迁移落点 | migration_status |
+|---|---|---|---|---|---|
+| `07/12-scheduled-tasks.md` | user-existing | `6dc6cf120add` | `bab63e8` | `09/01`、`09/02`、`09/03`、`09/04`、`12/04` | `pending` |
+| `09/03-provision-and-observe-via-nyxid/02-scheduled-agent-key-production-canary.md` | user-existing | `114817a9698d` | `da089e1` | `09/05`、`12/04` | `pending` |
+| `09/03-provision-and-observe-via-nyxid/index.md` | user-existing | `71dcf0ae50e1` | `da089e1` | `09/index.md`（Task 19 原位改写）、`09/05` | `pending` |
+| `07/index.md` | user-existing | `f24150cc40c0` | `bab63e8` | `07/index.md`、`08/index.md`、`09/index.md`（Task 19 原位改写） | `pending` |
+| `10/index.md` | user-existing | `05b07bbd30f6` | `bab63e8` | `10/index.md`、`12/index.md`（Task 19 原位改写） | `pending` |
+| `PLAN.md` | user-existing | `953b6241a587` | `bab63e8` | `PLAN.md`（Task 19 合并改写为 72 行清单，不整文件覆盖） | `pending` |
+| `mkdocs.yml` | user-existing | `8436e3b7ebe8` | `bab63e8` | `mkdocs.yml`（Task 19 原子替换 nav，保留站点/主题设置与已批准双行导航设计） | `pending` |
+
+## 4. 快照 C：并行用户分支
+
+| 引用 | 内容 | 处置 |
+|---|---|---|
+| `fix/chapter-navigation` @ `9bdf078` | 已批准双行导航布局的实现（`scripts/check-site-ui.py`、`docs/stylesheets/extra.css`、`mkdocs.yml`、`.github/workflows/docs.yml`），未合并入 `main` | 受保护。不由本任务合并、rebase 或删除。Task 19 扩展导航到 `00–13` 时必须保留该设计契约（桌面 tabs 换行、`mkdocs.yml` 为唯一导航事实源、不硬编码章节清单） |
+
+## 5. 外部只读仓库漂移记录
+
+| 项 | 值 |
+|---|---|
+| 冻结事实基线 | `f02aa690bbebb9cabeac30a553d737486b0eb661`（本轮唯一当前实现事实源） |
+| Task 1 起始时上游 live HEAD | `aba74805c6b40f3848a554b85e4192e7c06abfa2` |
+| 上游 live 工作区 | 存在他人未提交修改（10 个 `M` 路径 + 未跟踪项） |
+| 处置 | 只记录为外部漂移。不移动基线、不读取 live working tree 作为事实、不对上游做任何写操作 |
+
+## 6. 重新枚举义务
+
+每个 Task 与每次恢复后的 turn 都必须重新运行第 2 节的并集命令。当时存在且不属于该 Task 的任何新改动
+自动成为受保护输入，必须在派发或写入前追加到快照 A。设计期文件清单不是封闭清单。
