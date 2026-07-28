@@ -92,11 +92,11 @@
 
 ## `09` Automation、调度与凭证（5）
 
-- [ ] `09/01-automation-resource-api-and-readmodels.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/212
-- [ ] `09/02-scheduled-actor-callback-and-fire.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/213
-- [ ] `09/03-owner-authorization-and-agent-key.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/214
-- [ ] `09/04-vault-reference-and-revocation-compensation.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/215
-- [ ] `09/05-production-canary-and-recovery.md` — status:mixed — issue:https://github.com/eanzhao-os/aevatar-review/issues/216
+- [x] `09/01-automation-resource-api-and-readmodels.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/212
+- [x] `09/02-scheduled-actor-callback-and-fire.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/213
+- [x] `09/03-owner-authorization-and-agent-key.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/214
+- [x] `09/04-vault-reference-and-revocation-compensation.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/215
+- [x] `09/05-production-canary-and-recovery.md` — status:mixed — issue:https://github.com/eanzhao-os/aevatar-review/issues/216
 
 ## `10` 分布式与生产运行（8）
 
