@@ -61,20 +61,20 @@
 | `05/03-readmodel-providers.md` | tracked | retain-rewrite | `05/04` | migrated-reviewed | StateVersion 权威、幂等覆盖、索引生命周期与有限 DR repair 已复核 |
 | `05/04-workflow-projection.md` | tracked | retain-rewrite | `05/05` | migrated-reviewed | current-state、artifact、session event 与 Workflow/AGUI 方言边界已复核 |
 | `05/index.md` | tracked | rewrite-in-place | `05/index.md` | n/a | Task 19 原位改写 |
-| `06/01-current-vs-target.md` | tracked | retain-rewrite | `10/01` | pending | 删除无代码支撑的「当前 vs 目标」表，改为冻结基线拓扑与配置 |
-| `06/02-orleans-runtime.md` | tracked | retain-rewrite | `10/02` | pending | 单一激活、grain inbox turn 语义与 runtime-neutral dispatch |
-| `06/03-kafka-transport.md` | tracked | retain-rewrite | `10/04`、`12/03` | pending | 当前 KafkaProvider 为准；MassTransit 明确历史 |
-| `06/04-garnet-clustering.md` | tracked | retain-rewrite | `10/03` | pending | EventStore 与 SecretVault 职责必须分开 |
-| `06/05-architecture-guards.md` | tracked | retain-rewrite | `10/08` | pending | 门禁是可执行治理，不是正确性证明 |
-| `06/06-credentials-zero-standing-secrets.md` | tracked | split | `09/03`、`09/04`、`10/05` | migrated | 调度专用 Agent Key 与 Vault locator/双轨撤销已迁入`09/03–04`；通用认证授权待`10/05` |
+| `06/01-current-vs-target.md` | tracked | retain-rewrite | `10/01` | migrated-reviewed | 已删除无代码支撑的「当前 vs 目标」表，按冻结基线重写拓扑、配置档位与故障边界并复核 |
+| `06/02-orleans-runtime.md` | tracked | retain-rewrite | `10/02` | migrated-reviewed | 单一激活、grain inbox turn、持久恢复与 runtime-neutral dispatch 已迁移并复核 |
+| `06/03-kafka-transport.md` | tracked | retain-rewrite | `10/04`、`12/03` | migrated | 当前 KafkaProvider 语义已迁入 `10/04`；MassTransit 退役史仍待 `12/03` |
+| `06/04-garnet-clustering.md` | tracked | retain-rewrite | `10/03` | migrated-reviewed | Garnet 共享后端下的 EventStore、SecretVault、membership 与 state 职责已分层迁移并复核 |
+| `06/05-architecture-guards.md` | tracked | retain-rewrite | `10/08` | migrated-reviewed | 56 个顶层 guard 已按治理不变量重写，并明确其不是完整正确性证明 |
+| `06/06-credentials-zero-standing-secrets.md` | tracked | split | `09/03`、`09/04`、`10/05` | migrated-reviewed | 调度 Agent Key、Vault locator/双轨撤销与通用认证授权均已迁移并复核 |
 | `06/index.md` | tracked | rewrite-in-place | `06/index.md` | n/a | Task 19 原位改写 |
 | `07/01-channels.md` | tracked | retain-rewrite | `08/02` | migrated-reviewed | bot registration/conversation事实owner与raw credential边界已迁入并复核 |
 | `07/02-a2a-interop.md` | tracked | move-evolution | `12/03` | pending | A2A 已退役，只保留架构教训，不与现役能力等权展示 |
 | `07/03-chat-routing.md` | tracked | retain-rewrite | `08/01` | migrated-reviewed | 入站规范化、owner scope与route policy边界已迁入并复核 |
 | `07/04-voice-presence.md` | tracked | retain-rewrite | `08/05` | migrated-reviewed | actor control/realtime observation/volatile PCM与lease fencing已迁入并复核 |
 | `07/05-studio-and-scripting.md` | tracked | split | `06/01`、`06/04` | migrated-reviewed | Team/Member资源模型、identity边界与命令/ACK/读模型已拆分迁移并复核 |
-| `07/06-console-web.md` | tracked | merge | `06/03`、`06/04`、`10/07` | migrated | catalog/授权与Studio命令/readmodel已迁入`06`；Console观测面待`10/07`完成 |
-| `07/07-observability.md` | tracked | retain-rewrite | `10/07` | pending | OTel 实时信号 vs 权威读模型 |
+| `07/06-console-web.md` | tracked | merge | `06/03`、`06/04`、`10/07` | migrated-reviewed | catalog/授权、Studio命令/readmodel与只读Observatory查询面均已迁移并复核 |
+| `07/07-observability.md` | tracked | retain-rewrite | `10/07` | migrated-reviewed | OTel实时信号、Status probe事实、权威读模型与Observatory边界已分层迁移并复核 |
 | `07/08-lark-end-to-end.md` | tracked | split | `08/03`、`11/04` | migrated | Lark adapter/delivery/repair边界已迁入`08/03`；可复现教程待`11/04` |
 | `07/09-voice-presence-edge-brain.md` | tracked | merge | `08/05`、`12/05` | migrated | 当前control/media/credential/restart边界已迁入`08/05`；剩余zero-config、resume与transcript缺口待`12/05` |
 | `07/10-input-ingress-unification.md` | tracked | retain-rewrite | `08/01` | migrated-reviewed | 统一入站骨干、canonical identity与执行意图分层已迁入并复核 |
@@ -104,17 +104,17 @@
 | `09/03-provision-and-observe-via-nyxid/index.md` | protected | delete | `09/index.md`、`12/index.md` | migrated | 内容意图与生产证据导读已进入`09/05`；块级导航仍待Task 19原子切换 |
 | `09/index.md` | tracked | rewrite-in-place | `09/index.md` | n/a | Task 19 原位改写为 Automation 与调度块导读 |
 | `10/01-cli-lark-scope-isolation.md` | tracked | split | `06/03`、`12/04` | migrated | scope catalog/Workflow授权边界已迁入`06/03`；事故叙事待`12/04` |
-| `10/02-codex-shell-vs-aevatar-tools.md` | tracked | split | `04/03`、`10/06`、`12/04` | migrated | 工具归属已迁入 `04/03`；sandbox 与事故落点待后续章节完成；旧章 stale reference 属已接受迁移红态 |
+| `10/02-codex-shell-vs-aevatar-tools.md` | tracked | split | `04/03`、`10/06`、`12/04` | migrated | 工具归属与managed sandbox/delegation边界已迁入 `04/03`、`10/06`；事故仍待 `12/04`，旧章 stale reference 属已接受迁移红态 |
 | `10/03-ingress-own-tool-stream-leak.md` | tracked | split | `04/03`、`08/01`、`12/04` | migrated | tool ownership与ingress/route边界已迁入`04/03`、`08/01`；事故落点待`12/04` |
 | `10/04-responses-llm-run-offactor-and-observation.md` | tracked | split | `04/01`、`05/02`、`12/04` | migrated | off-actor AI 执行与 committed/session observation 边界已迁入 `04/01`、`05/02`；事故落点待 `12/04` |
 | `10/05-lark-delivery-layer-failures.md` | tracked | split | `08/03`、`12/04` | migrated | delivery语义、当前drift与原位repair已迁入`08/03`；事故过程待`12/04` |
-| `10/06-lark-identity-and-authorization.md` | tracked | split | `08/02`、`10/05`、`12/04` | migrated | Channel credential/current durable边界已迁入`08/02`；通用auth与事故落点待`10/05`、`12/04` |
+| `10/06-lark-identity-and-authorization.md` | tracked | split | `08/02`、`10/05`、`12/04` | migrated | Channel credential/current durable边界与通用auth已迁入`08/02`、`10/05`；身份授权事故仍待`12/04` |
 | `10/07-scheduled-task-not-firing.md` | tracked | split | `09/02`、`12/04` | migrated | callback/lease/stale拒绝与one-shot grain-context修复已迁入`09/02`；四类事故仍待`12/04`逐类复盘 |
-| `10/08-observatory-read-side.md` | tracked | split | `05/04`、`10/07`、`12/04` | migrated | 索引漂移、versioning 与显式 repair 边界已迁入 `05/04`；观测运维与事故落点待后续章节 |
+| `10/08-observatory-read-side.md` | tracked | split | `05/04`、`10/07`、`12/04` | migrated | 索引漂移、versioning、显式repair与只读Observatory边界已迁入`05/04`、`10/07`；事故仍待`12/04` |
 | `10/09-studio-console-three-traps.md` | tracked | split | `06/04`、`07/01`、`12/04` | migrated | 命令/ACK/读模型与identity resolution已迁入`06/04`，conversation/turn/history边界已迁入`07/01`；事故落点待`12/04` |
 | `10/10-voice-cancel-race-and-reconnect.md` | tracked | split | `08/05`、`12/04`、`12/05` | migrated | cancel/drain/restart当前边界已迁入`08/05`；事故与真正resume缺口待`12/04–05` |
 | `10/11-nyxid-direct-llm-entry.md` | tracked | split | `04/02`、`07/02`、`12/04` | migrated | LLM provider/route边界已迁入`04/02`，NyxIdChat actor/progress边界已迁入`07/02`；事故落点待`12/04` |
-| `10/12-api-security-audit-and-hardening.md` | tracked | split | `10/05`、`10/08`、`12/05` | pending | 已落地加固转当前，未闭合项留 12/05；旧章 stale reference 属已接受迁移红态 |
+| `10/12-api-security-audit-and-hardening.md` | tracked | split | `10/05`、`10/08`、`12/05` | migrated | 已落地认证授权与security guards已迁入`10/05`、`10/08`；未闭合项仍待`12/05`，旧章 stale reference 属已接受迁移红态 |
 | `10/index.md` | protected | rewrite-in-place | `10/index.md`、`12/index.md` | n/a | 受保护索引；Task 19 原位改写 |
 | `11/01-aevatar-control-plane-skills.md` | tracked | merge | `04/03`、`11/03`、`12/03` | migrated | tool catalog 边界已迁入 `04/03`；教程与退役落点待后续章节完成 |
 | `11/02-aevatar-platform-and-probe-skills.md` | tracked | merge | `04/05`、`11/05`、`12/03` | migrated | prompt/skill overlay 边界已迁入 `04/05`；排障教程与退役落点待后续章节完成 |

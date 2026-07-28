@@ -100,14 +100,14 @@
 
 ## `10` 分布式与生产运行（8）
 
-- [ ] `10/01-production-topology-and-configuration.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/217
-- [ ] `10/02-orleans-runtime.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/218
-- [ ] `10/03-garnet-clustering-and-secret-storage.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/219
-- [ ] `10/04-streaming-transport-and-kafka.md` — status:mixed — issue:https://github.com/eanzhao-os/aevatar-review/issues/220
-- [ ] `10/05-authentication-scope-and-admin-authorization.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/221
-- [ ] `10/06-managed-codex-sandbox-and-delegation.md` — status:mixed — issue:https://github.com/eanzhao-os/aevatar-review/issues/222
-- [ ] `10/07-observability-status-and-observatory.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/223
-- [ ] `10/08-architecture-and-security-guards.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/224
+- [x] `10/01-production-topology-and-configuration.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/217
+- [x] `10/02-orleans-runtime.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/218
+- [x] `10/03-garnet-clustering-and-secret-storage.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/219
+- [x] `10/04-streaming-transport-and-kafka.md` — status:mixed — issue:https://github.com/eanzhao-os/aevatar-review/issues/220
+- [x] `10/05-authentication-scope-and-admin-authorization.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/221
+- [x] `10/06-managed-codex-sandbox-and-delegation.md` — status:mixed — issue:https://github.com/eanzhao-os/aevatar-review/issues/222
+- [x] `10/07-observability-status-and-observatory.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/223
+- [x] `10/08-architecture-and-security-guards.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/224
 
 ## `11` 场景教程与 Cookbook（5）
 
