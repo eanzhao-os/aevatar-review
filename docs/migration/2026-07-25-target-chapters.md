@@ -33,12 +33,12 @@
 
 ## `02` Actor 运行内核（6）
 
-- [ ] `02/01-agent-actor-runtime.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/174
-- [ ] `02/02-envelope-command-event-query.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/175
-- [ ] `02/03-gagent-event-pipeline.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/176
-- [ ] `02/04-state-event-sourcing-and-guard.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/177
-- [ ] `02/05-dispatch-routing-and-topology.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/178
-- [ ] `02/06-local-runtime-and-lifecycle.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/179
+- [x] `02/01-agent-actor-runtime.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/174
+- [x] `02/02-envelope-command-event-query.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/175
+- [x] `02/03-gagent-event-pipeline.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/176
+- [x] `02/04-state-event-sourcing-and-guard.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/177
+- [x] `02/05-dispatch-routing-and-topology.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/178
+- [x] `02/06-local-runtime-and-lifecycle.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/179
 
 ## `03` Workflow 编排（7）
 

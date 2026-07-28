@@ -42,14 +42,14 @@
 | `02/07-connectors.md` | tracked | retain-rewrite | `03/07` | pending | 补 capability admission 与 bind/startup 准入，不写查询期刷新 |
 | `02/08-saga-durable-execution.md` | tracked | split | `03/05`、`03/06` | pending | 挂起/信号/审批与补偿恢复分离；ADR 状态漂移与代码事实分开 |
 | `02/index.md` | tracked | rewrite-in-place | `02/index.md` | n/a | Task 19 原位改写 |
-| `03/01-agent-actor-runtime.md` | tracked | retain-rewrite | `02/01` | pending | Agent/Actor/Runtime/Stream 四层边界 |
-| `03/02-event-envelope-vs-state-event.md` | tracked | split | `02/02`、`02/04` | pending | 消息语义与状态事实分成两章，杜绝 envelope 冒充事实源 |
-| `03/03-gagent-base.md` | tracked | retain-rewrite | `02/03` | pending | handler/优先级/hook/turn 边界 |
-| `03/04-state-guard-and-event-sourcing.md` | tracked | retain-rewrite | `02/04` | pending | committed 才是事实；StateGuard 作用域与乐观版本 |
-| `03/05-routing-and-topology.md` | tracked | retain-rewrite | `02/05` | pending | publish 即投递到 inbox，无 inline self 捷径 |
-| `03/06-local-runtime-deep-dive.md` | tracked | retain-rewrite | `02/06` | pending | 本地 runtime 局限与向 Orleans 迁移不改业务协议 |
-| `03/07-stream-actor-gagent-facts.md` | tracked | merge | `02/01`、`02/05` | pending | 辨析并入运行内核与路由章，不单列「事实澄清」章 |
-| `03/08-event-sourcing-dividends.md` | tracked | merge | `02/04`、`05/01`、`05/02` | pending | 收益论述并入状态与投影章，避免与 CQRS 章重复 |
+| `03/01-agent-actor-runtime.md` | tracked | retain-rewrite | `02/01` | migrated-reviewed | Agent/Actor/Runtime/Stream 四层边界 |
+| `03/02-event-envelope-vs-state-event.md` | tracked | split | `02/02`、`02/04` | migrated-reviewed | 消息语义与状态事实分成两章，杜绝 envelope 冒充事实源 |
+| `03/03-gagent-base.md` | tracked | retain-rewrite | `02/03` | migrated-reviewed | handler/优先级/hook/turn 边界 |
+| `03/04-state-guard-and-event-sourcing.md` | tracked | retain-rewrite | `02/04`、`12/05` | migrated | 主链已迁入 `02/04`；RunManager/latest-wins canon drift 已在旧 `08/04` 登记，待 Task 17 迁入 `12/05` 后复核 |
+| `03/05-routing-and-topology.md` | tracked | retain-rewrite | `02/05` | migrated-reviewed | publish 即投递到 inbox，无 inline self 捷径 |
+| `03/06-local-runtime-deep-dive.md` | tracked | retain-rewrite | `02/06` | migrated-reviewed | 本地 runtime 局限与向 Orleans 迁移不改业务协议 |
+| `03/07-stream-actor-gagent-facts.md` | tracked | merge | `02/01`、`02/05` | migrated-reviewed | 辨析并入运行内核与路由章，不单列「事实澄清」章 |
+| `03/08-event-sourcing-dividends.md` | tracked | merge | `02/04`、`05/01`、`05/02` | migrated | Actor 侧收益已迁入 `02/04`；CQRS 侧收益待 Task 10 完成后复核 |
 | `03/index.md` | tracked | rewrite-in-place | `03/index.md` | n/a | Task 19 原位改写 |
 | `04/01-role-gagent.md` | tracked | retain-rewrite | `04/01` | pending | ChatStreamAsync 唯一面向用户路径；off-turn 执行折叠为 actor 信号 |
 | `04/02-llm-providers.md` | tracked | retain-rewrite | `04/02` | pending | NyxID 是 adapter，不是通用后端 |
