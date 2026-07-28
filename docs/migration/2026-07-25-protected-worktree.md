@@ -66,12 +66,12 @@ Task 14 与 Task 17 迁移 `09/02` 与 `12/04` 时必须重新取哈希并按节
 
 | 路径 | XY | owner | HEAD blob | worktree SHA-256 | 迁移落点 | migration_status |
 |---|---|---|---|---|---|---|
-| `02/01-agent-actor-runtime.md` | `??` | user-existing | absent | `29573a0ca236164930b1cb8f613d4dc143cb90c6357c6cd6278b55ed40219d88` | 原路径保留并按 Task 7 验收 | `unreviewed` |
-| `02/02-envelope-command-event-query.md` | `??` | user-existing | absent | `d4108f40dbcea03bac21a4c9462b958dc8e7cc656e673738a11d6f4402ab32aa` | 原路径保留并按 Task 7 验收 | `unreviewed` |
-| `02/03-gagent-event-pipeline.md` | `??` | user-existing | absent | `67ce6b4a10ec1fb891541564934d7248e86fa028d9b6252dc3bb6dc1ca7f4b98` | 原路径保留并按 Task 7 验收 | `unreviewed` |
-| `02/04-state-event-sourcing-and-guard.md` | `??` | user-existing | absent | `8943fbe9b11929a609a84a77b5ece1d92668c6592dc968e32ecdc6c2457c56b0` | 原路径保留并按 Task 7 验收 | `unreviewed` |
-| `02/05-dispatch-routing-and-topology.md` | `??` | user-existing | absent | `2ef758322587dbf1aed0f657f6bb91f97f3f84cc0ea7e4c99e9d8e27fb3e75f5` | 原路径保留并按 Task 7 验收 | `unreviewed` |
-| `02/06-local-runtime-and-lifecycle.md` | `??` | user-existing | absent | `686fc165baac0fb88dd718f804a4db206cb51d7076eb80c0581db2ac429dfabe` | 原路径保留并按 Task 7 验收 | `unreviewed` |
+| `02/01-agent-actor-runtime.md` | `??` | user-existing | absent | `29573a0ca236164930b1cb8f613d4dc143cb90c6357c6cd6278b55ed40219d88` | 原路径保留并按 Task 7 验收 | `migrated-reviewed` |
+| `02/02-envelope-command-event-query.md` | `??` | user-existing | absent | `d4108f40dbcea03bac21a4c9462b958dc8e7cc656e673738a11d6f4402ab32aa` | 原路径保留并按 Task 7 验收 | `migrated-reviewed` |
+| `02/03-gagent-event-pipeline.md` | `??` | user-existing | absent | `67ce6b4a10ec1fb891541564934d7248e86fa028d9b6252dc3bb6dc1ca7f4b98` | 原路径保留并按 Task 7 验收 | `migrated-reviewed` |
+| `02/04-state-event-sourcing-and-guard.md` | `??` | user-existing | absent | `8943fbe9b11929a609a84a77b5ece1d92668c6592dc968e32ecdc6c2457c56b0` | 原路径保留并按 Task 7 验收 | `migrated-reviewed` |
+| `02/05-dispatch-routing-and-topology.md` | `??` | user-existing | absent | `2ef758322587dbf1aed0f657f6bb91f97f3f84cc0ea7e4c99e9d8e27fb3e75f5` | 原路径保留并按 Task 7 验收 | `migrated-reviewed` |
+| `02/06-local-runtime-and-lifecycle.md` | `??` | user-existing | absent | `686fc165baac0fb88dd718f804a4db206cb51d7076eb80c0581db2ac429dfabe` | 原路径保留并按 Task 7 验收 | `migrated-reviewed` |
 
 ## 3. 快照 B：设计期已识别、当前已进入 HEAD 的受保护迁移输入
 
