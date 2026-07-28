@@ -84,11 +84,11 @@
 
 ## `08` Ingress、Channel、文件与语音（5）
 
-- [ ] `08/01-ingress-normalization-and-routing.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/207
-- [ ] `08/02-channel-runtime-and-credential-boundary.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/208
-- [ ] `08/03-lark-delivery-interaction-and-repair.md` — status:mixed — issue:https://github.com/eanzhao-os/aevatar-review/issues/209
-- [ ] `08/04-file-artifacts-and-attachments.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/210
-- [ ] `08/05-voice-control-and-media-planes.md` — status:mixed — issue:https://github.com/eanzhao-os/aevatar-review/issues/211
+- [x] `08/01-ingress-normalization-and-routing.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/207
+- [x] `08/02-channel-runtime-and-credential-boundary.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/208
+- [x] `08/03-lark-delivery-interaction-and-repair.md` — status:mixed — issue:https://github.com/eanzhao-os/aevatar-review/issues/209
+- [x] `08/04-file-artifacts-and-attachments.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/210
+- [x] `08/05-voice-control-and-media-planes.md` — status:mixed — issue:https://github.com/eanzhao-os/aevatar-review/issues/211
 
 ## `09` Automation、调度与凭证（5）
 
