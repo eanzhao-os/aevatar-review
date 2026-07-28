@@ -69,11 +69,11 @@
 
 ## `06` 产品资源与身份（5）
 
-- [ ] `06/01-scope-team-member-resource-model.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/198
-- [ ] `06/02-draft-revision-binding-and-published-service.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/199
-- [ ] `06/03-catalog-visibility-and-scope-authorization.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/200
-- [ ] `06/04-studio-commands-acks-and-readmodels.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/201
-- [ ] `06/05-work-orders-and-durable-intent.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/202
+- [x] `06/01-scope-team-member-resource-model.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/198
+- [x] `06/02-draft-revision-binding-and-published-service.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/199
+- [x] `06/03-catalog-visibility-and-scope-authorization.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/200
+- [x] `06/04-studio-commands-acks-and-readmodels.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/201
+- [x] `06/05-work-orders-and-durable-intent.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/202
 
 ## `07` Conversation、NyxIdChat 与 Agent Profile（4）
 
