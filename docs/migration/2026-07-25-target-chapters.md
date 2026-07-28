@@ -77,10 +77,10 @@
 
 ## `07` Conversation、NyxIdChat 与 Agent Profile（4）
 
-- [ ] `07/01-conversation-turn-and-chat-history.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/203
-- [ ] `07/02-nyxid-chat-actor-model-and-progress.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/204
-- [ ] `07/03-agent-profile-and-immutable-binding.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/205
-- [ ] `07/04-turn-authority-tool-catalog-and-retry.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/206
+- [x] `07/01-conversation-turn-and-chat-history.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/203
+- [x] `07/02-nyxid-chat-actor-model-and-progress.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/204
+- [x] `07/03-agent-profile-and-immutable-binding.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/205
+- [x] `07/04-turn-authority-tool-catalog-and-retry.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/206
 
 ## `08` Ingress、Channel、文件与语音（5）
 

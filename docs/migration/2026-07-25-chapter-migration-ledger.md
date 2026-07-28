@@ -111,9 +111,9 @@
 | `10/06-lark-identity-and-authorization.md` | tracked | split | `08/02`、`10/05`、`12/04` | pending | 身份与授权边界 |
 | `10/07-scheduled-task-not-firing.md` | tracked | split | `09/02`、`12/04` | pending | callback 只唤醒 actor；stale callback 拒绝 |
 | `10/08-observatory-read-side.md` | tracked | split | `05/04`、`10/07`、`12/04` | migrated | 索引漂移、versioning 与显式 repair 边界已迁入 `05/04`；观测运维与事故落点待后续章节 |
-| `10/09-studio-console-three-traps.md` | tracked | split | `06/04`、`07/01`、`12/04` | migrated | 命令/ACK/读模型与identity resolution已迁入`06/04`；conversation与事故落点待后续章节 |
+| `10/09-studio-console-three-traps.md` | tracked | split | `06/04`、`07/01`、`12/04` | migrated | 命令/ACK/读模型与identity resolution已迁入`06/04`，conversation/turn/history边界已迁入`07/01`；事故落点待`12/04` |
 | `10/10-voice-cancel-race-and-reconnect.md` | tracked | split | `08/05`、`12/04`、`12/05` | pending | 取消竞态转当前边界，未解 reconnect 留 12/05 |
-| `10/11-nyxid-direct-llm-entry.md` | tracked | split | `04/02`、`07/02`、`12/04` | migrated | LLM provider/route 边界已迁入 `04/02`；NyxIdChat 与事故落点待后续章节完成 |
+| `10/11-nyxid-direct-llm-entry.md` | tracked | split | `04/02`、`07/02`、`12/04` | migrated | LLM provider/route边界已迁入`04/02`，NyxIdChat actor/progress边界已迁入`07/02`；事故落点待`12/04` |
 | `10/12-api-security-audit-and-hardening.md` | tracked | split | `10/05`、`10/08`、`12/05` | pending | 已落地加固转当前，未闭合项留 12/05；旧章 stale reference 属已接受迁移红态 |
 | `10/index.md` | protected | rewrite-in-place | `10/index.md`、`12/index.md` | n/a | 受保护索引；Task 19 原位改写 |
 | `11/01-aevatar-control-plane-skills.md` | tracked | merge | `04/03`、`11/03`、`12/03` | migrated | tool catalog 边界已迁入 `04/03`；教程与退役落点待后续章节完成 |
