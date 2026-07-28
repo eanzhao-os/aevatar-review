@@ -1,10 +1,10 @@
 site_name: Aevatar 结构化中文解读
 site_description: 自顶向下读懂 Aevatar —— 一次请求的生命周期、Workflow YAML、Actor+Event 内核、CQRS 双投影、分布式目标态。85 篇章节,全部锚定 ~/Code/aevatar 源码事实源。
 site_author: eanzhao
-site_url: https://eanzhao.github.io/aevatar-review/
+site_url: https://eanzhao-os.github.io/aevatar-review/
 
-repo_name: eanzhao/aevatar-review
-repo_url: https://github.com/eanzhao/aevatar-review
+repo_name: eanzhao-os/aevatar-review
+repo_url: https://github.com/eanzhao-os/aevatar-review
 
 docs_dir: docs
 site_dir: site
@@ -53,7 +53,7 @@ theme:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/eanzhao/aevatar-review
+      link: https://github.com/eanzhao-os/aevatar-review
   generator: false
 
 markdown_extensions:
