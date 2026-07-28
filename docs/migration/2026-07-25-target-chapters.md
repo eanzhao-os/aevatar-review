@@ -111,11 +111,11 @@
 
 ## `11` 场景教程与 Cookbook（5）
 
-- [ ] `11/01-run-a-simple-workflow.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/225
-- [ ] `11/02-build-a-branching-tool-workflow.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/226
-- [ ] `11/03-create-bind-and-invoke-a-team-member.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/227
-- [ ] `11/04-connect-a-channel-and-handle-files.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/228
-- [ ] `11/05-create-verify-and-troubleshoot-automation.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/229
+- [x] `11/01-run-a-simple-workflow.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/225
+- [x] `11/02-build-a-branching-tool-workflow.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/226
+- [x] `11/03-create-bind-and-invoke-a-team-member.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/227
+- [x] `11/04-connect-a-channel-and-handle-files.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/228
+- [x] `11/05-create-verify-and-troubleshoot-automation.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/229
 
 ## `12` 架构演进、案例与开放缺口（5）
 

@@ -37,7 +37,7 @@
 | `02/02-definition-and-run-actors.md` | tracked | retain-rewrite | `03/01` | migrated-reviewed | definition/run/draft/published 身份必须显式区分 |
 | `02/03-execution-kernel.md` | tracked | retain-rewrite | `03/03` | migrated-reviewed | 补齐终态收敛与 typed tool error |
 | `02/04-step-modules-catalog.md` | tracked | retain-rewrite | `03/04` | migrated-reviewed | primitive 清单以 catalog 为权威，冻结 SHA 计数，不写「30+」永恒口径 |
-| `02/05-workflows-walkthrough.md` | tracked | split | `11/01`、`11/02` | pending | 走读改为两篇可复现教程；旧章现存 stale reference 属已接受迁移红态 |
+| `02/05-workflows-walkthrough.md` | tracked | split | `11/01`、`11/02` | migrated-reviewed | 已拆为最小运行与分支Tool Workflow两篇verified-static教程，并复核definition/admission/run与副作用边界 |
 | `02/06-maker-plugin.md` | tracked | move-evolution | `12/03` | pending | Maker 若非当前路径则只保留历史与教训 |
 | `02/07-connectors.md` | tracked | retain-rewrite | `03/07` | migrated-reviewed | 补 capability admission 与 bind/startup 准入，不写查询期刷新 |
 | `02/08-saga-durable-execution.md` | tracked | split | `03/05`、`03/06` | migrated-reviewed | 挂起/信号/审批与补偿恢复分离；ADR 状态漂移与代码事实分开 |
@@ -75,23 +75,23 @@
 | `07/05-studio-and-scripting.md` | tracked | split | `06/01`、`06/04` | migrated-reviewed | Team/Member资源模型、identity边界与命令/ACK/读模型已拆分迁移并复核 |
 | `07/06-console-web.md` | tracked | merge | `06/03`、`06/04`、`10/07` | migrated-reviewed | catalog/授权、Studio命令/readmodel与只读Observatory查询面均已迁移并复核 |
 | `07/07-observability.md` | tracked | retain-rewrite | `10/07` | migrated-reviewed | OTel实时信号、Status probe事实、权威读模型与Observatory边界已分层迁移并复核 |
-| `07/08-lark-end-to-end.md` | tracked | split | `08/03`、`11/04` | migrated | Lark adapter/delivery/repair边界已迁入`08/03`；可复现教程待`11/04` |
+| `07/08-lark-end-to-end.md` | tracked | split | `08/03`、`11/04` | migrated-reviewed | Lark adapter/delivery/repair与registration→relay→conversation→delivery教程已迁移并复核 |
 | `07/09-voice-presence-edge-brain.md` | tracked | merge | `08/05`、`12/05` | migrated | 当前control/media/credential/restart边界已迁入`08/05`；剩余zero-config、resume与transcript缺口待`12/05` |
 | `07/10-input-ingress-unification.md` | tracked | retain-rewrite | `08/01` | migrated-reviewed | 统一入站骨干、canonical identity与执行意图分层已迁入并复核 |
 | `07/11-file-handling-end-to-end.md` | tracked | retain-rewrite | `08/04` | migrated-reviewed | durable ref、bytes窄边界、ownership与cleanup已迁入并复核；旧章stale reference属已接受迁移红态 |
 | `07/12-scheduled-tasks.md` | protected | promote-current+split | `09/01`、`09/02`、`09/03`、`09/04`、`12/04` | migrated | canonical资源、callback、Agent Key与Vault生命周期已迁入`09/01–04`；fire-time换票历史与事故仍待`12/04` |
-| `07/13-lark-bot-registration.md` | tracked | merge | `08/03`、`11/04` | migrated | registration/repair事实已迁入`08/03`；操作教程待`11/04` |
+| `07/13-lark-bot-registration.md` | tracked | merge | `08/03`、`11/04` | migrated-reviewed | registration/repair事实与webhook、callback、status分层教程已迁移并复核 |
 | `07/index.md` | protected | rewrite-in-place | `07/index.md`、`08/index.md`、`09/index.md` | n/a | 受保护索引；Task 19 原位改写并把导航拆到三个新块 |
 | `08/01-glossary.md` | tracked | retain-rewrite | `13/01` | pending | 术语表补齐易混对，每词一个定义 |
 | `08/02-doc-index.md` | tracked | retain-rewrite | `13/02` | pending | canon/ADR 索引从冻结快照重新生成，状态从正文解析 |
-| `08/03-demo-cookbook.md` | tracked | split | `11/01`、`11/02`、`11/03`、`11/04`、`11/05` | pending | cookbook 拆成五篇诚实标注的教程 |
+| `08/03-demo-cookbook.md` | tracked | split | `11/01`、`11/02`、`11/03`、`11/04`、`11/05` | migrated-reviewed | cookbook已拆成五篇verified-static教程，统一区分receipt、projected state、run/fire与外部副作用证据 |
 | `08/04-todo-list.md` | tracked | move-evolution | `12/05` | pending | TODO 变成带 owner/exit criterion 的开放缺口登记 |
 | `08/05-crystallization-roadmap.md` | tracked | move-evolution | `12/01`、`12/05` | pending | 路线图不得写成当前能力 |
 | `08/index.md` | tracked | rewrite-in-place | `08/index.md` | n/a | Task 19 原位改写 |
 | `09/01-workflow-as-nyxid-service/01-mechanisms.md` | tracked | promote-current | `06/02`、`03/07` | migrated-reviewed | draft/revision/member/binding/service身份与准入机制已迁入当前模型并复核 |
-| `09/01-workflow-as-nyxid-service/02-publish-path.md` | tracked | promote-current | `06/02`、`11/03` | migrated | 发布身份与binding链已迁入`06/02`；端到端教程待`11/03` |
+| `09/01-workflow-as-nyxid-service/02-publish-path.md` | tracked | promote-current | `06/02`、`11/03` | migrated-reviewed | 发布身份、binding链与authority-returned service/revision观察教程均已迁移并复核 |
 | `09/01-workflow-as-nyxid-service/03-register-and-discover.md` | tracked | split | `06/03`、`12/05` | migrated | catalog可见性与scope授权已迁入`06/03`；未落地注册语义待`12/05` |
-| `09/01-workflow-as-nyxid-service/04-calling.md` | tracked | promote-current | `11/03` | pending | 调用路径进入教程，区分 202 与观察到的完成 |
+| `09/01-workflow-as-nyxid-service/04-calling.md` | tracked | promote-current | `11/03` | migrated-reviewed | member-first调用已迁入教程并区分invoke 202、statusUrl与terminal run |
 | `09/01-workflow-as-nyxid-service/05-end-to-end-plan.md` | tracked | merge | `11/03`、`12/05` | pending | 计划口吻去掉；未落地部分留 12/05 |
 | `09/01-workflow-as-nyxid-service/06-auto-registration-plan.md` | tracked | move-evolution | `12/05` | pending | 自动注册未落地，只能是 target |
 | `09/01-workflow-as-nyxid-service/07-auto-registration-adr.md` | tracked | move-evolution | `12/05` | pending | Proposed ADR 不进 current 正文 |
@@ -99,7 +99,7 @@
 | `09/02-ingress-tool-ownership/01-leak-and-asymmetric-rule.md` | tracked | promote-current | `04/03`、`04/04` | migrated-reviewed | 工具归属规则转当前设计 |
 | `09/02-ingress-tool-ownership/02-fix-and-rollout.md` | tracked | split | `04/04`、`12/04` | migrated | 修复语义已迁入 `04/04`；事故过程待 `12/04` 完成后复核 |
 | `09/02-ingress-tool-ownership/index.md` | tracked | delete | `04/index.md`、`12/index.md` | pending | 方案区嵌套索引取消 |
-| `09/03-provision-and-observe-via-nyxid/01-end-to-end.md` | tracked | split | `09/05`、`11/03`、`11/05` | migrated | 版本化生产证据与恢复顺序已迁入`09/05`；可复现调用/排障步骤待`11/03`、`11/05` |
+| `09/03-provision-and-observe-via-nyxid/01-end-to-end.md` | tracked | split | `09/05`、`11/03`、`11/05` | migrated-reviewed | 版本化生产证据、Member调用与automation preflight/create/run-or-cron/revocation恢复均已迁移并复核 |
 | `09/03-provision-and-observe-via-nyxid/02-scheduled-agent-key-production-canary.md` | protected | promote-current+split | `09/05`、`12/04` | migrated | 四次证据的commit/image/date/environment、`last_used_at`、6201/6202强度、provenance与cleanup差异已迁入`09/05`；事故复盘待`12/04` |
 | `09/03-provision-and-observe-via-nyxid/index.md` | protected | delete | `09/index.md`、`12/index.md` | migrated | 内容意图与生产证据导读已进入`09/05`；块级导航仍待Task 19原子切换 |
 | `09/index.md` | tracked | rewrite-in-place | `09/index.md` | n/a | Task 19 原位改写为 Automation 与调度块导读 |
@@ -117,7 +117,7 @@
 | `10/12-api-security-audit-and-hardening.md` | tracked | split | `10/05`、`10/08`、`12/05` | migrated | 已落地认证授权与security guards已迁入`10/05`、`10/08`；未闭合项仍待`12/05`，旧章 stale reference 属已接受迁移红态 |
 | `10/index.md` | protected | rewrite-in-place | `10/index.md`、`12/index.md` | n/a | 受保护索引；Task 19 原位改写 |
 | `11/01-aevatar-control-plane-skills.md` | tracked | merge | `04/03`、`11/03`、`12/03` | migrated | tool catalog 边界已迁入 `04/03`；教程与退役落点待后续章节完成 |
-| `11/02-aevatar-platform-and-probe-skills.md` | tracked | merge | `04/05`、`11/05`、`12/03` | migrated | prompt/skill overlay 边界已迁入 `04/05`；排障教程与退役落点待后续章节完成 |
+| `11/02-aevatar-platform-and-probe-skills.md` | tracked | merge | `04/05`、`11/05`、`12/03` | migrated | prompt/skill overlay与automation排障证据梯度已迁入`04/05`、`11/05`；退役判定仍待`12/03` |
 | `11/index.md` | tracked | rewrite-in-place | `11/index.md` | n/a | Task 19 原位改写为教程块导读 |
 | `12/01-2026-06-22-to-06-26.md` | tracked | merge | `12/01`、`12/02`、`12/04` | pending | 按周复盘改为按主题聚合的决策记录 + 日期/issue 索引 |
 | `12/index.md` | tracked | rewrite-in-place | `12/index.md` | n/a | Task 19 原位改写为演进块导读 |
