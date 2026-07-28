@@ -58,6 +58,21 @@ Task 14 与 Task 17 迁移 `09/02` 与 `12/04` 时必须重新取哈希并按节
 的输出中。它承载本轮 SDD 运行态（`progress.md`、`task-1-brief.md`、`task-1-report.md`），同样属于 `no-migration-runtime`：
 不进入任何 Task 提交，也不作为任何事实源。
 
+### 快照 A3：Task 7 恢复时新出现的目标章节
+
+下列未跟踪文件在本次恢复会话开始时已经存在，因此先按 `user-existing` 保护。它们恰好位于 Task 7
+的精确目标路径，但“路径正确”不等于“章节已完成”：只有逐章通过事实审计、四项门禁与独立复核后，
+才能提交并把状态改为 `migrated-reviewed`。
+
+| 路径 | XY | owner | HEAD blob | worktree SHA-256 | 迁移落点 | migration_status |
+|---|---|---|---|---|---|---|
+| `02/01-agent-actor-runtime.md` | `??` | user-existing | absent | `29573a0ca236164930b1cb8f613d4dc143cb90c6357c6cd6278b55ed40219d88` | 原路径保留并按 Task 7 验收 | `unreviewed` |
+| `02/02-envelope-command-event-query.md` | `??` | user-existing | absent | `d4108f40dbcea03bac21a4c9462b958dc8e7cc656e673738a11d6f4402ab32aa` | 原路径保留并按 Task 7 验收 | `unreviewed` |
+| `02/03-gagent-event-pipeline.md` | `??` | user-existing | absent | `67ce6b4a10ec1fb891541564934d7248e86fa028d9b6252dc3bb6dc1ca7f4b98` | 原路径保留并按 Task 7 验收 | `unreviewed` |
+| `02/04-state-event-sourcing-and-guard.md` | `??` | user-existing | absent | `8943fbe9b11929a609a84a77b5ece1d92668c6592dc968e32ecdc6c2457c56b0` | 原路径保留并按 Task 7 验收 | `unreviewed` |
+| `02/05-dispatch-routing-and-topology.md` | `??` | user-existing | absent | `2ef758322587dbf1aed0f657f6bb91f97f3f84cc0ea7e4c99e9d8e27fb3e75f5` | 原路径保留并按 Task 7 验收 | `unreviewed` |
+| `02/06-local-runtime-and-lifecycle.md` | `??` | user-existing | absent | `686fc165baac0fb88dd718f804a4db206cb51d7076eb80c0581db2ac429dfabe` | 原路径保留并按 Task 7 验收 | `unreviewed` |
+
 ## 3. 快照 B：设计期已识别、当前已进入 HEAD 的受保护迁移输入
 
 设计 §9.3 列出的受保护文件在 `bab63e8` / `da089e1` 两个用户提交中已进入 HEAD，因此在本次执行基线上
@@ -78,7 +93,8 @@ Task 14 与 Task 17 迁移 `09/02` 与 `12/04` 时必须重新取哈希并按节
 
 | 引用 | 内容 | 处置 |
 |---|---|---|
-| `fix/chapter-navigation` @ `9bdf078` | 已批准双行导航布局的实现（`scripts/check-site-ui.py`、`docs/stylesheets/extra.css`、`mkdocs.yml`、`.github/workflows/docs.yml`），未合并入 `main` | 受保护。不由本任务合并、rebase 或删除。Task 19 扩展导航到 `00–13` 时必须保留该设计契约（桌面 tabs 换行、`mkdocs.yml` 为唯一导航事实源、不硬编码章节清单） |
+| `fix/chapter-navigation` @ `9bdf078` | 已批准双行导航布局的实现（`scripts/check-site-ui.py`、`docs/stylesheets/extra.css`、`mkdocs.yml`、`.github/workflows/docs.yml`） | 用户于 2026-07-28 明确要求捞取其他分支成品并只在 `main` 续写；原分支 source contract 通过后，于 `e751fe8` 合入 `main`。Task 19 扩展导航到 `00–13` 时必须保留该设计契约，并把 `CURRENT_TOP_LEVEL_COUNT` 从 14 更新为 15。 |
+| `codex/fix-pages-owner` @ `56e2a57` | 仓库迁移后的 Pages、repository 与 social URL 修正 | 原提交 `git show --check` 通过后，经 `b39578c` 合入 `main`；Task 19 改写 `mkdocs.yml` 时必须保留 `eanzhao-os` 地址。 |
 
 ## 5. 外部只读仓库漂移记录
 
