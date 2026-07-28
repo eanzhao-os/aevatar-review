@@ -60,12 +60,12 @@
 
 ## `05` CQRS、Projection 与 Audit（6）
 
-- [ ] `05/01-command-event-projection-readmodel.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/192
-- [ ] `05/02-committed-state-and-observation.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/193
-- [ ] `05/03-projection-lifecycle-and-leases.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/194
-- [ ] `05/04-readmodel-stores-versioning-and-rebuild.md` — status:mixed — issue:https://github.com/eanzhao-os/aevatar-review/issues/195
-- [ ] `05/05-workflow-agui-and-live-observation.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/196
-- [ ] `05/06-audit-trail-lifecycle-and-export.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/197
+- [x] `05/01-command-event-projection-readmodel.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/192
+- [x] `05/02-committed-state-and-observation.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/193
+- [x] `05/03-projection-lifecycle-and-leases.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/194
+- [x] `05/04-readmodel-stores-versioning-and-rebuild.md` — status:mixed — issue:https://github.com/eanzhao-os/aevatar-review/issues/195
+- [x] `05/05-workflow-agui-and-live-observation.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/196
+- [x] `05/06-audit-trail-lifecycle-and-export.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/197
 
 ## `06` 产品资源与身份（5）
 

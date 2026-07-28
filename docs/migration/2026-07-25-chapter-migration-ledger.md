@@ -31,7 +31,7 @@
 | `01/01-hosts-and-composition.md` | tracked | retain-rewrite | `01/02` | migrated | Host 只承担协议与组装，业务编排不下沉到 Host |
 | `01/02-chat-api-and-sse.md` | tracked | split | `01/03`、`01/04` | migrated | API 契约与 SSE/AGUI 帧分层，dispatch receipt 与终态观察分开 |
 | `01/03-run-semantics.md` | tracked | merge | `01/04`、`12/05` | migrated | 已落地语义并入生命周期章；未落地 reconnect 保证只进 12/05 |
-| `01/04-platform-audit-trail.md` | tracked | promote-current | `05/06` | pending | Audit 生命周期与导出提升为读侧正式章节 |
+| `01/04-platform-audit-trail.md` | tracked | promote-current | `05/06` | migrated-reviewed | Audit 生命周期、三采集面、追加语义、查询 coverage 与 CloudEvents 导出已提升为正式读侧章节 |
 | `01/index.md` | tracked | rewrite-in-place | `01/index.md` | n/a | Task 19 原位改写 |
 | `02/01-yaml-grammar.md` | tracked | retain-rewrite | `03/02` | migrated-reviewed | 以冻结 parser/validator 为准重述 schema 与准入阶段 |
 | `02/02-definition-and-run-actors.md` | tracked | retain-rewrite | `03/01` | migrated-reviewed | definition/run/draft/published 身份必须显式区分 |
@@ -49,17 +49,17 @@
 | `03/05-routing-and-topology.md` | tracked | retain-rewrite | `02/05` | migrated-reviewed | publish 即投递到 inbox，无 inline self 捷径 |
 | `03/06-local-runtime-deep-dive.md` | tracked | retain-rewrite | `02/06` | migrated-reviewed | 本地 runtime 局限与向 Orleans 迁移不改业务协议 |
 | `03/07-stream-actor-gagent-facts.md` | tracked | merge | `02/01`、`02/05` | migrated-reviewed | 辨析并入运行内核与路由章，不单列「事实澄清」章 |
-| `03/08-event-sourcing-dividends.md` | tracked | merge | `02/04`、`05/01`、`05/02` | migrated | Actor 侧收益已迁入 `02/04`；CQRS 侧收益待 Task 10 完成后复核 |
+| `03/08-event-sourcing-dividends.md` | tracked | merge | `02/04`、`05/01`、`05/02` | migrated-reviewed | Actor 侧收益与 CQRS committed/read-side 边界均已迁移并复核 |
 | `03/index.md` | tracked | rewrite-in-place | `03/index.md` | n/a | Task 19 原位改写 |
 | `04/01-role-gagent.md` | tracked | retain-rewrite | `04/01` | migrated-reviewed | ChatStreamAsync 唯一面向用户路径；off-turn 执行折叠为 actor 信号 |
 | `04/02-llm-providers.md` | tracked | retain-rewrite | `04/02` | migrated-reviewed | NyxID 是 adapter，不是通用后端 |
 | `04/03-tool-providers.md` | tracked | split | `04/03`、`04/04` | migrated-reviewed | 工具目录/呈现与审批/授权拆开 |
 | `04/04-chat-runtime-and-middleware.md` | tracked | split | `04/01`、`04/04`、`07/04` | migrated | AI runtime 与审批边界已迁入 `04`；conversation turn authority 待 `07/04` 完成后复核 |
 | `04/index.md` | tracked | rewrite-in-place | `04/index.md` | n/a | Task 19 原位改写 |
-| `05/01-projection-overview.md` | tracked | split | `05/01`、`05/02` | pending | 写侧/读侧模型与 committed 观察分离 |
-| `05/02-two-projection-modes.md` | tracked | retain-rewrite | `05/03` | pending | 生命周期与 lease/session 句柄，禁止 actorId→context 注册表 |
-| `05/03-readmodel-providers.md` | tracked | retain-rewrite | `05/04` | pending | StateVersion 权威、幂等覆盖与 DR rebuild 属修复而非常规查询 |
-| `05/04-workflow-projection.md` | tracked | retain-rewrite | `05/05` | pending | current-state / artifact / session event 三类分清 |
+| `05/01-projection-overview.md` | tracked | split | `05/01`、`05/02` | migrated-reviewed | 写侧事实、committed observation、durable read side 与 session observation 已分层复核 |
+| `05/02-two-projection-modes.md` | tracked | retain-rewrite | `05/03` | migrated-reviewed | 生命周期、actor-owned scope、lease 与 exact subscription handle 已复核 |
+| `05/03-readmodel-providers.md` | tracked | retain-rewrite | `05/04` | migrated-reviewed | StateVersion 权威、幂等覆盖、索引生命周期与有限 DR repair 已复核 |
+| `05/04-workflow-projection.md` | tracked | retain-rewrite | `05/05` | migrated-reviewed | current-state、artifact、session event 与 Workflow/AGUI 方言边界已复核 |
 | `05/index.md` | tracked | rewrite-in-place | `05/index.md` | n/a | Task 19 原位改写 |
 | `06/01-current-vs-target.md` | tracked | retain-rewrite | `10/01` | pending | 删除无代码支撑的「当前 vs 目标」表，改为冻结基线拓扑与配置 |
 | `06/02-orleans-runtime.md` | tracked | retain-rewrite | `10/02` | pending | 单一激活、grain inbox turn 语义与 runtime-neutral dispatch |
@@ -106,11 +106,11 @@
 | `10/01-cli-lark-scope-isolation.md` | tracked | split | `06/03`、`12/04` | pending | scope 隔离规则转当前，事故转案例 |
 | `10/02-codex-shell-vs-aevatar-tools.md` | tracked | split | `04/03`、`10/06`、`12/04` | migrated | 工具归属已迁入 `04/03`；sandbox 与事故落点待后续章节完成；旧章 stale reference 属已接受迁移红态 |
 | `10/03-ingress-own-tool-stream-leak.md` | tracked | split | `04/03`、`08/01`、`12/04` | migrated | client/server tool ownership 已迁入 `04/03`；ingress 与事故落点待后续章节完成 |
-| `10/04-responses-llm-run-offactor-and-observation.md` | tracked | split | `04/01`、`05/02`、`12/04` | migrated | off-actor AI 执行已迁入 `04/01`；观察与事故落点待后续章节完成 |
+| `10/04-responses-llm-run-offactor-and-observation.md` | tracked | split | `04/01`、`05/02`、`12/04` | migrated | off-actor AI 执行与 committed/session observation 边界已迁入 `04/01`、`05/02`；事故落点待 `12/04` |
 | `10/05-lark-delivery-layer-failures.md` | tracked | split | `08/03`、`12/04` | pending | 投递账本与原位修复 |
 | `10/06-lark-identity-and-authorization.md` | tracked | split | `08/02`、`10/05`、`12/04` | pending | 身份与授权边界 |
 | `10/07-scheduled-task-not-firing.md` | tracked | split | `09/02`、`12/04` | pending | callback 只唤醒 actor；stale callback 拒绝 |
-| `10/08-observatory-read-side.md` | tracked | split | `05/04`、`10/07`、`12/04` | pending | 索引漂移与读侧修复 |
+| `10/08-observatory-read-side.md` | tracked | split | `05/04`、`10/07`、`12/04` | migrated | 索引漂移、versioning 与显式 repair 边界已迁入 `05/04`；观测运维与事故落点待后续章节 |
 | `10/09-studio-console-three-traps.md` | tracked | split | `06/04`、`07/01`、`12/04` | pending | 命令/ACK/读模型陷阱；旧章 stale reference 属已接受迁移红态 |
 | `10/10-voice-cancel-race-and-reconnect.md` | tracked | split | `08/05`、`12/04`、`12/05` | pending | 取消竞态转当前边界，未解 reconnect 留 12/05 |
 | `10/11-nyxid-direct-llm-entry.md` | tracked | split | `04/02`、`07/02`、`12/04` | migrated | LLM provider/route 边界已迁入 `04/02`；NyxIdChat 与事故落点待后续章节完成 |
