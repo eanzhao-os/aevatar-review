@@ -6,7 +6,7 @@ verified_at: 2026-07-25
 
 # Agent Profile 与不可变会话绑定
 
-> 版本与结论：本章描述 `current`。Agent Profile 是 Host 审核并封装的 typed policy snapshot；新建 NyxIdChat conversation 可以把它完整提交进 actor state，之后所有 turn 都以这份 snapshot 为共同上限。Profile 不是可热更新的配置指针，也不是让客户端逐轮指定 skill 或工具的入口。
+> 版本与结论：本章描述 `current`。Agent Profile 是 Host 审核并封装的 typed policy snapshot；新建 NyxIdChat conversation 可以把它完整提交进 actor state。`ENFORCED` turn 以这份 snapshot 为共同上限；`SHADOW` 只观察候选路由，冻结代码仍沿用 legacy execution。Profile 不是可热更新的配置指针，也不是让客户端逐轮指定 skill 或工具的入口。
 
 本章聚焦 conversation-level snapshot、exact Ornn reference、activation mode，以及它们如何生成 turn-local prompt/tool catalog。turn authority 的单调提交、reconcile 与 retry fencing 见 [Turn 权威、工具目录与重试](04-turn-authority-tool-catalog-and-retry.md)。
 
@@ -35,8 +35,8 @@ flowchart LR
     Source -->|"clone for selected new actor"| Resolver
     Resolver -->|"typed create command"| Actor
     Actor --> State
-    State -->|"same snapshot across turns"| Turn
-    Turn --> Catalog
+    State -->|"ENFORCED execution or SHADOW observation"| Turn
+    Turn -->|"ENFORCED only"| Catalog
 
     Client["HTTP client"]
     Ornn["Ornn exact read<br/>GUID + literal version"]
@@ -107,7 +107,7 @@ actor 收到 create command 后，在 `creation-started` 与 registry I/O 之前
 
 Mainnet rollout 还可以对 `profileVersion + NUL + actorId` 做 SHA-256，取 digest 前 4 bytes 的 big-endian `UInt32 mod 10000`，据此选择新 actor cohort。这个 bucket 只决定“创建时是否带 snapshot”；它不会把已存在 conversation 从 unprofiled 切到 profiled，也不会把已绑定 conversation 换到新 version。
 
-## 每个 turn 从共同上限生成局部 catalog
+## ENFORCED turn 从共同上限生成局部 catalog
 
 ```mermaid
 %%{init: {"maxTextSize": 100000, "flowchart": {"useMaxWidth": false, "nodeSpacing": 18, "rankSpacing": 48}, "themeVariables": {"fontSize": "10px"}}}%%
@@ -117,13 +117,14 @@ flowchart TB
     Maximum["Maximum policy intersection"]
     Recovery["Recovery policy intersection"]
     Candidate["One alias match or bounded classifier"]
-    Shadow["SHADOW<br/>candidate diagnostic only"]
+    Shadow["SHADOW observation<br/>candidate telemetry only"]
     Enforced["ENFORCED<br/>candidate + task policy"]
     Exact["Exact Ornn read<br/>GUID + literal version"]
     Checks["name + publisher + hash + unique SKILL.md + bounds"]
     Selected["SELECTED<br/>profile layer + skill layer + narrowed tools"]
     Fallback["RECOVERY<br/>profile layer + recovery tools"]
     Empty["RESTRICTED_EMPTY<br/>explicit zero tools"]
+    Legacy["null catalog<br/>legacy execution"]
     Request["Immutable request-local catalog"]
 
     Snapshot --> Maximum
@@ -132,7 +133,7 @@ flowchart TB
     Snapshot --> Candidate
     Candidate --> Shadow
     Candidate --> Enforced
-    Shadow --> Fallback
+    Shadow --> Legacy
     Enforced --> Exact
     Exact --> Checks
     Checks -->|"all pass"| Selected
@@ -146,15 +147,18 @@ flowchart TB
 
 materializer 先固定能力天花板，而不是先相信 classifier：route tool set 的 exact objects、actor 当前 registered tools、typed visibility、maximum policy 依次取交集；recovery policy 再从中取子集。同名工具只有引用同一个 `IAgentTool` object 才能合并，同名不同引用是 collision，该名字被整体移除。这避免“schema 来自工具 A、执行却按名字落到工具 B”。
 
-候选优先由唯一 explicit alias 命中，否则交给有界 classifier；alias collision、no-match、未知 intent 或 classifier failure 都不能扩大权限。三个结果不是三种配置，而是单 turn 的执行收敛态：
+候选优先由唯一 explicit alias 命中，否则交给有界 classifier；alias collision、no-match、未知 intent 或 classifier failure 都不能扩大权限。`ENFORCED` 的三个结果不是三种配置，而是单 turn 的执行收敛态：
 
 | turn 结果 | prompt | tools | 典型原因 |
 |---|---|---|---|
 | `SELECTED` | profile routing layer + 已验证 skill body | recovery 与 member task policy 的并集，再受既有 ceiling 限制 | `ENFORCED` candidate 且 exact identity/integrity 全通过 |
-| `RECOVERY` | profile routing layer，无 candidate skill body | recovery intersection | `SHADOW`、无 candidate、classifier/exact fetch/正文校验失败 |
+| `RECOVERY` | profile routing layer，无 candidate skill body | recovery intersection | 无 candidate、classifier/exact fetch/正文校验失败 |
 | `RESTRICTED_EMPTY` | 仍是显式 profiled catalog | 空集合 | digest、route capability、collision 等失败使安全交集为空 |
 
-`SHADOW` 只记录 candidate identity 与有界 diagnostic，始终使用 recovery prompt/tool 权限；它不会读取、解析或注入 candidate skill body。`ENFORCED` 也不是“分类器说了算”：Ornn fetch 必须按 exact GUID + literal version 读取，返回值还要匹配 expected skill name、reviewed publisher、hash evidence、唯一非空 `SKILL.md` 与 UTF-8 body bound，才能产生 `SelectedSkillPromptLayer`。读取失败只能降级，禁止按 name、latest 或 search 找一个“差不多”的版本。
+`SHADOW` materializer 会计算 candidate 与 recovery preparation 供 telemetry 使用，但 `NyxIdChatGAgent` 随即返回 `null`：不提交 turn authority、不生成执行 catalog、保持 legacy execution；它也不会读取、解析或注入 candidate skill body。`ENFORCED` 才进入上述三态，而且也不是“分类器说了算”：Ornn fetch 必须按 exact GUID + literal version 读取，返回值还要匹配 expected skill name、reviewed publisher、hash evidence、唯一非空 `SKILL.md` 与 UTF-8 body bound，才能产生 `SelectedSkillPromptLayer`。读取失败只能降级，禁止按 name、latest 或 search 找一个“差不多”的版本。
+
+!!! warning "SHADOW canon drift"
+    冻结代码与 `docs/canon/nyxid-chat-agent-profile-binding.md` 的“SHADOW 固定 recovery 权限/prompt”表述不一致。E1 测试明确要求 SHADOW 不改变 legacy execution；本章按代码描述 current，并把合同收敛登记到 [开放缺口与 canon drift](../12/05-open-gaps-and-canon-drift.md)。
 
 为什么 prompt layer 与 tool catalog 必须同源但不能混成一个字符串？Prompt 说明模型应采用哪套 procedure；`FinalAllowedToolNames` 和 `RouteOwnedTools` 决定 schema 与实际 object capability。只注入 skill 文本会让模型看到不可执行的工具，只按名字过滤又可能发生 object substitution。一个 immutable turn catalog 同时携带两者，并在进入 LLM request 时继续与 visibility 取交集，才保持“看得见的能力就是可执行能力”。
 
@@ -194,9 +198,9 @@ activation_mode: AGENT_PROFILE_ACTIVATION_MODE_ENFORCED
 - exact Ornn body、access token、tool object、prompt layer 与 free-form diagnostic 都不是 conversation profile state；它们只活在当前 turn materialization/request 中。
 - snapshot 保存 exact reference 和 policy identity，不保存动态 Ornn body。这样 passivation 后仍能重建“允许读取哪个版本”，同时避免把外部正文和凭据写进 actor journal。
 - 当前没有公开 profile 更新 API、profile query/readmodel 或对存量会话的 migration。观察到某个新 profile version 已发布，不能推出旧 conversation 已升级。
-- rollout 只控制 new binding；`SHADOW` 与 `ENFORCED` 控制被绑定后的 turn 行为。把 cohort percentage 与 activation mode 混为一谈，会错误解释未绑定 conversation 或 shadow candidate。
-- 非 profile consumer 必须显式传 `null` catalog；`null` 表示 unprofiled，而“非空 catalog + 零工具”表示 profiled restricted-empty。两者不能用同一个空集合替代。
-- profile snapshot 本身不越过 route policy、typed tool visibility、human-session credential requirement 或 tool approval。它只能继续缩小这些既有边界。
+- rollout 只控制 new binding；`SHADOW` 观察候选但保持 legacy execution，`ENFORCED` 才应用 profile catalog。把 cohort percentage 与 activation mode 混为一谈，会错误解释未绑定 conversation 或 shadow candidate。
+- `null` catalog 表示本次没有 profile execution catalog：未绑定 consumer 与 SHADOW 都会走这条路径；“非空 catalog + 零工具”才表示 ENFORCED 的 restricted-empty。两者不能用同一个空集合替代。
+- profile snapshot 本身不越过 route policy、human-session credential requirement 或 tool approval。ENFORCED catalog 只能继续缩小既有边界；SHADOW 当前不施加这个缩权。
 
 ## 读完应能回答
 
@@ -218,7 +222,7 @@ activation_mode: AGENT_PROFILE_ACTIVATION_MODE_ENFORCED
 | exact refs、activation mode、profile fields 和 actor state tags 都是 typed additive contract | E1 | `src/Aevatar.AI.Abstractions/ai_messages.proto:602`、`:625`、`:631`、`:642`、`:787` |
 | rollout 对 profileVersion + actorId 做稳定 0..9999 bucket，只为新 conversation 返回 clone | E1 | `src/Aevatar.Mainnet.Host.Api/Profiles/MainnetAgentProfileRolloutSelector.cs:61`、`:66`、`:95`、`:105` |
 | materializer 先取 route object、registered identity、visibility、maximum/recovery policy 交集，再选择 candidate | E1 | `agents/Aevatar.GAgents.NyxidChat/AgentProfiles/AgentProfileTurnCatalogMaterializer.cs:53`、`:68`、`:85`、`:94`、`:113` |
-| SHADOW 固定 recovery；ENFORCED exact fetch 还必须核对 GUID/version/name/publisher/hash/body bounds | E1 | `agents/Aevatar.GAgents.NyxidChat/AgentProfiles/AgentProfileTurnCatalogMaterializer.cs:132`、`:146`、`:288`、`:405`、`:461`、`:473` |
+| SHADOW 只观察 candidate、返回 null catalog 并保持 legacy execution；ENFORCED exact fetch 必须核对 GUID/version/name/publisher/hash/body bounds | E1 | `agents/Aevatar.GAgents.NyxidChat/NyxIdChatGAgent.cs:356`、`:371`、`:404`；`agents/Aevatar.GAgents.NyxidChat/AgentProfiles/AgentProfileTurnCatalogMaterializer.cs:132`、`:288`、`:405`、`:461`、`:473`；`test/Aevatar.AI.Tests/NyxIdChatGAgentTests.cs:893`、`:941`、`:947` |
 | Ornn adapter 只接受 canonical nonzero GUID 和 major.minor literal version，并做 version-pinned reads | E1 | `src/Aevatar.AI.ToolProviders.Ornn/OrnnExactRemoteSkillFetcher.cs:16`、`:27`、`:35`、`:44`、`:110`、`:131` |
 | turn catalog 同时冻结 allowed names、visibility、exact route-owned objects 与两个 prompt layers | E1 | `src/Aevatar.AI.Core/AgentProfiles/AgentProfileTurnCatalog.cs:28`、`:44`、`:48`、`:49`、`:63` |
 
