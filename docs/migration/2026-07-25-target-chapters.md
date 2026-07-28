@@ -52,11 +52,11 @@
 
 ## `04` AI 执行与工具（5）
 
-- [ ] `04/01-role-agent-and-streaming-run.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/187
-- [ ] `04/02-llm-providers-and-route-selection.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/188
-- [ ] `04/03-tool-loop-catalog-and-presentation.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/189
-- [ ] `04/04-tool-approval-and-authorization.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/190
-- [ ] `04/05-prompt-overlays-and-agent-context.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/191
+- [x] `04/01-role-agent-and-streaming-run.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/187
+- [x] `04/02-llm-providers-and-route-selection.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/188
+- [x] `04/03-tool-loop-catalog-and-presentation.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/189
+- [x] `04/04-tool-approval-and-authorization.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/190
+- [x] `04/05-prompt-overlays-and-agent-context.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/191
 
 ## `05` CQRS、Projection 与 Audit（6）
 

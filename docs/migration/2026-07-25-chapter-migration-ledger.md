@@ -51,10 +51,10 @@
 | `03/07-stream-actor-gagent-facts.md` | tracked | merge | `02/01`、`02/05` | migrated-reviewed | 辨析并入运行内核与路由章，不单列「事实澄清」章 |
 | `03/08-event-sourcing-dividends.md` | tracked | merge | `02/04`、`05/01`、`05/02` | migrated | Actor 侧收益已迁入 `02/04`；CQRS 侧收益待 Task 10 完成后复核 |
 | `03/index.md` | tracked | rewrite-in-place | `03/index.md` | n/a | Task 19 原位改写 |
-| `04/01-role-gagent.md` | tracked | retain-rewrite | `04/01` | pending | ChatStreamAsync 唯一面向用户路径；off-turn 执行折叠为 actor 信号 |
-| `04/02-llm-providers.md` | tracked | retain-rewrite | `04/02` | pending | NyxID 是 adapter，不是通用后端 |
-| `04/03-tool-providers.md` | tracked | split | `04/03`、`04/04` | pending | 工具目录/呈现与审批/授权拆开 |
-| `04/04-chat-runtime-and-middleware.md` | tracked | split | `04/01`、`04/04`、`07/04` | pending | middleware 归属按 turn authority 与审批边界重新划分 |
+| `04/01-role-gagent.md` | tracked | retain-rewrite | `04/01` | migrated-reviewed | ChatStreamAsync 唯一面向用户路径；off-turn 执行折叠为 actor 信号 |
+| `04/02-llm-providers.md` | tracked | retain-rewrite | `04/02` | migrated-reviewed | NyxID 是 adapter，不是通用后端 |
+| `04/03-tool-providers.md` | tracked | split | `04/03`、`04/04` | migrated-reviewed | 工具目录/呈现与审批/授权拆开 |
+| `04/04-chat-runtime-and-middleware.md` | tracked | split | `04/01`、`04/04`、`07/04` | migrated | AI runtime 与审批边界已迁入 `04`；conversation turn authority 待 `07/04` 完成后复核 |
 | `04/index.md` | tracked | rewrite-in-place | `04/index.md` | n/a | Task 19 原位改写 |
 | `05/01-projection-overview.md` | tracked | split | `05/01`、`05/02` | pending | 写侧/读侧模型与 committed 观察分离 |
 | `05/02-two-projection-modes.md` | tracked | retain-rewrite | `05/03` | pending | 生命周期与 lease/session 句柄，禁止 actorId→context 注册表 |
@@ -96,28 +96,28 @@
 | `09/01-workflow-as-nyxid-service/06-auto-registration-plan.md` | tracked | move-evolution | `12/05` | pending | 自动注册未落地，只能是 target |
 | `09/01-workflow-as-nyxid-service/07-auto-registration-adr.md` | tracked | move-evolution | `12/05` | pending | Proposed ADR 不进 current 正文 |
 | `09/01-workflow-as-nyxid-service/index.md` | tracked | delete | `06/index.md`、`12/index.md` | pending | 方案区嵌套索引取消，导航由新块索引承担 |
-| `09/02-ingress-tool-ownership/01-leak-and-asymmetric-rule.md` | tracked | promote-current | `04/03`、`04/04` | pending | 工具归属规则转当前设计 |
-| `09/02-ingress-tool-ownership/02-fix-and-rollout.md` | tracked | split | `04/04`、`12/04` | pending | 修复语义转当前，事故过程转案例 |
+| `09/02-ingress-tool-ownership/01-leak-and-asymmetric-rule.md` | tracked | promote-current | `04/03`、`04/04` | migrated-reviewed | 工具归属规则转当前设计 |
+| `09/02-ingress-tool-ownership/02-fix-and-rollout.md` | tracked | split | `04/04`、`12/04` | migrated | 修复语义已迁入 `04/04`；事故过程待 `12/04` 完成后复核 |
 | `09/02-ingress-tool-ownership/index.md` | tracked | delete | `04/index.md`、`12/index.md` | pending | 方案区嵌套索引取消 |
 | `09/03-provision-and-observe-via-nyxid/01-end-to-end.md` | tracked | split | `09/05`、`11/03`、`11/05` | pending | 端到端过程拆成生产证据与两篇教程 |
 | `09/03-provision-and-observe-via-nyxid/02-scheduled-agent-key-production-canary.md` | protected | promote-current+split | `09/05`、`12/04` | pending | 受保护生产证据：commit/镜像/日期/环境绑定，严格 canary 与功能性重跑强度不同，不得混同 |
 | `09/03-provision-and-observe-via-nyxid/index.md` | protected | delete | `09/index.md`、`12/index.md` | pending | 受保护嵌套索引；内容意图迁入新块索引与 09/05 |
 | `09/index.md` | tracked | rewrite-in-place | `09/index.md` | n/a | Task 19 原位改写为 Automation 与调度块导读 |
 | `10/01-cli-lark-scope-isolation.md` | tracked | split | `06/03`、`12/04` | pending | scope 隔离规则转当前，事故转案例 |
-| `10/02-codex-shell-vs-aevatar-tools.md` | tracked | split | `04/03`、`10/06`、`12/04` | pending | 工具归属与 sandbox 边界转当前；旧章 stale reference 属已接受迁移红态 |
-| `10/03-ingress-own-tool-stream-leak.md` | tracked | split | `04/03`、`08/01`、`12/04` | pending | 泄漏根因转边界规则 |
-| `10/04-responses-llm-run-offactor-and-observation.md` | tracked | split | `04/01`、`05/02`、`12/04` | pending | off-actor 执行与观察边界 |
+| `10/02-codex-shell-vs-aevatar-tools.md` | tracked | split | `04/03`、`10/06`、`12/04` | migrated | 工具归属已迁入 `04/03`；sandbox 与事故落点待后续章节完成；旧章 stale reference 属已接受迁移红态 |
+| `10/03-ingress-own-tool-stream-leak.md` | tracked | split | `04/03`、`08/01`、`12/04` | migrated | client/server tool ownership 已迁入 `04/03`；ingress 与事故落点待后续章节完成 |
+| `10/04-responses-llm-run-offactor-and-observation.md` | tracked | split | `04/01`、`05/02`、`12/04` | migrated | off-actor AI 执行已迁入 `04/01`；观察与事故落点待后续章节完成 |
 | `10/05-lark-delivery-layer-failures.md` | tracked | split | `08/03`、`12/04` | pending | 投递账本与原位修复 |
 | `10/06-lark-identity-and-authorization.md` | tracked | split | `08/02`、`10/05`、`12/04` | pending | 身份与授权边界 |
 | `10/07-scheduled-task-not-firing.md` | tracked | split | `09/02`、`12/04` | pending | callback 只唤醒 actor；stale callback 拒绝 |
 | `10/08-observatory-read-side.md` | tracked | split | `05/04`、`10/07`、`12/04` | pending | 索引漂移与读侧修复 |
 | `10/09-studio-console-three-traps.md` | tracked | split | `06/04`、`07/01`、`12/04` | pending | 命令/ACK/读模型陷阱；旧章 stale reference 属已接受迁移红态 |
 | `10/10-voice-cancel-race-and-reconnect.md` | tracked | split | `08/05`、`12/04`、`12/05` | pending | 取消竞态转当前边界，未解 reconnect 留 12/05 |
-| `10/11-nyxid-direct-llm-entry.md` | tracked | split | `04/02`、`07/02`、`12/04` | pending | 直连入口与 NyxIdChat 路径区分 |
+| `10/11-nyxid-direct-llm-entry.md` | tracked | split | `04/02`、`07/02`、`12/04` | migrated | LLM provider/route 边界已迁入 `04/02`；NyxIdChat 与事故落点待后续章节完成 |
 | `10/12-api-security-audit-and-hardening.md` | tracked | split | `10/05`、`10/08`、`12/05` | pending | 已落地加固转当前，未闭合项留 12/05；旧章 stale reference 属已接受迁移红态 |
 | `10/index.md` | protected | rewrite-in-place | `10/index.md`、`12/index.md` | n/a | 受保护索引；Task 19 原位改写 |
-| `11/01-aevatar-control-plane-skills.md` | tracked | merge | `04/03`、`11/03`、`12/03` | pending | 受支持部分并入工具与教程，不受支持配方标退役 |
-| `11/02-aevatar-platform-and-probe-skills.md` | tracked | merge | `04/05`、`11/05`、`12/03` | pending | 探针配方并入排障教程 |
+| `11/01-aevatar-control-plane-skills.md` | tracked | merge | `04/03`、`11/03`、`12/03` | migrated | tool catalog 边界已迁入 `04/03`；教程与退役落点待后续章节完成 |
+| `11/02-aevatar-platform-and-probe-skills.md` | tracked | merge | `04/05`、`11/05`、`12/03` | migrated | prompt/skill overlay 边界已迁入 `04/05`；排障教程与退役落点待后续章节完成 |
 | `11/index.md` | tracked | rewrite-in-place | `11/index.md` | n/a | Task 19 原位改写为教程块导读 |
 | `12/01-2026-06-22-to-06-26.md` | tracked | merge | `12/01`、`12/02`、`12/04` | pending | 按周复盘改为按主题聚合的决策记录 + 日期/issue 索引 |
 | `12/index.md` | tracked | rewrite-in-place | `12/index.md` | n/a | Task 19 原位改写为演进块导读 |
