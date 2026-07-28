@@ -33,14 +33,14 @@
 | `01/03-run-semantics.md` | tracked | merge | `01/04`、`12/05` | migrated | 已落地语义并入生命周期章；未落地 reconnect 保证只进 12/05 |
 | `01/04-platform-audit-trail.md` | tracked | promote-current | `05/06` | pending | Audit 生命周期与导出提升为读侧正式章节 |
 | `01/index.md` | tracked | rewrite-in-place | `01/index.md` | n/a | Task 19 原位改写 |
-| `02/01-yaml-grammar.md` | tracked | retain-rewrite | `03/02` | pending | 以冻结 parser/validator 为准重述 schema 与准入阶段 |
-| `02/02-definition-and-run-actors.md` | tracked | retain-rewrite | `03/01` | pending | definition/run/draft/published 身份必须显式区分 |
-| `02/03-execution-kernel.md` | tracked | retain-rewrite | `03/03` | pending | 补齐终态收敛与 typed tool error |
-| `02/04-step-modules-catalog.md` | tracked | retain-rewrite | `03/04` | pending | primitive 清单以 catalog 为权威，冻结 SHA 计数，不写「30+」永恒口径 |
+| `02/01-yaml-grammar.md` | tracked | retain-rewrite | `03/02` | migrated-reviewed | 以冻结 parser/validator 为准重述 schema 与准入阶段 |
+| `02/02-definition-and-run-actors.md` | tracked | retain-rewrite | `03/01` | migrated-reviewed | definition/run/draft/published 身份必须显式区分 |
+| `02/03-execution-kernel.md` | tracked | retain-rewrite | `03/03` | migrated-reviewed | 补齐终态收敛与 typed tool error |
+| `02/04-step-modules-catalog.md` | tracked | retain-rewrite | `03/04` | migrated-reviewed | primitive 清单以 catalog 为权威，冻结 SHA 计数，不写「30+」永恒口径 |
 | `02/05-workflows-walkthrough.md` | tracked | split | `11/01`、`11/02` | pending | 走读改为两篇可复现教程；旧章现存 stale reference 属已接受迁移红态 |
 | `02/06-maker-plugin.md` | tracked | move-evolution | `12/03` | pending | Maker 若非当前路径则只保留历史与教训 |
-| `02/07-connectors.md` | tracked | retain-rewrite | `03/07` | pending | 补 capability admission 与 bind/startup 准入，不写查询期刷新 |
-| `02/08-saga-durable-execution.md` | tracked | split | `03/05`、`03/06` | pending | 挂起/信号/审批与补偿恢复分离；ADR 状态漂移与代码事实分开 |
+| `02/07-connectors.md` | tracked | retain-rewrite | `03/07` | migrated-reviewed | 补 capability admission 与 bind/startup 准入，不写查询期刷新 |
+| `02/08-saga-durable-execution.md` | tracked | split | `03/05`、`03/06` | migrated-reviewed | 挂起/信号/审批与补偿恢复分离；ADR 状态漂移与代码事实分开 |
 | `02/index.md` | tracked | rewrite-in-place | `02/index.md` | n/a | Task 19 原位改写 |
 | `03/01-agent-actor-runtime.md` | tracked | retain-rewrite | `02/01` | migrated-reviewed | Agent/Actor/Runtime/Stream 四层边界 |
 | `03/02-event-envelope-vs-state-event.md` | tracked | split | `02/02`、`02/04` | migrated-reviewed | 消息语义与状态事实分成两章，杜绝 envelope 冒充事实源 |

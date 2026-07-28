@@ -42,13 +42,13 @@
 
 ## `03` Workflow 编排（7）
 
-- [ ] `03/01-workflow-model-and-identities.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/180
-- [ ] `03/02-yaml-schema-and-validation.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/181
-- [ ] `03/03-execution-kernel-and-outcomes.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/182
-- [ ] `03/04-primitives-catalog.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/183
-- [ ] `03/05-pause-signal-approval-and-resume.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/184
-- [ ] `03/06-saga-compensation-and-recovery.md` — status:mixed — issue:https://github.com/eanzhao-os/aevatar-review/issues/185
-- [ ] `03/07-connectors-and-capability-admission.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/186
+- [x] `03/01-workflow-model-and-identities.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/180
+- [x] `03/02-yaml-schema-and-validation.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/181
+- [x] `03/03-execution-kernel-and-outcomes.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/182
+- [x] `03/04-primitives-catalog.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/183
+- [x] `03/05-pause-signal-approval-and-resume.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/184
+- [x] `03/06-saga-compensation-and-recovery.md` — status:mixed — issue:https://github.com/eanzhao-os/aevatar-review/issues/185
+- [x] `03/07-connectors-and-capability-admission.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/186
 
 ## `04` AI 执行与工具（5）
 
