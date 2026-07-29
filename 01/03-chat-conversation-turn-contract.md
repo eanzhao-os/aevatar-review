@@ -191,7 +191,7 @@ resume / signal / stop 不属于 conversation 协议，它们定位的是 run：
 
 - **当前（current）**：本章全部论断以冻结基线代码为准。身份服务端签发、续聊准入、scope 信任链、turn 幂等追加均有 E1 证据。
 - **演进（为什么变成这样）**：上游 issues #2834、#2915、#2920 是本契约成型的直接动因（本仓库 docs/migration 下的 2026-07-25 issue 证据账本中，三行均分类为 landed-current 并各自带 E1 锚点）。#2834 把 `POST /api/chat` 的 conversation 契约重构为"后端拥有 `conversationId` 与 `turnId`"——本章的所有权模型即其落地；#2920 修复"续聊只归档消息、不把历史注入执行"——即上文 `ConversationContext` 注入链路；#2915 修复 LLM delta 未投影到 SSE，属于同一 chat 表面的投影链路闭合，不改变身份契约本身。三者解释了"为什么是服务端拥有 + 准入 + 注入"这个组合，但实现状态以本章 E1 为准，不由 issue 状态证明。
-- **历史/已移除**：HTTP body 里的 `scopeId` 是 legacy 字段，当前被显式忽略；`sessionId` 从来不是 conversation 身份。旧篇章 `00/04-chat-request-lifecycle.md` 提供全链路地图，可配合阅读。
+- **历史/已移除**：HTTP body 里的 `scopeId` 是 legacy 字段，当前被显式忽略；`sessionId` 从来不是 conversation 身份。请求传输、ACK 与终态观察的全链路地图见 [请求与流式生命周期](04-request-streaming-lifecycle.md)。
 - **开放缺口**：`MaxTurns = 250` 触顶后的产品行为（开新会话还是截断）在代码里只有拒绝，没有自动迁移策略；跨 scope 的会话迁移不存在——删除即 `ConversationDeletedEvent`，续聊一律 404。
 
 ## 读完应能回答
