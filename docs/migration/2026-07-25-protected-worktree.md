@@ -48,7 +48,7 @@
 
 | 路径 | XY | owner | HEAD blob（前 12） | worktree SHA-256 | 迁移落点 | migration_status |
 |---|---|---|---|---|---|---|
-| `10/07-scheduled-task-not-firing.md` | ` M` | user-existing | `3d6a5f95ee31` | `c9cf3458f5b8d8c0b9c9f8b1f6a7c758470e7fcb09ddb1839780cdaba23e7192` | `09/02`、`12/04`（新增的第四类"reminder 收尾丢上下文"必须与既有三类根因分层保留，不得合并成一句） | `unreviewed` |
+| `10/07-scheduled-task-not-firing.md` | ` M` | user-existing | `3d6a5f95ee31` | `c9cf3458f5b8d8c0b9c9f8b1f6a7c758470e7fcb09ddb1839780cdaba23e7192` | `09/02`、`12/04`（第四类"reminder 收尾丢上下文"已与既有三类根因分层保留） | `migrated-reviewed` |
 
 该文件的未提交改动新增了第四类"定时任务不触发"根因（一次性回调触发后收尾注销失败，tick 被 Orleans
 记为投递错误、物理 reminder 行不删除）。它是**尚未提交的用户内容**，不得被本任务提交、还原或覆盖；
@@ -81,9 +81,9 @@ Task 14 与 Task 17 迁移 `09/02` 与 `12/04` 时必须重新取哈希并按节
 
 | 路径 | owner | HEAD blob（前 12） | 最近提交 | 迁移落点 | migration_status |
 |---|---|---|---|---|---|
-| `07/12-scheduled-tasks.md` | user-existing | `6dc6cf120add` | `bab63e8` | `09/01`、`09/02`、`09/03`、`09/04`、`12/04` | `unreviewed` |
-| `09/03-provision-and-observe-via-nyxid/02-scheduled-agent-key-production-canary.md` | user-existing | `114817a9698d` | `da089e1` | `09/05`、`12/04` | `unreviewed` |
-| `09/03-provision-and-observe-via-nyxid/index.md` | user-existing | `71dcf0ae50e1` | `da089e1` | `09/index.md`（Task 19 原位改写）、`09/05` | `unreviewed` |
+| `07/12-scheduled-tasks.md` | user-existing | `6dc6cf120add` | `bab63e8` | `09/01`、`09/02`、`09/03`、`09/04`、`12/04` | `migrated-reviewed` |
+| `09/03-provision-and-observe-via-nyxid/02-scheduled-agent-key-production-canary.md` | user-existing | `114817a9698d` | `da089e1` | `09/05`、`12/04` | `migrated-reviewed` |
+| `09/03-provision-and-observe-via-nyxid/index.md` | user-existing | `71dcf0ae50e1` | `da089e1` | `09/index.md`（Task 19 原位改写）、`09/05` | `migrated-reviewed` |
 | `07/index.md` | user-existing | `f24150cc40c0` | `bab63e8` | `07/index.md`、`08/index.md`、`09/index.md`（Task 19 原位改写） | `pending` |
 | `10/index.md` | user-existing | `05b07bbd30f6` | `bab63e8` | `10/index.md`、`12/index.md`（Task 19 原位改写） | `pending` |
 | `PLAN.md` | user-existing | `953b6241a587` | `bab63e8` | `PLAN.md`（Task 19 合并改写为 72 行清单，不整文件覆盖） | `pending` |
@@ -117,11 +117,11 @@ Task 14 协调前重新枚举只发现既有 `.superpowers/` 与 `CLAUDE_HANDOFF
 
 | 路径 | 当前 blob（前 12） | 当前 SHA-256 | 已迁入落点 | 尚待落点 | migration_status |
 |---|---|---|---|---|---|
-| `07/12-scheduled-tasks.md` | `6dc6cf120add` | `1eb1dc5c6b559347b881117a8136c47770e9de6d001ca3dd560d7dc3a09673a1` | §0–1 资源/API→`09/01`；§2 callback/fire→`09/02`；§3 Agent Key/Vault→`09/03–04`；§4–5 ACK/补偿→`09/01`、`09/04`；§6–8 current surface与验证层级→`09/01–05` | §6 fire-time exchange历史与事故教训→`12/04` | `unreviewed` |
-| `10/07-scheduled-task-not-firing.md` | `7718b7ad24a0` | `c9cf3458f5b8d8c0b9c9f8b1f6a7c758470e7fcb09ddb1839780cdaba23e7192` | §0、§4 的current callback ownership、one-shot grain-context修复→`09/02` | §1–4 四类根因各自的症状/根因/修复/余限→`12/04` | `unreviewed` |
-| `09/03/provision-and-observe-via-nyxid/02-scheduled-agent-key-production-canary.md` | `85f5b61ac091` | `cb2ae417ad2d3bf7796b91a7a5f6a3620bb6623dc574312f58efb02d6dbb5d8e` | §0、§2–5、§6四次证据、§6.1前置失败、§7–9恢复/检查单/结论→`09/05`，其中授权与Vault边界分别回指`09/03–04` | 版本化生产缺口、projection repair与第四次前置事故→`12/04` | `unreviewed` |
-| `09/03/provision-and-observe-via-nyxid/index.md` | `71dcf0ae50e1` | `c2551412e7ac21fb639751d3a57af9a776e080cf2a30ddb50dfb1e278d67c9e0` | production evidence导读意图→`09/05` | 目录导航→Task 19 的`09/index.md`、`12/index.md` | `unreviewed` |
+| `07/12-scheduled-tasks.md` | `6dc6cf120add` | `1eb1dc5c6b559347b881117a8136c47770e9de6d001ca3dd560d7dc3a09673a1` | §0–1 资源/API→`09/01`；§2 callback/fire→`09/02`；§3 Agent Key/Vault→`09/03–04`；§4–5 ACK/补偿→`09/01`、`09/04`；§6–8 current surface与验证层级→`09/01–05` | §6 fire-time exchange历史、credential/callback事故与证据边界→`12/04` | `migrated-reviewed` |
+| `10/07-scheduled-task-not-firing.md` | `7718b7ad24a0` | `c9cf3458f5b8d8c0b9c9f8b1f6a7c758470e7fcb09ddb1839780cdaba23e7192` | §0、§4 的current callback ownership、one-shot grain-context修复→`09/02` | §1–4 四类根因各自的症状/root boundary/fix/remaining limit→`12/04` | `migrated-reviewed` |
+| `09/03-provision-and-observe-via-nyxid/02-scheduled-agent-key-production-canary.md` | `85f5b61ac091` | `cb2ae417ad2d3bf7796b91a7a5f6a3620bb6623dc574312f58efb02d6dbb5d8e` | §0、§2–5、§6四次证据、§6.1前置失败、§7–9恢复/检查单/结论→`09/05`，其中授权与Vault边界分别回指`09/03–04` | 版本化生产缺口、projection repair与第四次前置事故→`12/04` | `migrated-reviewed` |
+| `09/03-provision-and-observe-via-nyxid/index.md` | `71dcf0ae50e1` | `c2551412e7ac21fb639751d3a57af9a776e080cf2a30ddb50dfb1e278d67c9e0` | production evidence导读意图→`09/05` | 目录导航意图已映射到Task 19原位改写的`09/index.md`、`12/index.md` | `migrated-reviewed` |
 
-这里的 `unreviewed` 是有意保留的中间态：`09` 已逐节承接 current model 与四次证据强度，但`12/04`尚未写作，
-因此不能提前宣称受保护输入已经完成全落点复核。Task 17 必须再次按上述 SHA-256 比对并把四类 schedule 事故、
-canary audit/provenance 缺口无损收拢后，才能把对应行推进为 `migrated-reviewed`。
+Task 17 按上述 SHA-256 重新比对了四份输入：`09/01–05` 承接current model与四次证据强度，`12/04`分别保留
+四类schedule根因、四次canary的不同证明力、projection repair与audit/provenance限制。内容迁移已逐节复核；
+原文件是否删除、块索引何时切换仍由Task 19原子步骤控制。

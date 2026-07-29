@@ -119,11 +119,11 @@
 
 ## `12` 架构演进、案例与开放缺口（5）
 
-- [ ] `12/01-evolution-method-and-timeline.md` — status:historical — issue:https://github.com/eanzhao-os/aevatar-review/issues/230
-- [ ] `12/02-issue-decisions-by-theme.md` — status:mixed — issue:https://github.com/eanzhao-os/aevatar-review/issues/231
-- [ ] `12/03-retired-and-superseded-components.md` — status:historical — issue:https://github.com/eanzhao-os/aevatar-review/issues/232
-- [ ] `12/04-incident-case-studies.md` — status:mixed — issue:https://github.com/eanzhao-os/aevatar-review/issues/233
-- [ ] `12/05-open-gaps-and-canon-drift.md` — status:target — issue:https://github.com/eanzhao-os/aevatar-review/issues/234
+- [x] `12/01-evolution-method-and-timeline.md` — status:historical — issue:https://github.com/eanzhao-os/aevatar-review/issues/230
+- [x] `12/02-issue-decisions-by-theme.md` — status:mixed — issue:https://github.com/eanzhao-os/aevatar-review/issues/231
+- [x] `12/03-retired-and-superseded-components.md` — status:historical — issue:https://github.com/eanzhao-os/aevatar-review/issues/232
+- [x] `12/04-incident-case-studies.md` — status:mixed — issue:https://github.com/eanzhao-os/aevatar-review/issues/233
+- [x] `12/05-open-gaps-and-canon-drift.md` — status:target — issue:https://github.com/eanzhao-os/aevatar-review/issues/234
 
 ## `13` 术语与事实源索引（4）
 
