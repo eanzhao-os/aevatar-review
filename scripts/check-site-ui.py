@@ -17,7 +17,7 @@ WORKFLOW = ROOT / ".github/workflows/docs.yml"
 CSS_RELATIVE = Path("stylesheets/extra.css")
 CSS_SOURCE = ROOT / "docs" / CSS_RELATIVE
 DESKTOP_MEDIA = "@media screen and (min-width: 76.25em)"
-CURRENT_TOP_LEVEL_COUNT = 14
+CURRENT_TOP_LEVEL_COUNT = 15
 
 
 class TabsParser(HTMLParser):
