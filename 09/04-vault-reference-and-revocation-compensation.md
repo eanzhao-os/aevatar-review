@@ -14,6 +14,8 @@ verified_at: 2026-07-25
 - `src/Aevatar.Foundation.Abstractions/Credentials/credential_secret_references.proto:7-15`、`agents/Aevatar.GAgents.Scheduled/StudioScheduledCredentialMaterializer.cs:30-133`：typed `SecretReference`、requested locator、one-time issued material写Vault及失败清理。
 - `docs/adr/0043-scheduled-credential-lifecycle-compensation.md:20-66`、`agents/Aevatar.GAgents.Scheduled/protos/user_agent_catalog.proto:80-146`：通用scheduled credential的intent-first双轨补偿、`REQUESTED_NOT_CONFIRMED`与`BLOCKED_MISSING_SECRET_REF` repair。第三项属于与Team Automation相邻的历史修复路径，本章会明确owner边界。
 
+这里按 schedule state、secret materialization、历史 repair contract 三个设计边界分组；后两项各含一对相互约束的证据，因此共有五条路径。它们只属于事实源清单，不构成正文骨架。
+
 ## Secret custody：状态保存定位符，不保存可用秘密
 
 `SecretReference`包含 `ref`、`purpose`、fingerprint、version、owner scope与时间边界；它是一份“怎样在正确owner与purpose下定位某个secret”的typed descriptor，不是secret本身。Team Automation在actor state里的credential形状只有：
