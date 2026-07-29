@@ -210,14 +210,15 @@ AEVATAR_FROZEN=$(bash scripts/materialize-frozen-upstream.sh \
   --repo /Users/eanzhao/Code/aevatar \
   --sha f02aa690bbebb9cabeac30a553d737486b0eb661)
 
-test "$(shasum -a 256 07/12-scheduled-tasks.md | awk '{print $1}')" = \
-  1eb1dc5c6b559347b881117a8136c47770e9de6d001ca3dd560d7dc3a09673a1
-test "$(shasum -a 256 10/07-scheduled-task-not-firing.md | awk '{print $1}')" = \
-  c9cf3458f5b8d8c0b9c9f8b1f6a7c758470e7fcb09ddb1839780cdaba23e7192
-test "$(shasum -a 256 09/03-provision-and-observe-via-nyxid/02-scheduled-agent-key-production-canary.md | awk '{print $1}')" = \
-  cb2ae417ad2d3bf7796b91a7a5f6a3620bb6623dc574312f58efb02d6dbb5d8e
-test "$(shasum -a 256 09/03-provision-and-observe-via-nyxid/index.md | awk '{print $1}')" = \
-  c2551412e7ac21fb639751d3a57af9a776e080cf2a30ddb50dfb1e278d67c9e0
+ledger=docs/migration/2026-07-25-protected-worktree.md
+for hash in \
+  1eb1dc5c6b559347b881117a8136c47770e9de6d001ca3dd560d7dc3a09673a1 \
+  c9cf3458f5b8d8c0b9c9f8b1f6a7c758470e7fcb09ddb1839780cdaba23e7192 \
+  cb2ae417ad2d3bf7796b91a7a5f6a3620bb6623dc574312f58efb02d6dbb5d8e \
+  c2551412e7ac21fb639751d3a57af9a776e080cf2a30ddb50dfb1e278d67c9e0; do
+  rg -q "$hash" "$ledger"
+done
+test "$(rg -c '\| `migrated-reviewed` \|' "$ledger")" -ge 4
 
 test -f "$AEVATAR_FROZEN/src/Aevatar.Capabilities/AevatarScopeAccessGuard.cs"
 test -f "$AEVATAR_FROZEN/src/platform/Aevatar.GAgentService.Core/Schedules/ScheduledDispatchGAgent.cs"
@@ -233,7 +234,7 @@ printf '%s\n' 'incident-evidence: protected hashes and frozen owners verified'
 - 为什么保留矛盾：功能完成、read model可见、外部 delivered、audit collected和provenance attested是不同证明对象。
 - 为什么不写“已彻底修复”：每个 current fix后仍列 frozen limitation或外部边界；真正开放项统一进入 [12/05](05-open-gaps-and-canon-drift.md)。
 - 历史 commit只解释当时 fix；本章的 current句子另有冻结 E1。生产 E3只绑定source/image/date/environment。
-- 受保护输入在 Task 19删除前还要由协调账本记录 `migrated-reviewed`；本章内容本身不授权删除源文件。
+- 受保护输入已由 Task 19 协调账本记录为 `migrated-reviewed` 后删除；源内容由 Git 历史归档，本章与账本共同保留新落点、哈希和证据强度。
 
 ## 读完应能回答
 
