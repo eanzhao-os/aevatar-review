@@ -161,7 +161,7 @@ def repo_form(root: Path, logical: str) -> str:
 
 
 def markdown_files(root: Path) -> List[Path]:
-    skip = {".git", ".refactor-loop", ".worktrees", "site", "node_modules"}
+    skip = {".git", ".refactor-loop", ".superpowers", ".worktrees", "site", "node_modules"}
     out: List[Path] = []
     for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = [d for d in dirnames if d not in skip]

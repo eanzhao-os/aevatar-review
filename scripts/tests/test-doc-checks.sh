@@ -577,6 +577,14 @@ MANIFEST
   python3 "$ROOT/scripts/check-links.py" --repo-root "$repo" --paths 01/07-asset-gone.md > "$tmp/asset2.log" 2>&1
   assert_eq "1" "$?" "validators: a genuinely missing asset must still fail"
 
+  # Skill-private runtime Markdown is not part of the repository or book.
+  # --all must not scan it, even when it contains host-local absolute links.
+  local runtime_repo="$tmp/runtime-repo"
+  mkdir -p "$runtime_repo/.superpowers/task4"
+  printf '# Runtime note\n\n[host-local](/aevatar/private/path.md)\n' > "$runtime_repo/.superpowers/task4/batch.md"
+  python3 "$ROOT/scripts/check-links.py" --repo-root "$runtime_repo" --all > "$tmp/runtime-links.log" 2>&1
+  assert_eq "0" "$?" "validators: --all must ignore .superpowers skill-private runtime Markdown"
+
   # ---------------- check-drift ----------------
   printf 'nav:\n  - 首页: index.md\n  - 01 旧: 01/01-old.md\n' > "$repo/mkdocs.yml"
   printf '# README\n\n本书共 43 篇章节。\n' > "$repo/README.md"
