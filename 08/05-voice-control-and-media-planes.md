@@ -14,6 +14,8 @@ verified_at: 2026-07-25
 - `src/Aevatar.Foundation.VoicePresence.Abstractions/Sessions/IVoiceVolatileMediaStreamPort.cs:3-50`、`src/Aevatar.Foundation.VoicePresence/Hosting/VoiceVolatileMediaStreamPort.cs:43-100`：live relay 按 transport lease 寻址，找不到 relay 必须暴露 delivery gap。
 - `src/Aevatar.Mainnet.Host.Api/Voice/PolicyAwareVoiceEndpoints.cs:190-250`、`:394-468`：认证 caller 先经 `ChatRoutePolicy` 得到 voice attach target，Host 签发、绑定并释放短期 tool credential reference。
 
+这里按协议、volatile relay、Host 准入三个设计边界分组；第二项同时列出 port 与实现，因此共有四条路径。它们只属于事实源清单，不构成正文骨架。
+
 ## 一条边界：同一会话有三种数据，不是一份状态
 
 Voice 不是第二套 Conversation actor。它是挂在既有 actor 上的 `VoicePresenceModule` capability：persona、tool catalog、回合与注入时机由这个 actor 的事件循环裁决；WebSocket/WebRTC 与 provider connection 只是可丢弃 transport handles。
