@@ -1,3 +1,9 @@
+/* Keep wide diagrams scrollable without widening the whole page. */
+.md-typeset .mermaid {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
 /* Keep every top-level chapter visible when Material renders desktop tabs. */
 @media screen and (min-width: 76.25em) {
   .md-tabs {

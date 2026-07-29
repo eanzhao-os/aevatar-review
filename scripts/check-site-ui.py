@@ -128,6 +128,15 @@ def validate_source() -> int:
     )
 
     css = CSS_SOURCE.read_text(encoding="utf-8")
+    mermaid = declarations(css, ".md-typeset .mermaid")
+    require(
+        re.search(r"max-width\s*:\s*100%\s*;", mermaid) is not None,
+        "Mermaid diagrams must stay within the article width",
+    )
+    require(
+        re.search(r"overflow-x\s*:\s*auto\s*;", mermaid) is not None,
+        "wide Mermaid diagrams must scroll inside their container",
+    )
     desktop_rule = extract_balanced_rule(css, DESKTOP_MEDIA)
     tabs = declarations(desktop_rule, ".md-tabs")
     tab_list = declarations(desktop_rule, ".md-tabs__list")
