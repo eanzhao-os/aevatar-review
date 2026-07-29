@@ -141,6 +141,7 @@ flowchart LR
 | ADR-0021 + Lark completion canon | canon要求failed-post-send诚实终态，冻结CardKit两个partial terminal仍提交success | `docs/canon/lark-reply-completion-semantics.md:25-155`；[08/03 warning](../08/03-lark-delivery-interaction-and-repair.md) | 两条分支产生typed partial/failure，delivery read model回归不再记succeeded；ADR/canon状态反映实际完成度 |
 | ADR-0026 / tool-first ingress | route contract承诺tool set/choice/prefill，generation executor未找到对应消费链 | [08/01 warning](../08/01-ingress-normalization-and-routing.md) | 实现并测试route→catalog→LLM request，或收缩ADR/canon承诺；两边不能继续各说一套 |
 | Agent Profile canon | canon描述SHADOW固定recovery prompt/authority，冻结测试要求SHADOW不改变legacy execution | `docs/canon/nyxid-chat-agent-profile-binding.md:9-70`；[07/03 warning](../07/03-agent-profile-and-immutable-binding.md) | 选择并写明SHADOW语义；codec/materializer/execution tests与canon一致，旧snapshot兼容有fixture |
+| Foundation canon | canon与Foundation README把`IRunManager`、`RunManager`、`RunContextScope`列为current latest-wins机制，冻结代码却没有这些类型，实际上下文传播只找到`IAgentContextAccessor`与`AsyncLocalAgentContext` | `docs/canon/architecture.md:39`、`:82`；`src/Aevatar.Foundation.Core/README.md:19` | owner选择并落地一种事实：实现有测试的stable run manager contract，或从canon/README删除现役声明并明确替代边界；全树类型清单与文档一致 |
 | MassTransit governance | runtime零consumer，但central package、v9 guard与historical ADR/guard语义仍残留 | open `#2209`；[12/03](03-retired-and-superseded-components.md) | 明确删除或保留用途；package/guard/ADR与csproj consumer inventory一致，不再把残留误读为current transport |
 
 为什么把“Proposed 但代码已部分存在”和“Canon 承诺大于代码”都放在这里？前者缺治理接受，后者缺实现事实；两者都不能让读者只看一侧得到错误 current 结论。退出不是机械改status，而是完成双向对账。
@@ -228,5 +229,6 @@ PY
 | `#435/#2418/#2737`是局部E1 drift candidate，不改snapshot成员 | 账本对应三行；[06/04](../06/04-studio-commands-acks-and-readmodels.md)、[09/01](../09/01-automation-resource-api-and-readmodels.md)、[09/03](../09/03-owner-authorization-and-agent-key.md) |
 | current章节warning的owner/limit/exit criterion | 本章“章节发现”表所链接的各章warning |
 | Proposed ADR与code/canon冲突 | 本章“Canon / ADR drift”表列出的冻结ADR/canon与current章节E1 |
+| Foundation latest-wins现役声明缺对应类型 | `docs/canon/architecture.md:39`、`:82`；`src/Aevatar.Foundation.Core/README.md:19`；冻结`src/`类型检索零命中 |
 
 </details>
