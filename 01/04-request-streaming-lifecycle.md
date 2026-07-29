@@ -209,7 +209,7 @@ data: {"timestamp":"1785000002501","stateSnapshot":{"snapshot":{"@type":"type.go
 
 **当前实现（current）**：入口归一化、双帧方言、心跳保活、ACK 强度阶梯、终态帧收敛，均为冻结基线可验证的行为。
 
-**历史 / 已隔离（legacy）**：streaming-proxy（`/api/scopes/{scopeId}/streaming-proxy/...`）是 room-based 多 participant fan-out 的旧链路，已软废弃，sunset 日期 2026-11-25，所有响应携带 `Deprecation` / `Sunset` / `Link: rel="successor-version"` 头（见 `docs/2026-04-02-streaming-proxy-flow.md:5`）。它的 `messages:stream` 是「长连接订阅房间消息流」的另一种流式形态，与本章主链路的「一次 run 一条观测流」语义不同；room CRUD、participant join/post、room fan-out 均不能被 `/v1/responses` 无损替代。迁移分析见 [02-chat-api-and-sse](02-chat-api-and-sse.md)，run 语义本身见 [03-run-semantics](03-run-semantics.md)。
+**历史 / 已隔离（legacy）**：streaming-proxy（`/api/scopes/{scopeId}/streaming-proxy/...`）是 room-based 多 participant fan-out 的旧链路，已软废弃，sunset 日期 2026-11-25，所有响应携带 `Deprecation` / `Sunset` / `Link: rel="successor-version"` 头（见 `docs/2026-04-02-streaming-proxy-flow.md:5`）。它的 `messages:stream` 是「长连接订阅房间消息流」的另一种流式形态，与本章主链路的「一次 run 一条观测流」语义不同；room CRUD、participant join/post、room fan-out 均不能被 `/v1/responses` 无损替代。旧章的流式协议与 run 语义已合并进本章；会话身份边界另见 [Chat / Conversation / Turn 服务端身份契约](03-chat-conversation-turn-contract.md)，未落地的断线续传与 retention 契约只在 [开放缺口](../12/05-open-gaps-and-canon-drift.md) 中登记。
 
 **Open gap**：chat capability 入口无断线续传（无 `id:` / `Last-Event-ID`），断线恢复完全依赖 current-state 读模型；系统内已存在更严格的 replay + fence 范式（NyxIdChat），是否推广到 chat 入口未见落地证据。
 
