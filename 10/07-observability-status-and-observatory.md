@@ -162,7 +162,7 @@ printf 'observation-boundaries: verified-static\n'
 - OTel tag多数仍是experimental；consumer不能把名称当永久schema，稳定项也必须走deprecation周期。
 - `/api/status` 与页面当前匿名可读，内容必须保持operational summary，不能把credential、raw upstream response或跨scope业务数据塞进detail。
 - Observatory跨scope依赖 [10/05](05-authentication-scope-and-admin-authorization.md) 的platform-admin authorizer；`scope=__all__` 本身从不授予权限。
-- #2611已把backend console页面拆成checked-in embedded assets并由Host注入必要配置；页面组织落地不提升其中数据的证据等级。
+- Issue #2611 已把backend console页面拆成checked-in embedded assets并由Host注入必要配置；页面组织落地不提升其中数据的证据等级。
 - 旧Observatory/read-side事故、索引漂移和repair教训统一迁入 [12/04](../12/04-incident-case-studies.md)，不能在本章把“有repair”写成“不会漂移”。
 
 ## 读完应能回答

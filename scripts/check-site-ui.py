@@ -9,6 +9,7 @@ import sys
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
+from urllib.parse import urlparse
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -28,14 +29,21 @@ class TabsParser(HTMLParser):
         self.in_link = False
         self.items: List[Dict[str, object]] = []
         self.stylesheets: List[str] = []
+        self.icons: List[str] = []
+        self.h1_count = 0
 
     def handle_starttag(
         self, tag: str, attrs: List[Tuple[str, Optional[str]]]
     ) -> None:
         attributes = dict(attrs)
         classes = set((attributes.get("class") or "").split())
-        if tag == "link" and "stylesheet" in (attributes.get("rel") or "").split():
+        rel = (attributes.get("rel") or "").split()
+        if tag == "link" and "stylesheet" in rel:
             self.stylesheets.append(attributes.get("href") or "")
+        if tag == "link" and "icon" in rel:
+            self.icons.append(attributes.get("href") or "")
+        if tag == "h1":
+            self.h1_count += 1
         if tag == "nav" and "md-tabs" in classes:
             self.in_tabs = True
         elif self.in_tabs and tag == "li" and "md-tabs__item" in classes:
@@ -97,6 +105,13 @@ def top_level_nav_count(config: str) -> int:
 def validate_source() -> int:
     config = CONFIG.read_text(encoding="utf-8")
     workflow = WORKFLOW.read_text(encoding="utf-8")
+    favicon = re.search(r"(?m)^\s+favicon:\s*(\S+)\s*$", config)
+    if favicon is not None:
+        favicon_path = ROOT / "docs" / favicon.group(1)
+        require(
+            favicon_path.is_file(),
+            f"configured favicon does not exist: {favicon_path.relative_to(ROOT)}",
+        )
     require(
         re.search(r"(?m)^extra_css:\s*$[\s\S]*?^  - stylesheets/extra\.css\s*$", config)
         is not None,
@@ -156,6 +171,29 @@ def validate_built_site(site_dir: Path, expected_count: int) -> None:
         any(href.endswith(CSS_RELATIVE.as_posix()) for href in parser.stylesheets),
         "built index.html does not load stylesheets/extra.css",
     )
+    config = CONFIG.read_text(encoding="utf-8")
+    site_url = re.search(r"(?m)^site_url:\s*(\S+)\s*$", config)
+    require(site_url is not None, "mkdocs.yml has no site_url")
+    site_prefix = urlparse(site_url.group(1)).path.rstrip("/") + "/"
+    for page_path in site_dir.rglob("*.html"):
+        page = TabsParser()
+        page.feed(page_path.read_text(encoding="utf-8"))
+        if page_path.name == "index.html":
+            relative = page_path.relative_to(site_dir)
+            require(
+                page.h1_count == 1,
+                f"built {relative} has {page.h1_count} h1 elements, expected 1",
+            )
+        for href in page.icons:
+            parsed = urlparse(href)
+            if parsed.scheme or parsed.netloc:
+                continue
+            if parsed.path.startswith(site_prefix):
+                icon = site_dir / parsed.path.removeprefix(site_prefix)
+            else:
+                icon = (page_path.parent / parsed.path).resolve()
+            relative = page_path.relative_to(site_dir)
+            require(icon.is_file(), f"built {relative} references missing icon: {href}")
     require(
         len(parser.items) == expected_count,
         f"built index.html has {len(parser.items)} top-level tabs, expected {expected_count}",

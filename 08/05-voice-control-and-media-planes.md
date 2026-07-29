@@ -185,7 +185,7 @@ open #2319 的原始描述已经**部分落地**：
 
 !!! warning "完整 zero-config voice 仍缺 route provisioning"
 
-    #2319 的剩余断点是：authenticated caller没有既有 chat route时，WebSocket不会自动建立可审计的default voice route/actor binding。退出条件是定义route owner、幂等provision identity、失败补偿与并发首次连接规则，并以“空账号第一次连接 → route创建 → actor capability enable → attach”集成测试覆盖。该缺口必须迁入 [12/05](../12/05-open-gaps-and-canon-drift.md)。
+    Issue #2319 的剩余断点是：authenticated caller没有既有 chat route时，WebSocket不会自动建立可审计的default voice route/actor binding。退出条件是定义route owner、幂等provision identity、失败补偿与并发首次连接规则，并以“空账号第一次连接 → route创建 → actor capability enable → attach”集成测试覆盖。该缺口必须迁入 [12/05](../12/05-open-gaps-and-canon-drift.md)。
 
 !!! warning "Restarted 不是可恢复重连"
 

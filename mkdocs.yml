@@ -48,7 +48,6 @@ theme:
     code: JetBrains Mono
   icon:
     logo: material/book-open-variant
-  favicon: assets/favicon.ico
 
 extra:
   social:
