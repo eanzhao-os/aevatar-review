@@ -14,6 +14,8 @@ verified_at: 2026-07-25
 - `src/Aevatar.AI.Infrastructure.ChronoSandbox/ChronoSandboxCodexExecutionAdapter.cs:26-95`、`src/Aevatar.AI.Infrastructure.ChronoSandbox/NyxIdChronoSandboxCodexClient.cs:31-100`：managed target adapter、Vault late resolution、固定NyxID proxy request与sanitized terminal mapping。
 - `docs/canon/managed-codex-execution.md:16-115`：Aevatar、NyxID、Chrono Sandbox、operations之间的所有权、当前gVisor/direct-token选择与延期安全边界。
 
+这里按 runtime-neutral contract、managed adapter、治理边界三个设计面分组；前两项分别成对列出 wire/port 与 adapter/client，因此共有五条路径。它们只属于事实源清单，不构成正文骨架。
+
 ## 一个业务入口，两种基础设施 Target
 
 `codex_exec` 的业务输入不是“给我一段shell和一个容器配置”。`CodexExecutionTarget` 是 `private_ssh | managed_sandbox` 的 `oneof`；workspace也是独立 `oneof`，当前managed target只接受 `empty_git`。调用者提供prompt和timeout，但不能选runner image、sandbox runtime、provider URL、credential、shell flags、任意repository、NyxID slug/route或header。
