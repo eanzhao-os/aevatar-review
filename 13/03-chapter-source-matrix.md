@@ -10,7 +10,7 @@ verified_at: 2026-07-25
 
 ## 设计抽象与事实源
 
-- 本仓库 [章节事实源矩阵](../docs/migration/2026-07-25-source-matrix.md)：72 行 status、spine、E2–E6 与 verified 状态的实施记录。
+- 本仓库 [章节事实源矩阵](../migration/2026-07-25-source-matrix.md)：72 行 status、spine、E2–E6 与 verified 状态的实施记录。
 - `docs/canon/overview.md:16-45`：Command、EventEnvelope、Domain Event、Projection、ReadModel 主链，是 source spine 分层的基准。
 - `docs/canon/module-placement-map.md:9-45`：项目/能力放置与路径语义，帮助读者从章节反查实现区域。
 
@@ -274,8 +274,8 @@ PY
 
 | 论断 | 证据 |
 |---|---|
-| 72 个唯一目标路径与 status | [目标章节清单](../docs/migration/2026-07-25-target-chapters.md) |
-| 每章 spine、E2–E6 与 resolved 状态 | [实施事实源矩阵](../docs/migration/2026-07-25-source-matrix.md) |
+| 72 个唯一目标路径与 status | [目标章节清单](../migration/2026-07-25-target-chapters.md) |
+| 每章 spine、E2–E6 与 resolved 状态 | [实施事实源矩阵](../migration/2026-07-25-source-matrix.md) |
 | 证据等级与合法表述 | [00/02](../00/02-version-evidence-and-status.md) |
 | current / history / operation / target 分层 | [12/01](../12/01-evolution-method-and-timeline.md) |
 
