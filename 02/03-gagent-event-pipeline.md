@@ -189,7 +189,7 @@ public sealed class DemoGAgent : GAgentBase<DemoState>
 - **当前实现**：本章全部论断以 `f02aa690` 的 Local Runtime + `GAgentBase` 为准。Orleans 实现把同一条 agent 管线挂在 grain 上（`src/Aevatar.Foundation.Runtime.Implementations.Orleans/Grains/RuntimeActorGrain.cs:274` 最终同样调用 `HandleEventAsync`），串行 turn 由 Orleans 的 grain 调度模型提供，管线协议本身不变。
 - **已知边界**：相同 Priority 的执行顺序不作承诺（非稳定排序）；无匹配 envelope 的静默丢弃只有 Debug 级痕迹；管线数组按 agent 缓存，增删模块整体重建，进行中的 turn 继续使用它进入时拿到的数组快照。
 - **上游逃逸口**：`IEventModule.cs` 还定义了标记接口 `IRouteBypassModule`，供上层（AI 层路由包装器）让某些模块绕过路由过滤始终参与管线；那是 04 块的话题，本章不展开。
-- **历史**：旧章 `03/03-gagent-base.md` 已从「统一管线 + 双 hook」角度写过这一机制；本章按新契约把视角收紧到「一条消息进入 actor 之后」的完整链路，并补齐 turn 边界与自我继续。
+- **历史**：结构切换前的 GAgentBase 章节曾从「统一管线 + 双 hook」角度解释这一机制；本章按新契约把视角收紧到「一条消息进入 actor 之后」的完整链路，并补齐 turn 边界与自我继续。
 
 ## 读完应能回答
 
