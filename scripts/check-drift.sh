@@ -44,7 +44,8 @@ GAPS="12/05-open-gaps-and-canon-drift.md"
 
 findings="$(mktemp)"
 active="$(mktemp)"
-trap 'rm -f "$findings" "$active"' EXIT
+targets="$(mktemp)"
+trap 'rm -f "$findings" "$active" "$targets"' EXIT
 
 add() { printf '%s\n' "$1" >>"$findings"; }
 
@@ -52,13 +53,18 @@ add() { printf '%s\n' "$1" >>"$findings"; }
 # files, minus the immutable migration evidence.
 {
   find . -path './.git' -prune -o -path './site' -prune -o \
-       -path './.refactor-loop' -prune -o -path './.worktrees' -prune -o \
+       -path './.refactor-loop' -prune -o -path './.superpowers' -prune -o \
+       -path './.worktrees' -prune -o -name 'CLAUDE_HANDOFF_PROMPT.md' -prune -o \
        -path './docs/superpowers' -prune -o -path './docs/migration' -prune -o \
        -type f -name '*.md' -print 2>/dev/null | sed 's|^\./||'
   for extra in mkdocs.yml .config/upstream-sync/chapter-source-map.json; do
     [ -f "$extra" ] && printf '%s\n' "$extra"
   done
 } | sort -u > "$active"
+
+if [ -f "$MANIFEST" ]; then
+  sed -nE 's/^- \[[ x]\] `([^`]+)` — status:.*/\1/p' "$MANIFEST" > "$targets"
+fi
 
 # 1. retired paths still referenced from an active surface
 if [ -f "$RETIRE_LIST" ]; then
@@ -90,11 +96,11 @@ fi
 while IFS= read -r surface; do
   [ -z "$surface" ] && continue
   [ -f "$surface" ] || continue
-  if grep -nE '(共|计)?[^0-9](43|83|85)[[:space:]]*(篇|个)(章节|实质章节)?' "$surface" >/dev/null 2>&1; then
+  if grep -nE '(共|计)?[^0-9](43|83|85)[[:space:]]*(篇|个)(实质)?章节' "$surface" >/dev/null 2>&1; then
     while IFS= read -r hit; do
       add "stale chapter-count claim: $surface:$hit"
     done <<EOF
-$(grep -nE '(共|计)?[^0-9](43|83|85)[[:space:]]*(篇|个)(章节|实质章节)?' "$surface" | head -3)
+$(grep -nE '(共|计)?[^0-9](43|83|85)[[:space:]]*(篇|个)(实质)?章节' "$surface" | head -3)
 EOF
   fi
 done < "$active"
@@ -113,6 +119,7 @@ fi
 while IFS= read -r surface; do
   [ -z "$surface" ] && continue
   [ -f "$surface" ] || continue
+  grep -qxF -- "$surface" "$targets" || continue
   case "$surface" in "$GAPS") continue ;; esac
   grep -q '设计待论证' "$surface" || continue
   if [ ! -f "$GAPS" ] || ! grep -qF -- "$surface" "$GAPS"; then
@@ -125,6 +132,7 @@ RETIRED_COMPONENTS='A2A|MassTransit|StateMirror|SkillRunnerGAgent'
 while IFS= read -r surface; do
   [ -z "$surface" ] && continue
   [ -f "$surface" ] || continue
+  grep -qxF -- "$surface" "$targets" || continue
   case "$surface" in
     12/*|*/index.md|mkdocs.yml|*.json) continue ;;
   esac

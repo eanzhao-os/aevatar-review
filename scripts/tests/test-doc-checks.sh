@@ -593,6 +593,19 @@ MANIFEST
   assert_contains "$tmp/drift.log" "01/01-old.md" "validators: retired nav path must be named"
   assert_contains "$tmp/drift.log" "43" "validators: stale chapter-count claim must be named"
 
+  # Runtime/private handoff notes are not active reader surfaces, and an ADR
+  # inventory count is not a stale chapter-count claim.
+  printf 'nav:\n  - 首页: index.md\n  - 00 新: 00/01-good.md\n' > "$repo/mkdocs.yml"
+  printf '# README\n\n本书共 72 篇实质章节。\n' > "$repo/README.md"
+  sed 's/^- \[ \]/- [x]/' "$repo/docs/migration/2026-07-25-target-chapters.md" > "$tmp/checked-manifest.md"
+  mv "$tmp/checked-manifest.md" "$repo/docs/migration/2026-07-25-target-chapters.md"
+  mkdir -p "$repo/.superpowers/task"
+  printf '# Runtime\n\n01/01-old.md 设计待论证 MassTransit\n' > "$repo/.superpowers/task/note.md"
+  printf '# Handoff\n\n旧路径 01/01-old.md，本轮有 85 个删除路径。\n' > "$repo/CLAUDE_HANDOFF_PROMPT.md"
+  printf -- '---\nstatus: mixed\n---\n\n# Canon 与 ADR\n\n冻结库存含 43 篇 ADR。\n' > "$repo/13/02-reference.md"
+  bash "$ROOT/scripts/check-drift.sh" --repo-root "$repo" > "$tmp/drift-scope.log" 2>&1
+  assert_eq "0" "$?" "validators: drift scan must ignore runtime/handoff notes and non-chapter inventory counts"
+
   rm -rf "$tmp"
 }
 
