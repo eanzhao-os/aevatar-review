@@ -127,7 +127,7 @@
 
 ## `13` 术语与事实源索引（4）
 
-- [ ] `13/01-glossary.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/235
-- [ ] `13/02-canon-and-adr-index.md` — status:mixed — issue:https://github.com/eanzhao-os/aevatar-review/issues/236
-- [ ] `13/03-chapter-source-matrix.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/237
-- [ ] `13/04-issue-evolution-index.md` — status:mixed — issue:https://github.com/eanzhao-os/aevatar-review/issues/238
+- [x] `13/01-glossary.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/235
+- [x] `13/02-canon-and-adr-index.md` — status:mixed — issue:https://github.com/eanzhao-os/aevatar-review/issues/236
+- [x] `13/03-chapter-source-matrix.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/237
+- [x] `13/04-issue-evolution-index.md` — status:mixed — issue:https://github.com/eanzhao-os/aevatar-review/issues/238

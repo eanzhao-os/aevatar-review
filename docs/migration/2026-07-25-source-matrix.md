@@ -95,7 +95,7 @@ E1 列写入的是**已批准的脊柱候选**（来自计划主题表），实�
 | `12/03-retired-and-superseded-components.md` | historical | `tools/ci/architecture_guards.sh:578-592`、`:1501-1531`; `docs/canon/cqrs-projection.md:9-32`、`:104-129`; `agents/Aevatar.GAgents.Channel.Runtime/ChannelMetadataKeys.cs:24-78` | CQRS canon 与 architecture guards 说明现役替代边界；Lark 中立化仍是 partial | — | `#2731`、`#2732`、`#2733` 支撑旧 SkillRunner 路径删除与防回流 | `#2209` 记录 MassTransit residue 未决 | `#2350`、`#2676`、`#2683`、`#2735`、`#2742`、`#2778` 与历史删除 commits | resolved |
 | `12/04-incident-case-studies.md` | mixed | `src/Aevatar.Capabilities/AevatarScopeAccessGuard.cs:18-44`、`:57-75`、`:98-140`; `src/platform/Aevatar.GAgentService.Application/Responses/ResponsesToolClassificationService.cs:56-170`; `src/platform/Aevatar.GAgentService.Core/Schedules/ScheduledDispatchGAgent.cs:50-72`、`:904-1008`、`:1833-1854` | — | 四次 canary 严格绑定 source/image/date/environment；功能、cron、6201/6202 与 provenance 不互相代替 | `#2355`、`#2377`、`#2451`、`#2620`、`#2670`、`#2673`、`#2678`、`#2703`、`#2829`、`#2862`、`#2913` | — | 旧 `10/*` 与四份受保护 schedule/canary 输入逐节保留为事故证据 | resolved |
 | `12/05-open-gaps-and-canon-drift.md` | target | `docs/adr/0034-workflow-saga-compensation-protocol.md:1-20`; `docs/canon/lark-reply-completion-semantics.md:25-155` | Proposed ADR 落后于 E1、canon 承诺大于 E1 都只登记 drift，不晋级 current | — | 12 个 frozen-closed drift/failed 证据行（issue 账本 §4） | frozen-open 126 行六类无损覆盖，含 target-only `#2954–#2957` | — | resolved |
-| `13/01-glossary.md` | current | 索引章：证据来自本表与 issue 账本，不单列代码脊柱 | — | — | — | — | — | pending |
-| `13/02-canon-and-adr-index.md` | mixed | 索引章：证据来自本表与 issue 账本，不单列代码脊柱 | — | — | — | — | — | pending |
-| `13/03-chapter-source-matrix.md` | current | 索引章：证据来自本表与 issue 账本，不单列代码脊柱 | — | — | — | — | — | pending |
-| `13/04-issue-evolution-index.md` | mixed | 索引章：证据来自本表与 issue 账本，不单列代码脊柱 | — | — | — | — | — | pending |
+| `13/01-glossary.md` | current | 索引章：证据来自本表与 issue 账本，不单列代码脊柱 | — | — | — | — | — | resolved |
+| `13/02-canon-and-adr-index.md` | mixed | 索引章：证据来自本表与 issue 账本，不单列代码脊柱 | — | — | — | — | — | resolved |
+| `13/03-chapter-source-matrix.md` | current | 索引章：证据来自本表与 issue 账本，不单列代码脊柱 | — | — | — | — | — | resolved |
+| `13/04-issue-evolution-index.md` | mixed | 索引章：证据来自本表与 issue 账本，不单列代码脊柱 | — | — | — | — | — | resolved |

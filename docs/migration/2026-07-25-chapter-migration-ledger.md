@@ -82,8 +82,8 @@
 | `07/12-scheduled-tasks.md` | protected | promote-current+split | `09/01`、`09/02`、`09/03`、`09/04`、`12/04` | migrated | canonical资源、callback、Agent Key与Vault生命周期已迁入`09/01–04`；fire-time凭证、callback与canary证据边界已逐节迁入`12/04` |
 | `07/13-lark-bot-registration.md` | tracked | merge | `08/03`、`11/04` | migrated-reviewed | registration/repair事实与webhook、callback、status分层教程已迁移并复核 |
 | `07/index.md` | protected | rewrite-in-place | `07/index.md`、`08/index.md`、`09/index.md` | n/a | 受保护索引；Task 19 原位改写并把导航拆到三个新块 |
-| `08/01-glossary.md` | tracked | retain-rewrite | `13/01` | pending | 术语表补齐易混对，每词一个定义 |
-| `08/02-doc-index.md` | tracked | retain-rewrite | `13/02` | pending | canon/ADR 索引从冻结快照重新生成，状态从正文解析 |
+| `08/01-glossary.md` | tracked | retain-rewrite | `13/01-glossary.md` | migrated-reviewed | 42 个唯一术语已迁入，必需词、owner/boundary、章节落点与易混对象均已复核 |
+| `08/02-doc-index.md` | tracked | retain-rewrite | `13/02-canon-and-adr-index.md` | migrated-reviewed | 冻结快照的 39 篇 canon + 43 篇 ADR 已完整重建索引，raw status、导读、落点与 drift/lifecycle 标记均已复核 |
 | `08/03-demo-cookbook.md` | tracked | split | `11/01`、`11/02`、`11/03`、`11/04`、`11/05` | migrated-reviewed | cookbook已拆成五篇verified-static教程，统一区分receipt、projected state、run/fire与外部副作用证据 |
 | `08/04-todo-list.md` | tracked | move-evolution | `12/05` | migrated | 旧TODO已重审为带owner、current limit、evidence与exit criterion的开放缺口/canon drift登记 |
 | `08/05-crystallization-roadmap.md` | tracked | move-evolution | `12/01`、`12/05` | migrated | 路线口吻已拆为`12/01`的历史方法与`12/05`的target缺口，不再伪装current能力 |
