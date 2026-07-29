@@ -14,6 +14,8 @@ verified_at: 2026-07-25
 - `src/platform/Aevatar.GAgentService.Application/Responses/ResponsesToolClassificationService.cs:56-170`、`src/platform/Aevatar.GAgentService.Application/Responses/LlmSessionRunObservationAccumulator.cs:18-52`：server-owned 与 client-forwarded tool 分类，以及只在 completion 暴露 forwarded calls 的 current ownership boundary。
 - `src/platform/Aevatar.GAgentService.Core/Schedules/ScheduledDispatchGAgent.cs:50-72`、`:904-1008`、`:1833-1854`：重激活按已武装时刻恢复、manual/scheduled fire 分流与 overdue catch-up 的 current schedule owner。
 
+这里按 scope、tool ownership、schedule 三个事故边界分组；第二项同时列出分类与 observation accumulator，因此共有四条路径。它们只属于事实源清单，不构成正文骨架。
+
 ## 先建立模型：事故发生在跨边界推断处
 
 ```mermaid
