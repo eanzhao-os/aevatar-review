@@ -189,7 +189,7 @@ curl http://127.0.0.1:5000/api/workflow-actors/{actorId}/current-state
 
 - **current(本章全部内容)**:Workflow Host 的协议层定位、`/api/chat` 请求/帧契约、端口与配置来源、`simple_qa` 的文件加载解析。
 - **产品面(current,非本章主题)**:Mainnet 的正式契约是 scope-first(`/api/scopes/{scopeId}/workflow/draft-run`、`/binding`、`/invoke/chat:stream` 等,`src/Aevatar.Mainnet.Host.Api/README.md:137`),本地有三种 profile:脚本默认 `local`(全临时态,重启即清空)、`PersistentLocal`(Orleans + Garnet 保 actor 态,读侧仍临时)、`Distributed`(Kafka + Elasticsearch + Neo4j)。
-- **historical**:Mainnet 上的 `/api/chat`、`/api/ws/chat`、`/api/workflows/resume|signal|stop` 作为 `aevatar app` 运行时 contract 已退役(`src/Aevatar.Mainnet.Host.Api/README.md:214`);框架面上这些端点仍由 Workflow Host 正式提供,旧章 `00/03-quick-start.md` 的"起 Mainnet 调 `/api/chat`"口径因此被本章替换。
+- **historical**:Mainnet 上的 `/api/chat`、`/api/ws/chat`、`/api/workflows/resume|signal|stop` 作为 `aevatar app` 运行时 contract 已退役(`src/Aevatar.Mainnet.Host.Api/README.md:214`);框架面上这些端点仍由 Workflow Host 正式提供,结构切换前 Quick Start 的"起 Mainnet 调 `/api/chat`"口径因此被本章替换。
 - **open gap**:Workflow Host 没有仓库钉死的监听地址契约(无 `launchSettings.json` / `UseUrls`),端口只能以启动日志或显式 `ASPNETCORE_URLS` 为准;文档无法给出"默认端口"的硬承诺。
 
 ## 读完应能回答
