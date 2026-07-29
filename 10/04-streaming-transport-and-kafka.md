@@ -107,7 +107,7 @@ PY
 
 > Demo status：`verified-static`（本轮执行了等价SHA-256映射断言，并静态核对producer、receiver、headers、watermark与冻结integration tests；未连接Kafka或启动Orleans）。
 
-## 为什么当前是 KafkaProvider，而不是 MassTransit
+## 为什么当前是 KafkaProvider，而不是已退役的 MassTransit
 
 历史MassTransit路径把stream transport替换成broker adapter，却没有让Orleans queue ownership与Kafka partition成为同一slot；旧ADR和历史文档还保留其比较价值，但冻结Mainnet `Distributed`选择 `OrleansStreamBackend=KafkaProvider`，当前solution/composition没有把MassTransit作为生产backend装入这条主链。
 
