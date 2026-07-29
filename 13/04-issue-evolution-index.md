@@ -6,11 +6,11 @@ verified_at: 2026-07-25
 
 # Issue 演进索引：280 个冻结成员，一个都不靠状态猜实现
 
-> 版本与结论：本章是 `mixed` 无损索引，成员固定为 154 个 closed + 126 个 open。每行保留 snapshot state、issue/title、classification、八桶主题、implementation evidence status 与章节 destinations；完整 evidence 文本仍由唯一 [Issue 演进账本](../docs/migration/2026-07-25-issue-evidence-ledger.md) 持有。Closed 不自动等于 landed，open 也不自动等于“没有任何基础设施”。
+> 版本与结论：本章是 `mixed` 无损索引，成员固定为 154 个 closed + 126 个 open。每行保留 snapshot state、issue/title、classification、八桶主题、implementation evidence status 与章节 destinations；完整 evidence 文本仍由唯一 [Issue 演进账本](../migration/2026-07-25-issue-evidence-ledger.md) 持有。Closed 不自动等于 landed，open 也不自动等于“没有任何基础设施”。
 
 ## 设计抽象与事实源
 
-- 本仓库 [Issue 演进账本](../docs/migration/2026-07-25-issue-evidence-ledger.md) §3–5 与 `docs/canon/overview.md:16-45`：280 个冻结成员、分类/evidence/destination，以及 current landing 应回到的主链边界。
+- 本仓库 [Issue 演进账本](../migration/2026-07-25-issue-evidence-ledger.md) §3–5 与 `docs/canon/overview.md:16-45`：280 个冻结成员、分类/evidence/destination，以及 current landing 应回到的主链边界。
 - `docs/adr/0037-scheduled-invocation-credential-source-model.md:1-60`：closed `design-only` 的代表，说明 accepted 决策不能冒充完整代码 landing。
 - `docs/canon/scheduled-skill-runners.md:9-32`：删除/替代型 landing 的代表，说明“实现完成”也可能表现为旧 runtime 消失。
 
@@ -493,9 +493,9 @@ PY
 
 | 论断 | 证据 |
 |---|---|
-| canonical cutoff、成员恢复与唯一性 | [Issue 演进账本 §1–2](../docs/migration/2026-07-25-issue-evidence-ledger.md) |
-| closed 七类与逐行 implementation evidence | [Issue 演进账本 §3.1、§4](../docs/migration/2026-07-25-issue-evidence-ledger.md) |
-| open 六类与逐行 current-limit evidence | [Issue 演进账本 §3.2、§5](../docs/migration/2026-07-25-issue-evidence-ledger.md) |
+| canonical cutoff、成员恢复与唯一性 | [Issue 演进账本 §1–2](../migration/2026-07-25-issue-evidence-ledger.md) |
+| closed 七类与逐行 implementation evidence | [Issue 演进账本 §3.1、§4](../migration/2026-07-25-issue-evidence-ledger.md) |
+| open 六类与逐行 current-limit evidence | [Issue 演进账本 §3.2、§5](../migration/2026-07-25-issue-evidence-ledger.md) |
 | 八桶主题归并与计数 | [12/02](../12/02-issue-decisions-by-theme.md) |
 | open gaps、partial drift 与 exit criterion | [12/05](../12/05-open-gaps-and-canon-drift.md) |
 
