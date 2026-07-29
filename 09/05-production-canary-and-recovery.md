@@ -12,7 +12,7 @@ verified_at: 2026-07-25
 
 - `docs/operations/2026-07-23-scheduled-agent-key-production-canary.md:9-31`、`:36-89`、`:2002-2085`：首次生产结果、secret-safe gate、ambiguous-create/revocation recovery与cleanup顺序。
 - `docs/operations/2026-07-23-scheduled-agent-key-runtime-integrity-rollout.md:14-30`、`:32-109`、`:111-168`：old-binary drain、atomic release provenance、live contract、key-use与双轨验收。
-- 受保护迁移输入 `09/03-provision-and-observe-via-nyxid/02-scheduled-agent-key-production-canary.md:236-292`：第二/三/四次owner-only evidence摘要、真实cron、audit缺口、前置失败与恢复矩阵；其当前SHA-256为`cb2ae417ad2d3bf7796b91a7a5f6a3620bb6623dc574312f58efb02d6dbb5d8e`。
+- 本仓库 [受保护工作区账本 §7](../migration/2026-07-25-protected-worktree.md)：退役 canary 输入的第二/三/四次 owner-only evidence、真实 cron、audit 缺口、前置失败与恢复矩阵已逐节迁入本章和 `12/04`；源内容由 Git 历史归档，复核 SHA-256 为 `cb2ae417ad2d3bf7796b91a7a5f6a3620bb6623dc574312f58efb02d6dbb5d8e`。
 
 ## Evidence ladder：每一层回答一个不同问题
 
@@ -175,9 +175,9 @@ jq -e '
 |---|---|
 | 首次生产canary的source/image、exact key transition、6201/6202与cleanup | `docs/operations/2026-07-23-scheduled-agent-key-production-canary.md:9-31`、`:36-59` |
 | strict rollout要求old-binary drain、atomic image set、live sensitive-field gate与完整key/revocation proof | `docs/operations/2026-07-23-scheduled-agent-key-runtime-integrity-rollout.md:32-168` |
-| 第二/三/四次证据等级、版本、时间、缺口与owner-only artifact hash | 受保护输入`09/03-provision-and-observe-via-nyxid/02-scheduled-agent-key-production-canary.md:236-278` |
-| ambiguous create、run unknown、revocation pending与audit缺失的恢复规则 | `docs/operations/2026-07-23-scheduled-agent-key-production-canary.md:2002-2085`、受保护输入`:282-292` |
+| 第二/三/四次证据等级、版本、时间、缺口与owner-only artifact hash | [受保护工作区账本 §7](../migration/2026-07-25-protected-worktree.md) 的逐节迁移与 SHA-256 记录；源内容由 Git 历史归档 |
+| ambiguous create、run unknown、revocation pending与audit缺失的恢复规则 | `docs/operations/2026-07-23-scheduled-agent-key-production-canary.md:2002-2085`、[受保护工作区账本 §7](../migration/2026-07-25-protected-worktree.md) |
 | cleanup必须先完成credential terminal，再按revision/member/draft/Team收尾 | `docs/operations/2026-07-23-scheduled-agent-key-production-canary.md:1624-1953` |
-| phased Responses不能依赖`previous_response_id`保存history | 受保护输入`09/03-provision-and-observe-via-nyxid/02-scheduled-agent-key-production-canary.md:347-348`（2026-07-27 production observation） |
+| phased Responses不能依赖`previous_response_id`保存history | [受保护工作区账本 §7](../migration/2026-07-25-protected-worktree.md) 所登记的 2026-07-27 production observation；源内容由 Git 历史归档 |
 
 </details>
