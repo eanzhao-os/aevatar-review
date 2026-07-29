@@ -606,6 +606,11 @@ MANIFEST
   bash "$ROOT/scripts/check-drift.sh" --repo-root "$repo" > "$tmp/drift-scope.log" 2>&1
   assert_eq "0" "$?" "validators: drift scan must ignore runtime/handoff notes and non-chapter inventory counts"
 
+  # A frozen issue title is snapshot data, not a current-default claim.
+  printf '| `open` | [#1](https://example.invalid/1) | MassTransit cleanup |\n' >> "$repo/00/01-good.md"
+  bash "$ROOT/scripts/check-drift.sh" --repo-root "$repo" > "$tmp/drift-issue-row.log" 2>&1
+  assert_eq "0" "$?" "validators: frozen open/closed issue rows must not be treated as current component prose"
+
   rm -rf "$tmp"
 }
 

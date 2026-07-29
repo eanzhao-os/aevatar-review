@@ -147,6 +147,9 @@ while IFS= read -r surface; do
     line_no="${hit%%:*}"
     text="${hit#*:}"
     case "$text" in
+      '| `open` |'*|'| `closed` |'*) continue ;;
+    esac
+    case "$text" in
       *历史*|*已移除*|*已退役*|*已删除*|*superseded*|*retired*|*removed*) continue ;;
     esac
     add "retired component presented without a retired marker: $surface:$line_no"
