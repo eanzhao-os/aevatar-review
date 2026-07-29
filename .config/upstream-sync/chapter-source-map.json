@@ -233,7 +233,6 @@
     ],
     "08/05-voice-control-and-media-planes.md": [
       "src/Aevatar.Foundation.VoicePresence.Abstractions/Protos/voice_presence.proto",
-      "src/Aevatar.Foundation.VoicePresence.Abstractions/Sessions/IVoiceVolatileMediaStreamPort.cs",
       "src/Aevatar.Foundation.VoicePresence/Hosting/VoiceVolatileMediaStreamPort.cs",
       "src/Aevatar.Mainnet.Host.Api/Voice/PolicyAwareVoiceEndpoints.cs"
     ],
@@ -251,16 +250,12 @@
     "09/03-owner-authorization-and-agent-key.md": [
       "src/platform/Aevatar.GAgentService.Abstractions/Protos/scheduled_invocation_authorization_plan.proto",
       "src/platform/Aevatar.GAgentService.Application/Schedules/Authorization/ScheduledInvocationAuthorizationPlanner.cs",
-      "agents/Aevatar.GAgents.Scheduled/Authoring/ScheduledAgentApiKeyIssuer.cs",
-      "src/Aevatar.Studio.Application/Studio/Services/StudioMemberWorkflowSchedulePort.cs",
-      "docs/adr/0041-scheduled-invocation-agent-key-credential-reference.md"
+      "agents/Aevatar.GAgents.Scheduled/Authoring/ScheduledAgentApiKeyIssuer.cs"
     ],
     "09/04-vault-reference-and-revocation-compensation.md": [
       "src/platform/Aevatar.GAgentService.Core/Schedules/scheduled_dispatch_state.proto",
       "src/Aevatar.Foundation.Abstractions/Credentials/credential_secret_references.proto",
-      "agents/Aevatar.GAgents.Scheduled/StudioScheduledCredentialMaterializer.cs",
-      "docs/adr/0043-scheduled-credential-lifecycle-compensation.md",
-      "agents/Aevatar.GAgents.Scheduled/protos/user_agent_catalog.proto"
+      "agents/Aevatar.GAgents.Scheduled/StudioScheduledCredentialMaterializer.cs"
     ],
     "09/05-production-canary-and-recovery.md": [
       "docs/operations/2026-07-23-scheduled-agent-key-production-canary.md",
@@ -294,9 +289,7 @@
     ],
     "10/06-managed-codex-sandbox-and-delegation.md": [
       "src/Aevatar.AI.Abstractions/CodexExecution/codex_execution.proto",
-      "src/Aevatar.AI.Abstractions/CodexExecution/ICodexExecutionPort.cs",
       "src/Aevatar.AI.Infrastructure.ChronoSandbox/ChronoSandboxCodexExecutionAdapter.cs",
-      "src/Aevatar.AI.Infrastructure.ChronoSandbox/NyxIdChronoSandboxCodexClient.cs",
       "docs/canon/managed-codex-execution.md"
     ],
     "10/07-observability-status-and-observatory.md": [
@@ -343,7 +336,6 @@
     "12/04-incident-case-studies.md": [
       "src/Aevatar.Capabilities/AevatarScopeAccessGuard.cs",
       "src/platform/Aevatar.GAgentService.Application/Responses/ResponsesToolClassificationService.cs",
-      "src/platform/Aevatar.GAgentService.Application/Responses/LlmSessionRunObservationAccumulator.cs",
       "src/platform/Aevatar.GAgentService.Core/Schedules/ScheduledDispatchGAgent.cs"
     ],
     "_doc_13": "13 术语与事实源索引",
