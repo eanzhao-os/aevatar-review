@@ -46,7 +46,7 @@ flowchart LR
 
 ### 2. CQRS、Event Sourcing 与 Projection 边界
 
-这组禁止query-time event replay/materialize、command path等待projection readiness、readmodel绕过typed query port、state version丢失、projection route映射漂移、旧StateMirror或legacy envelope重新出现。它还要求public projection activation、existing-side attach与projector registration覆盖。
+这组禁止query-time event replay/materialize、command path等待projection readiness、readmodel绕过typed query port、state version丢失、projection route映射漂移、已退役 StateMirror 或 legacy envelope重新出现。它还要求public projection activation、existing-side attach与projector registration覆盖。
 
 不变量是：write side提交事实，projection异步物化，query side只读read model；`202`不能冒充commit/readiness。guard查的是能静态识别的反模式，Roslyn architecture tests再覆盖继承与依赖语义。
 
