@@ -84,10 +84,10 @@ Task 14 与 Task 17 迁移 `09/02` 与 `12/04` 时必须重新取哈希并按节
 | `07/12-scheduled-tasks.md` | user-existing | `6dc6cf120add` | `bab63e8` | `09/01`、`09/02`、`09/03`、`09/04`、`12/04` | `migrated-reviewed` |
 | `09/03-provision-and-observe-via-nyxid/02-scheduled-agent-key-production-canary.md` | user-existing | `114817a9698d` | `da089e1` | `09/05`、`12/04` | `migrated-reviewed` |
 | `09/03-provision-and-observe-via-nyxid/index.md` | user-existing | `71dcf0ae50e1` | `da089e1` | `09/index.md`（Task 19 原位改写）、`09/05` | `migrated-reviewed` |
-| `07/index.md` | user-existing | `f24150cc40c0` | `bab63e8` | `07/index.md`、`08/index.md`、`09/index.md`（Task 19 原位改写） | `pending` |
-| `10/index.md` | user-existing | `05b07bbd30f6` | `bab63e8` | `10/index.md`、`12/index.md`（Task 19 原位改写） | `pending` |
-| `PLAN.md` | user-existing | `953b6241a587` | `bab63e8` | `PLAN.md`（Task 19 合并改写为 72 行清单，不整文件覆盖） | `pending` |
-| `mkdocs.yml` | user-existing | `8436e3b7ebe8` | `bab63e8` | `mkdocs.yml`（Task 19 原子替换 nav，保留站点/主题设置与已批准双行导航设计） | `pending` |
+| `07/index.md` | user-existing | `f24150cc40c0` | `bab63e8` | `07/index.md`、`08/index.md`、`09/index.md`（Task 19 原位改写） | `migrated-reviewed` |
+| `10/index.md` | user-existing | `05b07bbd30f6` | `bab63e8` | `10/index.md`、`12/index.md`（Task 19 原位改写） | `migrated-reviewed` |
+| `PLAN.md` | user-existing | `953b6241a587` | `bab63e8` | `PLAN.md`（Task 19 合并改写为 72 行清单，不整文件覆盖） | `migrated-reviewed` |
+| `mkdocs.yml` | user-existing | `8436e3b7ebe8` | `bab63e8` | `mkdocs.yml`（Task 19 原子替换 nav，保留站点/主题设置与已批准双行导航设计） | `migrated-reviewed` |
 
 ## 4. 快照 C：并行用户分支
 
@@ -125,3 +125,16 @@ Task 14 协调前重新枚举只发现既有 `.superpowers/` 与 `CLAUDE_HANDOFF
 Task 17 按上述 SHA-256 重新比对了四份输入：`09/01–05` 承接current model与四次证据强度，`12/04`分别保留
 四类schedule根因、四次canary的不同证明力、projection repair与audit/provenance限制。内容迁移已逐节复核；
 原文件是否删除、块索引何时切换仍由Task 19原子步骤控制。
+
+## 8. Task 19 结构输入复核
+
+Task 19 在删除旧路径前完成四项受保护结构输入的合并复核：
+
+| 路径 | Task 19 SHA-256 | 复核结论 | migration_status |
+|---|---|---|---|
+| `07/index.md` | `5a3c0d4eef5104196fdd739cce1c999f6b963690932f9d8f6250e966ae18f22f` | Conversation、Channel、Automation 三块导航已按新边界拆分；顺序与目标 manifest 一致 | `migrated-reviewed` |
+| `10/index.md` | `fcfb0b050416da274e0e511d9edc505ef76e334b939579515ea6bb77e178c488` | 生产运行与演进案例已分离到 `10` / `12`，不再把已知问题当作现役目录 | `migrated-reviewed` |
+| `PLAN.md` | `9d8b8d6443c7cdb4926a2ee88579ea4c444a0bc6fcb77fe6c7e3eeb3575c1daf` | 合并改写为 14 block、72 行 checked 清单；每行路径、status、H1 与 issue 已机械对账 | `migrated-reviewed` |
+| `mkdocs.yml` | `f2663195102864261a6f147af7b954a76513aef93e1a643530e04bd566e76a50` | nav 原子替换为首页 + 14 block + 72 章；保留 Material 主题、双行 CSS、`eanzhao-os` Pages/repository/social URL | `migrated-reviewed` |
+
+本轮只读回原始内容和新落点进行比较；未读取 `.superpowers/brainstorm/.last-token`，未把运行态或凭据指纹纳入迁移证据。

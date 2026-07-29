@@ -29,15 +29,36 @@ jobs:
       - name: Install MkDocs Material
         run: pip install mkdocs-material pymdown-extensions
 
-      # mermaid 在浏览器端渲染,mkdocs --strict 抓不到图的语法错误(会显示
-      # "Syntax error in text")。用真实 mermaid 引擎(mermaid-cli,固定 11.15.0
-      # = 站点 mermaid 大版本)解析每个 ```mermaid 块;失败则 build 失败 ⇒ deploy 跳过。
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
 
       - name: Install mermaid-cli (pinned to site mermaid 11.x)
         run: npm i -g @mermaid-js/mermaid-cli@11.15.0
+
+      - name: Checkout frozen upstream
+        uses: actions/checkout@v4
+        with:
+          repository: aevatarAI/aevatar
+          ref: f02aa690bbebb9cabeac30a553d737486b0eb661
+          path: .ci-upstream/aevatar
+          fetch-depth: 1
+
+      - name: Materialize frozen upstream
+        run: |
+          mkdir -p "$RUNNER_TEMP/aevatar-f02aa690"
+          git -C .ci-upstream/aevatar cat-file -e f02aa690bbebb9cabeac30a553d737486b0eb661^{commit}
+          git -C .ci-upstream/aevatar archive f02aa690bbebb9cabeac30a553d737486b0eb661 | tar -x -C "$RUNNER_TEMP/aevatar-f02aa690"
+          rm -rf .ci-upstream
+
+      - name: Validate chapter contracts
+        run: AEVATAR_SRC="$RUNNER_TEMP/aevatar-f02aa690" bash scripts/check-md.sh --all
+
+      - name: Validate links and anchors
+        run: python3 scripts/check-links.py --all
+
+      - name: Validate documentation drift
+        run: bash scripts/check-drift.sh
 
       - name: Validate mermaid diagrams
         run: python3 scripts/check-mermaid.py

@@ -1,5 +1,5 @@
 site_name: Aevatar 结构化中文解读
-site_description: 自顶向下读懂 Aevatar —— 一次请求的生命周期、Workflow YAML、Actor+Event 内核、CQRS 双投影、分布式目标态。85 篇章节,全部锚定 ~/Code/aevatar 源码事实源。
+site_description: 基于冻结上游 f02aa690 的 Aevatar 结构化中文解读：14 个 block、72 篇实质章节，覆盖请求、Actor、Workflow、CQRS、产品身份、Channel、Automation 与生产运行。
 site_author: eanzhao
 site_url: https://eanzhao-os.github.io/aevatar-review/
 
@@ -106,118 +106,104 @@ plugins:
         - en
 
 nav:
-  - 首页: index.md
-  - 00 序章:
-      - 00/index.md
-      - Aevatar 是什么: 00/01-what-is-aevatar.md
-      - 仓库地图: 00/02-repo-map.md
-      - Quick Start: 00/03-quick-start.md
-      - 主线全景图: 00/04-chat-request-lifecycle.md
-  - 01 宿主与入口:
-      - 01/index.md
-      - Mainnet vs Workflow Host: 01/01-hosts-and-composition.md
-      - POST /api/chat 协议与 SSE: 01/02-chat-api-and-sse.md
-      - Run 语义: 01/03-run-semantics.md
-      - 平台 Audit Trail: 01/04-platform-audit-trail.md
-  - 02 编排层:
-      - 02/index.md
-      - Workflow YAML 语法: 02/01-yaml-grammar.md
-      - definition vs run actor: 02/02-definition-and-run-actors.md
-      - ExecutionKernel 主循环: 02/03-execution-kernel.md
-      - 步骤模块全图 ★: 02/04-step-modules-catalog.md
-      - workflows/ 示例拆解: 02/05-workflows-walkthrough.md
-      - Maker 插件边界: 02/06-maker-plugin.md
-      - Connector: 02/07-connectors.md
-      - 亮点·saga + 持久执行: 02/08-saga-durable-execution.md
-  - 03 运行内核:
-      - 03/index.md
-      - Agent/Actor/Runtime/Stream: 03/01-agent-actor-runtime.md
-      - EventEnvelope vs StateEvent ★: 03/02-event-envelope-vs-state-event.md
-      - GAgentBase pipeline: 03/03-gagent-base.md
-      - StateGuard + Event Sourcing: 03/04-state-guard-and-event-sourcing.md
-      - 路由与拓扑: 03/05-routing-and-topology.md
-      - Local Runtime 深入: 03/06-local-runtime-deep-dive.md
-      - Stream×Actor×GAgent 事实清单: 03/07-stream-actor-gagent-facts.md
-      - 亮点·Event Sourcing 三重红利: 03/08-event-sourcing-dividends.md
-  - 04 AI 能力层:
-      - 04/index.md
-      - RoleGAgent: 04/01-role-gagent.md
-      - LLM Providers: 04/02-llm-providers.md
-      - Tool 体系 ★: 04/03-tool-providers.md
-      - ChatRuntime + 中间件: 04/04-chat-runtime-and-middleware.md
-  - 05 CQRS 读侧:
-      - 05/index.md
-      - Projection 总览: 05/01-projection-overview.md
-      - 两条投影主链 ★: 05/02-two-projection-modes.md
-      - ReadModel 存储实现: 05/03-readmodel-providers.md
-      - Workflow 投影: 05/04-workflow-projection.md
-  - 06 分布式与生产态:
-      - 06/index.md
-      - 当前 vs 目标态: 06/01-current-vs-target.md
-      - Orleans Runtime: 06/02-orleans-runtime.md
-      - Kafka Transport: 06/03-kafka-transport.md
-      - Garnet 聚类: 06/04-garnet-clustering.md
-      - 架构门禁: 06/05-architecture-guards.md
-      - Raw credential 不入事实层·凭证边界: 06/06-credentials-zero-standing-secrets.md
-  - 07 周边:
-      - 07/index.md
-      - Input 入口统一: 07/10-input-ingress-unification.md
-      - Channel Runtime: 07/01-channels.md
-      - Lark Bot 全链路走查: 07/08-lark-end-to-end.md
-      - A2A Interop: 07/02-a2a-interop.md
-      - ChatRouting: 07/03-chat-routing.md
-      - VoicePresence: 07/04-voice-presence.md
-      - voice-presence 边缘 × aevatar 大脑: 07/09-voice-presence-edge-brain.md
-      - Studio + Scripting: 07/05-studio-and-scripting.md
-      - 前端控制台: 07/06-console-web.md
-      - 可观测性: 07/07-observability.md
-      - 文件全链路走查: 07/11-file-handling-end-to-end.md
-      - 定时任务全链路走查: 07/12-scheduled-tasks.md
-      - Lark Bot 注册与对接: 07/13-lark-bot-registration.md
-  - 08 附录:
-      - 08/index.md
-      - 术语表: 08/01-glossary.md
-      - 上游文档索引: 08/02-doc-index.md
-      - Demo Cookbook: 08/03-demo-cookbook.md
-      - 未来规划·战术 TODO: 08/04-todo-list.md
-      - 未来规划·战略 结晶梯度路线图: 08/05-crystallization-roadmap.md
-  - 09 方案区:
-      - 09/index.md
-      - 方案 01·workflow 发布为 NyxID 服务:
-          - 09/01-workflow-as-nyxid-service/index.md
-          - 机制总览: 09/01-workflow-as-nyxid-service/01-mechanisms.md
-          - 发布路径: 09/01-workflow-as-nyxid-service/02-publish-path.md
-          - 注册与发现: 09/01-workflow-as-nyxid-service/03-register-and-discover.md
-          - 三个调用入口: 09/01-workflow-as-nyxid-service/04-calling.md
-          - 端到端方案: 09/01-workflow-as-nyxid-service/05-end-to-end-plan.md
-          - 自动注册落地方案: 09/01-workflow-as-nyxid-service/06-auto-registration-plan.md
-          - ADR·自动注册到 NyxID: 09/01-workflow-as-nyxid-service/07-auto-registration-adr.md
-      - 方案 02·Ingress 工具所有权(自有工具不上线):
-          - 09/02-ingress-tool-ownership/index.md
-          - 泄漏链路与非对称所有权: 09/02-ingress-tool-ownership/01-leak-and-asymmetric-rule.md
-          - 两落点·codex 6 缺口·落地: 09/02-ingress-tool-ownership/02-fix-and-rollout.md
-      - 方案 03·C1 Provision、C2 观测与 Team Member Automation Agent Key:
-          - 09/03-provision-and-observe-via-nyxid/index.md
-          - 全链路·大脑 reach C1 C2 + 6 条实测发现: 09/03-provision-and-observe-via-nyxid/01-end-to-end.md
-          - Studio Team Member Automation·Agent Key 生产闭环: 09/03-provision-and-observe-via-nyxid/02-scheduled-agent-key-production-canary.md
-  - 10 已知问题:
-      - 10/index.md
-      - CLI 看不到 Lark bot 创建的 agent(scope 隔离): 10/01-cli-lark-scope-isolation.md
-      - shell 工具 vs aevatar 自有工具(codex 当 model): 10/02-codex-shell-vs-aevatar-tools.md
-      - 自有工具泄漏进客户端流(agentic 客户端当 model): 10/03-ingress-own-tool-stream-leak.md
-      - /v1/responses off-actor LLM run 执行与流式观察(四层故障): 10/04-responses-llm-run-offactor-and-observation.md
-      - Lark 投递层三类故障·错对象/残片/全哑 401: 10/05-lark-delivery-layer-failures.md
-      - Lark 身份与授权·用谁调用/给谁授权: 10/06-lark-identity-and-authorization.md
-      - 定时任务为什么不触发·跳拍/脑裂/历史双凭证: 10/07-scheduled-task-not-firing.md
-      - 观测台读侧·排序/字段爆表/节点卡进行中: 10/08-observatory-read-side.md
-      - Studio 控制台三坑·binding 500/失忆/chip 溢出: 10/09-studio-console-three-traps.md
-      - 语音·打断 cancel 竞态/重连缺失: 10/10-voice-cancel-race-and-reconnect.md
-      - NyxID 直连 LLM 入口·收不到回复/不暴露服务工具: 10/11-nyxid-direct-llm-entry.md
-      - API 安全审计与加固·OAuth2/DPoP/脱敏/授权: 10/12-api-security-audit-and-hardening.md
-  - 11 Skills 能力层:
-      - 11/index.md
-      - 控制面家族·idea → schedule 客户端 REST: 11/01-aevatar-control-plane-skills.md
-      - 平台 skill 与 probe·authoring / fallback / 体检探针: 11/02-aevatar-platform-and-probe-skills.md
-  - 12 问题复盘:
-      - 12/index.md
-      - 2026-06-22 → 06-26: 12/01-2026-06-22-to-06-26.md
+  - "首页": index.md
+  - "00 导读与版本基线":
+      - "导读": 00/index.md
+      - "01 全书阅读指南：三条路线与证据纪律": 00/01-reading-guide.md
+      - "02 版本基线与证据等级：全书论断的可信度规则": 00/02-version-evidence-and-status.md
+      - "03 仓库地图：100+ 项目面前如何选阅读面": 00/03-repository-map.md
+  - "01 启动与请求全景":
+      - "导读": 01/index.md
+      - "01 快速上手:本地启动 Host 并完成第一次请求": 01/01-quick-start.md
+      - "02 Host 与组合：协议终结与能力装配的边界": 01/02-hosts-and-composition.md
+      - "03 Chat / Conversation / Turn 服务端身份契约": 01/03-chat-conversation-turn-contract.md
+      - "04 请求与流式生命周期：从 POST/WS 到终态观测": 01/04-request-streaming-lifecycle.md
+  - "02 Actor 运行内核":
+      - "导读": 02/index.md
+      - "01 Agent / Actor / Runtime:三层分离与传输底座": 02/01-agent-actor-runtime.md
+      - "02 Envelope 消息语义 —— command / reply / signal / domain event / query 的分野": 02/02-envelope-command-event-query.md
+      - "03 GAgent 事件处理管线：一条消息进入 actor 之后": 02/03-gagent-event-pipeline.md
+      - "04 状态与事件溯源：StateEvent、reducer 与 StateGuard": 02/04-state-event-sourcing-and-guard.md
+      - "05 Dispatch、路由与拓扑:消息怎么找到 Actor": 02/05-dispatch-routing-and-topology.md
+      - "06 Local Runtime 与 Actor 生命周期": 02/06-local-runtime-and-lifecycle.md
+  - "03 Workflow 编排":
+      - "导读": 03/index.md
+      - "01 Workflow 模型与身份：定义、运行、草稿与发布物不是同一个对象": 03/01-workflow-model-and-identities.md
+      - "02 Workflow YAML：一个根模式，四道不同的关": 03/02-yaml-schema-and-validation.md
+      - "03 Workflow 执行内核：把异步步骤收敛成一个 run 终态": 03/03-execution-kernel-and-outcomes.md
+      - "04 Workflow 原语目录：canonical type、模块与输出契约": 03/04-primitives-catalog.md
+      - "05 Workflow 暂停与恢复：signal、人工审批和 delivery 边界": 03/05-pause-signal-approval-and-resume.md
+      - "06 Workflow Saga：反向补偿、OutcomeUncertain 与恢复": 03/06-saga-compensation-and-recovery.md
+      - "07 Connector 与外部能力准入：所有权、readiness 和证据时效": 03/07-connectors-and-capability-admission.md
+  - "04 AI 执行与工具":
+      - "导读": 04/index.md
+      - "01 RoleGAgent 与流式执行：actor turn、会话事实和终态重放": 04/01-role-agent-and-streaming-run.md
+      - "02 LLM Provider 与路由选择：四类身份、owner 覆盖和安全 failover": 04/02-llm-providers-and-route-selection.md
+      - "03 Tool loop、请求目录与展示事实：先冻结权力，再执行调用": 04/03-tool-loop-catalog-and-presentation.md
+      - "04 工具审批与授权：先确定调用者，再等待可恢复的决定": 04/04-tool-approval-and-authorization.md
+      - "05 Prompt overlay 与 Agent context：固定层序不是授权层级": 04/05-prompt-overlays-and-agent-context.md
+  - "05 CQRS、Projection 与 Audit":
+      - "导读": 05/index.md
+      - "01 Command、committed fact、Projection 与 ReadModel：把写入结果和查询视图分开": 05/01-command-event-projection-readmodel.md
+      - "02 Committed state 与 observation：持久事实和实时可见性不是一回事": 05/02-committed-state-and-observation.md
+      - "03 Projection lifecycle 与 lease：scope actor 拥有状态，handle 只负责清理": 05/03-projection-lifecycle-and-leases.md
+      - "04 ReadModel store、versioning 与 rebuild：副本可覆盖，修复必须显式": 05/04-readmodel-stores-versioning-and-rebuild.md
+      - "05 Workflow AGUI 与 live observation：同源映射，不同持久性": 05/05-workflow-agui-and-live-observation.md
+      - "06 Audit Trail：生命周期、追加语义与 CloudEvents 导出": 05/06-audit-trail-lifecycle-and-export.md
+  - "06 产品资源与身份":
+      - "导读": 06/index.md
+      - "01 Scope、Team 与 Member：产品资源、归属权威与派生 roster": 06/01-scope-team-member-resource-model.md
+      - "02 Draft、Revision、Binding Run 与 Published Service：五种身份，三层完成语义": 06/02-draft-revision-binding-and-published-service.md
+      - "03 Workflow Catalog 可见性与 Scope 授权：公共模板不是私有可运行资源": 06/03-catalog-visibility-and-scope-authorization.md
+      - "04 Studio Command、ACK 与 Read Model：受理不是提交，查询不是修复": 06/04-studio-commands-acks-and-readmodels.md
+      - "05 WorkOrder：耐久授权意图，不是通用任务队列": 06/05-work-orders-and-durable-intent.md
+  - "07 Conversation、NyxIdChat 与 Agent Profile":
+      - "导读": 07/index.md
+      - "01 Conversation、Turn 与耐久聊天历史": 07/01-conversation-turn-and-chat-history.md
+      - "02 NyxIdChat Actor 模型与已提交进度": 07/02-nyxid-chat-actor-model-and-progress.md
+      - "03 Agent Profile 与不可变会话绑定": 07/03-agent-profile-and-immutable-binding.md
+      - "04 Turn 权威、工具目录与重试": 07/04-turn-authority-tool-catalog-and-retry.md
+  - "08 Ingress、Channel、文件与语音":
+      - "导读": 08/index.md
+      - "01 Ingress 规范化与路由：先固定身份，再选择执行意图": 08/01-ingress-normalization-and-routing.md
+      - "02 Channel Runtime 与凭据边界：current durable write 不保存 raw secret material": 08/02-channel-runtime-and-credential-boundary.md
+      - "03 Lark 投递、交互与修复：把意图、送达事实和平台故障分开": 08/03-lark-delivery-interaction-and-repair.md
+      - "04 文件工件与附件：让字节停在边界，让引用进入事实层": 08/04-file-artifacts-and-attachments.md
+      - "05 Voice 控制面与媒体面：actor 记住语义，relay 搬运 PCM": 08/05-voice-control-and-media-planes.md
+  - "09 Automation、调度与凭证":
+      - "导读": 09/index.md
+      - "01 Team Member Automation：资源 API、所有权与读模型": 09/01-automation-resource-api-and-readmodels.md
+      - "02 Schedule Actor、Durable Callback 与 Fire：唤醒不是执行事实": 09/02-scheduled-actor-callback-and-fire.md
+      - "03 Owner 授权与 Agent Key：把无人值守权限固定成可重验计划": 09/03-owner-authorization-and-agent-key.md
+      - "04 Vault Reference 与撤销补偿：秘密不成为业务事实": 09/04-vault-reference-and-revocation-compensation.md
+      - "05 Production Canary 与恢复：一次执行只能证明它绑定的版本": 09/05-production-canary-and-recovery.md
+  - "10 分布式与生产运行":
+      - "导读": 10/index.md
+      - "01 生产拓扑与配置：先选择一致性档位，再组合能力": 10/01-production-topology-and-configuration.md
+      - "02 Orleans Runtime：逻辑 Actor、Grain Turn 与可恢复投递": 10/02-orleans-runtime.md
+      - "03 Garnet 聚类与秘密存储：共享后端，不共享语义": 10/03-garnet-clustering-and-secret-storage.md
+      - "04 Streaming Transport 与 Kafka：一个 Stream 身份，一套 Partition 所有权": 10/04-streaming-transport-and-kafka.md
+      - "05 Authentication、Scope 与 Admin：四道门，不是一枚万能 Token": 10/05-authentication-scope-and-admin-authorization.md
+      - "06 Managed Codex：把执行、调用凭证与 Sandbox 委托拆成三层": 10/06-managed-codex-sandbox-and-delegation.md
+      - "07 Observability、Status 与 Observatory：观测事实，不接管业务事实": 10/07-observability-status-and-observatory.md
+      - "08 Architecture 与 Security Guards：把边界写成可失败的规则": 10/08-architecture-and-security-guards.md
+  - "11 场景教程与 Cookbook":
+      - "导读": 11/index.md
+      - "01 运行最小 Workflow：先证明定义，再观察一次运行": 11/01-run-a-simple-workflow.md
+      - "02 编写分支 Tool Workflow：把结果、路由与副作用分开": 11/02-build-a-branching-tool-workflow.md
+      - "03 创建、绑定并调用 Team Member：沿响应句柄逐层观察": 11/03-create-bind-and-invoke-a-team-member.md
+      - "04 连接 Channel 并处理文件：注册、入站、Artifact 与 Delivery 分层验证": 11/04-connect-a-channel-and-handle-files.md
+      - "05 创建、验证与排障 Automation：不要把 `202` 当成已经执行": 11/05-create-verify-and-troubleshoot-automation.md
+  - "12 架构演进、案例与开放缺口":
+      - "导读": 12/index.md
+      - "01 演进方法与时间线：先分清三套时钟，再解释“为什么变成现在这样”": 12/01-evolution-method-and-timeline.md
+      - "02 Issue 决策主题图：把 280 个工作项还原成边界迁移": 12/02-issue-decisions-by-theme.md
+      - "03 已退役与被替代组件：删除什么、由谁接管、留下什么约束": 12/03-retired-and-superseded-components.md
+      - "04 事故案例：症状相似时，先找到真正拥有事实的边界": 12/04-incident-case-studies.md
+      - "05 开放缺口与 Canon Drift：只登记当前限制，不预支未来能力": 12/05-open-gaps-and-canon-drift.md
+  - "13 术语与事实源索引":
+      - "导读": 13/index.md
+      - "01 术语表：先找事实 owner，再区分名字相近的协议角色": 13/01-glossary.md
+      - "02 Canon 与 ADR 索引：状态原样保留，current 结论仍回到冻结 E1": 13/02-canon-and-adr-index.md
+      - "03 章节—事实源矩阵：72 个阅读入口怎样回到冻结证据": 13/03-chapter-source-matrix.md
+      - "04 Issue 演进索引：280 个冻结成员，一个都不靠状态猜实现": 13/04-issue-evolution-index.md

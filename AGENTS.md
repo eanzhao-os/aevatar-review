@@ -6,7 +6,7 @@
 
 ## 仓库性质
 
-- **产物**:纯 Markdown 文档(`XX/NN-name.md`),对照 `PLAN.md` 当前 85 篇章节清单。
+- **产物**:纯 Markdown 文档(`XX/NN-name.md`),对照 `PLAN.md` 当前 72 篇实质章节清单；`00–13` 的 14 个 `index.md` 只承担导读与顺序。
 - **事实源唯一性**:所有关于 aevatar 内部的论断**必须**指向 `~/Code/aevatar` 下的真实
   `.cs` / `.yaml` / `docs/canon/*` / `docs/adr/*` 文件路径 + 行号锚点。禁止脑补、禁止
   泛泛而谈、禁止不引用源码就下结论。
@@ -17,23 +17,23 @@
 ## 分层与目录约定
 
 ```
-00/  序章(定位 / 主线 / 怎么跑)
-01/  宿主与入口(Host / API / SSE-WS)
-02/  编排层(Workflow YAML + 步骤模块 + Maker)★
-03/  运行内核(Foundation: Actor / Event / State)★
-04/  AI 能力层(RoleGAgent / LLM / Tool)
-05/  CQRS 与读侧(Projection / ReadModel)★
-06/  分布式与生产态(Orleans / Garnet / Kafka)
-07/  周边(Channel / A2A / Voice / 前端)
-08/  附录(术语表 / 文档索引 / demo cookbook)
-09/  方案区(按独立 solution 子目录组织)
-10/  已知问题(复现 / 根因 / 影响 / 状态)
-11/  Skills 能力层
-12/  问题复盘
+00/  导读与版本基线
+01/  启动与请求全景
+02/  Actor 运行内核
+03/  Workflow 编排
+04/  AI 执行与工具
+05/  CQRS、Projection 与 Audit
+06/  产品资源与身份
+07/  Conversation、NyxIdChat 与 Agent Profile
+08/  Ingress、Channel、文件与语音
+09/  Automation、调度与凭证
+10/  分布式与生产运行
+11/  场景教程与 Cookbook
+12/  架构演进、案例与开放缺口
+13/  术语与事实源索引
 ```
 
-普通章节文件命名为 `<block>/<NN>-<slug>.md`;方案区允许
-`09/<NN>-<slug>/index.md` 与同目录下的 `<NN>-<slug>.md`。所有合法路径以 `PLAN.md`
+普通章节文件命名为 `<block>/<NN>-<slug>.md`；不再新增嵌套方案区。所有合法路径以 `PLAN.md`
 和 `mkdocs.yml` 为准。
 
 ## 写作原则 v2(强制,见 issue #87)
@@ -68,9 +68,9 @@
 
 本仓库无编译产物。验证手段:
 
-- **BUILD**:`bash scripts/check-md.sh` —— 校验所有章节 Markdown 文件存在、frontmatter /
+- **BUILD**:`AEVATAR_SRC=<frozen-f02aa690-archive> bash scripts/check-md.sh --all` —— 校验所有章节 Markdown 文件存在、frontmatter /
   标题层级 / 空文件 / 孤儿链接基本结构合规。
-- **TEST**:同上脚本 + 检查每篇章节是否含「事实源/设计抽象」入口(可回指
+- **TEST**:同上脚本 + `python3 scripts/check-links.py --all` + `bash scripts/check-drift.sh`，并检查每篇章节是否含「事实源/设计抽象」入口(可回指
   `~/Code/aevatar` 的真实路径),且引用的源码文件真实存在。
 - **MERMAID**:`python3 scripts/check-mermaid.py` —— 用真实 mermaid 引擎(`mermaid-cli`,
   pin 11.15.0 = 站点 mermaid 大版本)解析每个 ` ```mermaid ` 块。`mkdocs --strict` **抓不到**

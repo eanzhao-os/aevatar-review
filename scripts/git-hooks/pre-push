@@ -1,51 +1,60 @@
 #!/usr/bin/env bash
-# pre-push — 阻止把"在 web 上渲染不出来"的文档推上去(机械兜底)。
-# 见 CLAUDE.md / AGENTS.md「推送前检查(web 呈现,强制)」。
-#
-# 做什么:用与 CI(.github/workflows/docs.yml)相同的 `mkdocs build --strict`
-#          构建当前工作树的文档站,任何 warning/error 即拦截 push。
-# 抓不到什么:mermaid 是浏览器端渲染,`mkdocs build` 不会报语法错——push 通过后会提醒人工
-#            `mkdocs serve` 目视确认。
-#
-# 启用(每个克隆一次性):git config core.hooksPath scripts/git-hooks
-# WIP 临时绕过:        SKIP_DOCS_CHECK=1 git push   或   git push --no-verify
+# Validate the active book before push. Missing local rendering dependencies are
+# reported explicitly; CI remains the fail-closed authority for those tools.
 set -uo pipefail
 
 if [ "${SKIP_DOCS_CHECK:-0}" = "1" ]; then
-  echo "pre-push: SKIP_DOCS_CHECK=1,跳过 mkdocs web 渲染校验。" >&2
+  echo "pre-push: SKIP_DOCS_CHECK=1, skipping documentation validation." >&2
   exit 0
 fi
 
 repo_root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-cd "$repo_root" || { echo "pre-push: 无法 cd 仓库根。" >&2; exit 1; }
+cd "$repo_root" || { echo "pre-push: cannot enter repository root" >&2; exit 1; }
+sha=f02aa690bbebb9cabeac30a553d737486b0eb661
+upstream_repo="${AEVATAR_UPSTREAM_REPO:-$HOME/Code/aevatar}"
+limited=0
 
-# 找 mkdocs:PATH 优先,回退 python3 -m mkdocs。缺工具不阻断(环境问题,非文档问题)。
+if [ -d "$upstream_repo/.git" ]; then
+  if ! AEVATAR_SRC="$(bash scripts/materialize-frozen-upstream.sh --repo "$upstream_repo" --sha "$sha")"; then
+    echo "pre-push: unable to materialize frozen upstream $sha" >&2
+    exit 1
+  fi
+  export AEVATAR_SRC
+  AEVATAR_SRC="$AEVATAR_SRC" bash scripts/check-md.sh --all || exit 1
+else
+  echo "pre-push: environment limitation — frozen upstream repository not found at $upstream_repo" >&2
+  limited=1
+fi
+
+python3 scripts/check-links.py --all || exit 1
+bash scripts/check-drift.sh || exit 1
+
+if command -v mmdc >/dev/null 2>&1 || command -v npx >/dev/null 2>&1; then
+  python3 scripts/check-mermaid.py || exit 1
+else
+  echo "pre-push: environment limitation — mermaid-cli/npx unavailable" >&2
+  limited=1
+fi
+
 if command -v mkdocs >/dev/null 2>&1; then
   MKDOCS=(mkdocs)
-elif command -v python3 >/dev/null 2>&1 && python3 -c "import mkdocs" >/dev/null 2>&1; then
+elif python3 -c "import mkdocs" >/dev/null 2>&1; then
   MKDOCS=(python3 -m mkdocs)
 else
-  echo "pre-push: ⚠ 未找到 mkdocs,跳过 web 渲染校验。" >&2
-  echo "          请 pip install mkdocs-material pymdown-extensions 后重试。" >&2
-  exit 0
+  echo "pre-push: environment limitation — MkDocs unavailable" >&2
+  limited=1
+  MKDOCS=()
 fi
 
-tmp_site="$(mktemp -d)"
-log_file="$(mktemp)"
-trap 'rm -rf "$tmp_site" "$log_file"' EXIT
-
-echo "pre-push: mkdocs build --strict(等同 CI,校验 web 呈现)…" >&2
-if ! "${MKDOCS[@]}" build --strict --site-dir "$tmp_site" >"$log_file" 2>&1; then
-  echo "" >&2
-  echo "pre-push: ✗ mkdocs build --strict 失败 —— 文档无法在 web 上正确呈现,推送已拦截。" >&2
-  echo "----------------------------------------------------------------------" >&2
-  grep -E 'WARNING|ERROR|Aborted' "$log_file" >&2 || cat "$log_file" >&2
-  echo "----------------------------------------------------------------------" >&2
-  echo "修复后再推。确需带病推送(WIP):SKIP_DOCS_CHECK=1 git push  或  git push --no-verify" >&2
-  exit 1
+if [ "${#MKDOCS[@]}" -gt 0 ]; then
+  tmp_site="$(mktemp -d)"
+  trap 'rm -rf "$tmp_site"' EXIT
+  "${MKDOCS[@]}" build --strict --clean --site-dir "$tmp_site" || exit 1
+  python3 scripts/check-site-ui.py --site-dir "$tmp_site" || exit 1
 fi
 
-echo "pre-push: ✓ 构建通过。" >&2
-echo "pre-push: 提醒 —— mermaid 为浏览器端渲染,本检查抓不到语法错误;" >&2
-echo "          若本次改过 mermaid,请另行 \`mkdocs serve\` 目视确认每张图都画得出来。" >&2
-exit 0
+if [ "$limited" -eq 1 ]; then
+  echo "pre-push: completed available checks; CI will fail closed on missing dependencies" >&2
+else
+  echo "pre-push: all documentation checks passed" >&2
+fi

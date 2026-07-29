@@ -1,360 +1,370 @@
 {
-  "_comment": "chapter-source-map.json — host-owned mapping from aevatar-review chapters to upstream ~/Code/aevatar source paths. Consumed by scripts/upstream-sync.sh. Edit freely; no script changes needed to retune.",
-  "_doc": "Matching rules (implemented in upstream-sync.sh): (1) entry ending with '/' = recursive prefix match against changed file path; (2) entry with extension = exact file match; (3) alias entries (bare NNNN-slug or canon keyword) are expanded via alias_expansion before matching; (4) a changed upstream file triggers a chapter if ANY of the chapter's entries match. Inverted index is built at runtime.",
-  "_convention": "宽启发式:误报代价(多关几个 issue)低于漏报代价(文档过时)。00/* 与 08/02 是 repo 总览,不触发增量同步——它们靠人审维护。",
-
-  "version": 1,
-
+  "_comment": "Host-owned mapping from active current/mixed review chapters to normalized frozen-upstream source paths. Consumed by scripts/upstream-sync.sh.",
+  "_doc": "A changed upstream file triggers a chapter when it equals a file entry or falls under an entry ending in /. Historical/target chapters are intentionally absent.",
+  "_convention": "Entries come from each chapter source-spine section with line anchors removed; block _doc keys are comments.",
+  "version": 2,
   "alias_expansion": {
-    "_doc": "Aliases found in chapter 事实源 sections that are NOT raw paths. Expanded to real paths before matching.",
-    "adr_pattern": "^(\\d{4}-[a-z0-9-]+)$",
-    "adr_expand": "docs/adr/{0}.md",
-    "canon": {
-      "overview": "docs/canon/overview.md",
-      "architecture": "docs/canon/architecture.md",
-      "architecture-vocabulary": "docs/canon/architecture-vocabulary.md",
-      "actor-evolution": "docs/canon/actor-evolution.md",
-      "event-sourcing": "docs/canon/event-sourcing.md",
-      "cqrs-projection": "docs/canon/cqrs-projection.md",
-      "workflow-runtime": "docs/canon/workflow-runtime.md",
-      "workflow-primitives": "docs/canon/workflow-primitives.md",
-      "role-model": "docs/canon/role-model.md",
-      "connector": "docs/canon/connector.md",
-      "chat-api": "docs/canon/chat-api.md",
-      "llm-streaming": "docs/canon/llm-streaming.md",
-      "scripting": "docs/canon/scripting.md",
-      "gagent-registry-ownership": "docs/canon/gagent-registry-ownership.md",
-      "aevatar-channel-architecture": "docs/canon/aevatar-channel-architecture.md",
-      "voice-presence-integration": "docs/canon/voice-presence-integration.md",
-      "lark-reply-completion-semantics": "docs/canon/lark-reply-completion-semantics.md",
-      "observability": "docs/canon/observability.md",
-      "frontend-design": "docs/canon/frontend-design.md",
-      "module-placement-map": "docs/canon/module-placement-map.md",
-      "sdk-dotnet": "docs/canon/sdk-dotnet.md",
-      "status-dashboard": "docs/canon/status-dashboard.md",
-      "scheduled-skill-runners": "docs/canon/scheduled-skill-runners.md",
-      "approval-quota-ledger": "docs/canon/approval-quota-ledger.md",
-      "nyxid-llm-integration": "docs/canon/nyxid-llm-integration.md",
-      "nyxid-responses-direct": "docs/canon/nyxid-responses-direct.md",
-      "nyxid-connected-service-tools": "docs/canon/nyxid-connected-service-tools.md"
-    }
+    "canon": {}
   },
-
   "chapters": {
-    "_doc_00": "00 序章:repo 总览 / 定位 / 生命周期。除 00/02 repo-map 外,大部分是概念性叙事,用宽 block 启发式。",
-
-    "00/01-what-is-aevatar.md": [
-      "src/workflow/README.md",
+    "_doc_00": "00 导读与版本基线",
+    "00/01-reading-guide.md": [
       "docs/canon/overview.md",
       "docs/canon/architecture.md"
     ],
-    "00/02-repo-map.md": {
-      "_note": "repo 总览。任何结构性变动(slnx/slnf 新增项目、src 大目录迁移)都可能影响。用宽匹配 + 标记为人审优先。",
-      "paths": [
-        "aevatar.slnx",
-        "src/",
-        "docs/canon/module-placement-map.md"
-      ]
-    },
-    "00/03-quick-start.md": [
-      "src/Aevatar.Mainnet.Host.Api/README.md",
-      "docs/canon/sdk-dotnet.md"
-    ],
-    "00/04-chat-request-lifecycle.md": [
-      "docs/canon/architecture.md",
-      "docs/canon/chat-api.md",
-      "src/Aevatar.Mainnet.Host.Api/"
-    ],
-
-    "_doc_01": "01 宿主与入口:Host 组合 + Chat API + Run 语义。",
-
-    "01/01-hosts-and-composition.md": [
-      "src/Aevatar.Mainnet.Host.Api/",
-      "src/Aevatar.Bootstrap/",
-      "src/Aevatar.Bootstrap.Extensions.AI/",
-      "src/Aevatar.Authentication.Hosting/",
-      "docs/canon/overview.md"
-    ],
-    "01/02-chat-api-and-sse.md": [
-      "docs/canon/chat-api.md",
-      "docs/canon/llm-streaming.md",
-      "src/Aevatar.AGUI.Contracts/",
-      "src/Aevatar.Presentation.AGUI/",
-      "agents/Aevatar.GAgents.StreamingProxy/",
-      "agents/Aevatar.GAgents.StreamingProxyParticipant/"
-    ],
-    "01/03-run-semantics.md": [
-      "docs/canon/workflow-runtime.md",
-      "src/workflow/Aevatar.Workflow.Application/"
-    ],
-
-    "_doc_02": "02 编排层:Workflow YAML + 步骤 + kernel + maker + connector。",
-
-    "02/01-yaml-grammar.md": [
-      "docs/canon/workflow-primitives.md",
-      "src/workflow/Aevatar.Workflow.Core/Primitives/",
-      "src/workflow/Aevatar.Workflow.Abstractions/"
-    ],
-    "02/02-definition-and-run-actors.md": [
-      "docs/canon/workflow-runtime.md",
-      "src/workflow/Aevatar.Workflow.Core/"
-    ],
-    "02/03-execution-kernel.md": [
-      "docs/canon/workflow-runtime.md",
-      "src/workflow/Aevatar.Workflow.Core/Execution/",
+    "00/02-version-evidence-and-status.md": [
       "docs/adr/0034-workflow-saga-compensation-protocol.md"
     ],
-    "02/04-step-modules-catalog.md": [
-      "docs/canon/workflow-primitives.md",
-      "src/workflow/Aevatar.Workflow.Core/Modules/",
-      "src/workflow/Aevatar.Workflow.Core/Primitives/"
+    "00/03-repository-map.md": [
+      "aevatar.slnx",
+      "docs/canon/module-placement-map.md"
     ],
-    "02/05-workflows-walkthrough.md": [
-      "workflows/simple_qa.yaml",
-      "workflows/cn_reimbursement_intake.yaml",
-      "workflows/codex_long_running_handoff.yaml",
-      "workflows/resume_screening.yaml",
-      "workflows/invoice_ocr_approval.yaml",
-      "workflows/lark_approval_wait.yaml",
-      "workflows/petty_cash_approval.yaml"
+    "_doc_01": "01 启动与请求全景",
+    "01/01-quick-start.md": [
+      "src/workflow/Aevatar.Workflow.Host.Api/README.md",
+      "src/Aevatar.Mainnet.Host.Api/README.md",
+      "workflows/simple_qa.yaml"
     ],
-    "02/06-maker-plugin.md": [
-      "src/workflow/extensions/Aevatar.Workflow.Extensions.Maker/",
-      "demos/Aevatar.Demos.Maker/",
+    "01/02-hosts-and-composition.md": [
       "docs/canon/overview.md",
-      "docs/adr/0006-multi-agent-evolution.md"
+      "src/Aevatar.Mainnet.Host.Api/Hosting/MainnetHostBuilderExtensions.cs",
+      "src/workflow/Aevatar.Workflow.Host.Api/Program.cs"
     ],
-    "02/07-connectors.md": [
-      "docs/canon/connector.md",
-      "docs/canon/role-model.md",
-      "src/Aevatar.Configuration/"
+    "01/03-chat-conversation-turn-contract.md": [
+      "docs/canon/chat-api.md",
+      "src/workflow/Aevatar.Workflow.Infrastructure/CapabilityApi/ChatEndpoints.cs",
+      "agents/Aevatar.GAgents.ChatHistory/chat_history_messages.proto"
     ],
-
-    "_doc_03": "03 运行内核:Agent/Actor/Runtime/Stream + EventEnvelope vs StateEvent + GAgentBase + StateGuard + 路由 + LocalRuntime。",
-
-    "03/01-agent-actor-runtime.md": [
-      "src/Aevatar.Foundation.Abstractions/",
-      "docs/canon/architecture.md"
+    "01/04-request-streaming-lifecycle.md": [
+      "src/workflow/Aevatar.Workflow.Infrastructure/CapabilityApi/ChatSseResponseWriter.cs",
+      "src/Aevatar.AGUI.Contracts/agui_events.proto",
+      "docs/canon/llm-streaming.md"
     ],
-    "03/02-event-envelope-vs-state-event.md": [
-      "src/Aevatar.Foundation.Abstractions/",
-      "src/Aevatar.Foundation.Core/",
-      "docs/canon/event-sourcing.md",
-      "docs/canon/architecture.md"
+    "_doc_02": "02 Actor 运行内核",
+    "02/01-agent-actor-runtime.md": [
+      "src/Aevatar.Foundation.Abstractions/IActorRuntime.cs",
+      "src/Aevatar.Foundation.Abstractions/README.md",
+      "src/Aevatar.Foundation.Abstractions/runtime_actor_identity.proto"
     ],
-    "03/03-gagent-base.md": [
+    "02/02-envelope-command-event-query.md": [
+      "src/Aevatar.Foundation.Abstractions/agent_messages.proto",
+      "src/Aevatar.Foundation.Abstractions/EnvelopeRouteSemantics.cs"
+    ],
+    "02/03-gagent-event-pipeline.md": [
       "src/Aevatar.Foundation.Core/GAgentBase.cs",
-      "src/Aevatar.Foundation.Core/",
-      "docs/canon/architecture.md"
+      "src/Aevatar.Foundation.Abstractions/EventModules/IEventModule.cs",
+      "src/Aevatar.Foundation.Abstractions/Attributes/EventHandlerAttribute.cs"
     ],
-    "03/04-state-guard-and-event-sourcing.md": [
-      "src/Aevatar.Foundation.Core/",
-      "docs/canon/event-sourcing.md"
+    "02/04-state-event-sourcing-and-guard.md": [
+      "src/Aevatar.Foundation.Abstractions/Persistence/IEventStore.cs",
+      "src/Aevatar.Foundation.Core/StateGuard.cs",
+      "src/Aevatar.Foundation.Core/GAgentBase.TState.cs"
     ],
-    "03/05-routing-and-topology.md": [
-      "src/Aevatar.Foundation.Core/",
-      "src/Aevatar.Foundation.Runtime.Hosting/"
+    "02/05-dispatch-routing-and-topology.md": [
+      "src/Aevatar.Foundation.Abstractions/IActorDispatchPort.cs",
+      "src/Aevatar.Foundation.Abstractions/EnvelopeRouteSemantics.cs",
+      "src/Aevatar.Foundation.Abstractions/EventEnvelopePublishOptions.cs"
     ],
-    "03/06-local-runtime-deep-dive.md": [
-      "src/Aevatar.Foundation.Runtime.Implementations.Local/"
+    "02/06-local-runtime-and-lifecycle.md": [
+      "src/Aevatar.Foundation.Runtime.Implementations.Local/Actors/LocalActor.cs",
+      "src/Aevatar.Foundation.Runtime.Implementations.Local/Actors/LocalActorRuntime.cs",
+      "src/Aevatar.Foundation.Runtime.Implementations.Local/README.md"
     ],
-
-    "_doc_04": "04 AI 能力层:RoleGAgent + LLM Providers + Tool Providers + ChatRuntime/Middleware。",
-
-    "04/01-role-gagent.md": [
+    "_doc_03": "03 Workflow 编排",
+    "03/01-workflow-model-and-identities.md": [
+      "src/workflow/Aevatar.Workflow.Core/WorkflowGAgent.cs",
+      "src/workflow/Aevatar.Workflow.Core/WorkflowRunGAgent.cs",
+      "src/workflow/Aevatar.Workflow.Core/workflow_state.proto"
+    ],
+    "03/02-yaml-schema-and-validation.md": [
+      "src/workflow/Aevatar.Workflow.Abstractions/Workflows/WorkflowYamlRootSchema.cs",
+      "src/workflow/Aevatar.Workflow.Core/Primitives/WorkflowParser.cs",
+      "src/workflow/Aevatar.Workflow.Core/WorkflowGAgent.cs"
+    ],
+    "03/03-execution-kernel-and-outcomes.md": [
+      "src/workflow/Aevatar.Workflow.Core/Execution/WorkflowExecutionKernel.cs",
+      "src/workflow/Aevatar.Workflow.Abstractions/workflow_execution_messages.proto",
+      "src/workflow/Aevatar.Workflow.Core/WorkflowRunGAgent.cs"
+    ],
+    "03/04-primitives-catalog.md": [
+      "src/workflow/Aevatar.Workflow.Core/Primitives/WorkflowPrimitiveCatalog.cs",
+      "src/workflow/Aevatar.Workflow.Core/WorkflowCoreModulePack.cs",
+      "docs/canon/workflow-primitives.md"
+    ],
+    "03/05-pause-signal-approval-and-resume.md": [
+      "src/workflow/Aevatar.Workflow.Core/Modules/WaitSignalModule.cs",
+      "src/workflow/Aevatar.Workflow.Core/Modules/HumanApprovalModule.cs",
+      "src/workflow/Aevatar.Workflow.Core/workflow_state.proto"
+    ],
+    "03/06-saga-compensation-and-recovery.md": [
+      "src/workflow/Aevatar.Workflow.Core/workflow_state.proto",
+      "src/workflow/Aevatar.Workflow.Core/WorkflowRunGAgent.cs",
+      "docs/adr/0034-workflow-saga-compensation-protocol.md"
+    ],
+    "03/07-connectors-and-capability-admission.md": [
+      "src/workflow/Aevatar.Workflow.Abstractions/workflow_capability_admission.proto",
+      "src/workflow/Aevatar.Workflow.Application/ExternalCapabilities/WorkflowExternalCapabilityAdmissionService.cs",
+      "docs/canon/connector.md"
+    ],
+    "_doc_04": "04 AI 执行与工具",
+    "04/01-role-agent-and-streaming-run.md": [
       "src/Aevatar.AI.Core/RoleGAgent.cs",
-      "src/Aevatar.AI.Core/"
+      "src/Aevatar.AI.Abstractions/ai_messages.proto",
+      "src/Aevatar.AI.Core/Chat/ChatRuntime.cs"
     ],
-    "04/02-llm-providers.md": [
-      "src/Aevatar.AI.LLMProviders.MEAI/",
-      "src/Aevatar.AI.LLMProviders.NyxId/",
-      "src/Aevatar.AI.LLMProviders.Tornado/",
-      "docs/canon/nyxid-llm-integration.md",
-      "docs/canon/nyxid-responses-direct.md"
+    "04/02-llm-providers-and-route-selection.md": [
+      "src/Aevatar.AI.Abstractions/LLMProviders/ILLMProvider.cs",
+      "src/Aevatar.AI.Core/LLMProviders/OwnerLlmConfigApplier.cs",
+      "src/Aevatar.Bootstrap.Extensions.AI/CompositeLLMProviderFactory.cs"
     ],
-    "04/03-tool-providers.md": [
-      "src/Aevatar.AI.ToolProviders.MCP/",
-      "src/Aevatar.AI.ToolProviders.Skills/",
-      "src/Aevatar.AI.ToolProviders.Lark/",
-      "src/Aevatar.AI.ToolProviders.Web/",
-      "src/Aevatar.AI.ToolProviders.Telegram/",
-      "src/Aevatar.AI.ToolProviders.Ornn/",
-      "src/Aevatar.AI.ToolProviders.Channel/",
-      "src/Aevatar.AI.ToolProviders.Scripting/",
-      "src/Aevatar.AI.ToolProviders.Workflow/",
-      "src/Aevatar.AI.ToolProviders.AgentCatalog/",
-      "src/Aevatar.AI.ToolProviders.Binding/",
-      "src/Aevatar.AI.ToolProviders.ToolSetRegistry/",
-      "src/Aevatar.AI.Core/Tools/"
-    ],
-    "04/04-chat-runtime-and-middleware.md": [
-      "src/Aevatar.AI.Core/Chat/",
+    "04/03-tool-loop-catalog-and-presentation.md": [
       "src/Aevatar.AI.Core/Tools/ToolCallLoop.cs",
-      "src/Aevatar.AI.Abstractions/"
+      "src/Aevatar.Foundation.Abstractions/Tools/tool_presentation.proto",
+      "src/Aevatar.AI.Abstractions/ToolProviders/IAgentToolSource.cs"
     ],
-
-    "_doc_05": "05 CQRS 读侧:Projection 概览 + 双投影模式 + ReadModel Providers + Workflow Projection。",
-
-    "05/01-projection-overview.md": [
+    "04/04-tool-approval-and-authorization.md": [
+      "src/Aevatar.AI.Core/Middleware/ToolCallCredentialPolicyMiddleware.cs",
+      "src/Aevatar.AI.Core/Middleware/ToolApprovalMiddleware.cs",
+      "src/Aevatar.AI.Abstractions/ToolProviders/IRemoteToolApprovalPort.cs"
+    ],
+    "04/05-prompt-overlays-and-agent-context.md": [
+      "src/Aevatar.AI.Abstractions/Prompting/SystemPromptLayers.cs",
+      "src/Aevatar.AI.Core/Prompting/SystemPromptLayerComposer.cs",
+      "docs/canon/system-skill-overlay-authoring-contract.md"
+    ],
+    "_doc_05": "05 CQRS、Projection 与 Audit",
+    "05/01-command-event-projection-readmodel.md": [
       "docs/canon/cqrs-projection.md",
-      "src/Aevatar.CQRS.Projection.Core/"
-    ],
-    "05/02-two-projection-modes.md": [
       "src/Aevatar.CQRS.Projection.Core/README.md",
-      "src/Aevatar.CQRS.Projection.Core/Orchestration/",
-      "docs/canon/cqrs-projection.md"
+      "src/Aevatar.CQRS.Projection.Core.Abstractions/Abstractions/Orchestration/CommittedStateEventEnvelope.cs"
     ],
-    "05/03-readmodel-providers.md": [
-      "src/Aevatar.CQRS.Projection.Providers.Elasticsearch/",
-      "src/Aevatar.CQRS.Projection.Providers.InMemory/",
-      "src/Aevatar.CQRS.Projection.Providers.Neo4j/",
-      "src/Aevatar.CQRS.Projection.StateMirror/"
+    "05/02-committed-state-and-observation.md": [
+      "src/Aevatar.Foundation.Abstractions/agent_messages.proto",
+      "src/Aevatar.CQRS.Projection.Core/Orchestration/CommittedStateProjectionActivationHook.cs",
+      "src/Aevatar.CQRS.Projection.Core/Streaming/ProjectionSessionEventHub.cs"
     ],
-    "05/04-workflow-projection.md": [
-      "src/workflow/Aevatar.Workflow.Projection/",
-      "src/Aevatar.CQRS.Projection.Core/"
+    "05/03-projection-lifecycle-and-leases.md": [
+      "src/Aevatar.CQRS.Projection.Core/Orchestration/ProjectionScopeGAgentBase.cs",
+      "src/Aevatar.CQRS.Projection.Core/Orchestration/ProjectionRuntimeLeaseBase.cs",
+      "src/Aevatar.CQRS.Projection.Core.Abstractions/Abstractions/Activation/ProjectionActivationPlan.cs"
     ],
-
-    "_doc_06": "06 分布式与生产态:当前 vs 目标 + Orleans + Kafka + Garnet + 架构守卫。",
-
-    "06/01-current-vs-target.md": [
-      "docs/canon/architecture.md",
-      "src/Aevatar.Foundation.Runtime.Hosting/",
-      "src/Aevatar.Foundation.Runtime.Implementations.Orleans/"
+    "05/04-readmodel-stores-versioning-and-rebuild.md": [
+      "src/Aevatar.CQRS.Projection.Stores.Abstractions/Abstractions/ReadModels/ProjectionWriteResult.cs",
+      "src/Aevatar.CQRS.Projection.Providers.Elasticsearch/Stores/ElasticsearchIndexLifecycleManager.cs",
+      "docs/adr/0040-current-state-readmodel-dr-rebuild.md"
     ],
-    "06/02-orleans-runtime.md": [
-      "src/Aevatar.Foundation.Runtime.Implementations.Orleans/",
-      "docs/adr/0002-mainnet-architecture.md"
+    "05/05-workflow-agui-and-live-observation.md": [
+      "src/workflow/Aevatar.Workflow.Projection/README.md",
+      "src/workflow/Aevatar.Workflow.Presentation.AGUIAdapter/EventEnvelopeToWorkflowRunEventMapper.cs",
+      "src/Aevatar.AGUI.Contracts/agui_events.proto"
     ],
-    "06/03-kafka-transport.md": [
-      "src/Aevatar.Foundation.Runtime.Transport.Implementations.MassTransitKafka/",
-      "src/Aevatar.Foundation.Runtime.Streaming.Implementations.MassTransit/",
-      "src/Aevatar.Foundation.Runtime.Implementations.Orleans.Transport.MassTransit/",
-      "src/Aevatar.Foundation.Runtime.Implementations.Orleans.Transport.KafkaProvider/",
-      "docs/adr/0003-kafka-transport.md"
+    "05/06-audit-trail-lifecycle-and-export.md": [
+      "src/Aevatar.Audit.Abstractions/audit_messages.proto",
+      "src/Aevatar.Audit.Core/CommittedFacts/CommittedAuditArtifactMaterializer.cs",
+      "docs/canon/audit-trail.md"
     ],
-    "06/04-garnet-clustering.md": [
-      "src/Aevatar.Foundation.Runtime.Persistence.Implementations.Garnet/",
-      "docs/adr/0032-mainnet-garnet-clustering.md"
+    "_doc_06": "06 产品资源与身份",
+    "06/01-scope-team-member-resource-model.md": [
+      "agents/Aevatar.GAgents.StudioMember/studio_member_messages.proto",
+      "agents/Aevatar.GAgents.StudioTeam/studio_team_messages.proto",
+      "src/Aevatar.Studio.Projection/Projectors/StudioTeamRosterFanoutMaterializer.cs"
     ],
-    "06/05-architecture-guards.md": [
-      "tools/ci/architecture_guards.sh",
-      "tools/ci/slow_test_guards.sh"
+    "06/02-draft-revision-binding-and-published-service.md": [
+      "src/Aevatar.Studio.Application/Studio/Services/StudioMemberWorkflowBindingPort.cs",
+      "agents/Aevatar.GAgents.StudioMember/StudioMemberBindingRunGAgent.cs",
+      "src/platform/Aevatar.GAgentService.Abstractions/Protos/service_revision.proto"
     ],
-
-    "_doc_07": "07 周边:Channel + A2A + ChatRouting + VoicePresence + Studio/Scripting + Console-Web + Observability + Lark + Voice 边缘。",
-
-    "07/01-channels.md": [
-      "src/Aevatar.ChatRouting.Abstractions/",
-      "docs/canon/aevatar-channel-architecture.md",
-      "docs/adr/0008-channel-credential-routing.md",
-      "docs/adr/0012-channel-runtime-credential-boundary.md",
-      "docs/adr/0013-unified-channel-inbound-backbone.md",
-      "docs/adr/0014-interactive-reply-abstraction.md",
-      "agents/Aevatar.GAgents.Channel.Abstractions/",
-      "agents/Aevatar.GAgents.Channel.Runtime/",
-      "agents/Aevatar.GAgents.ChannelRuntime/",
-      "agents/channels/"
+    "06/03-catalog-visibility-and-scope-authorization.md": [
+      "docs/canon/workflow-catalog-visibility.md",
+      "src/workflow/Aevatar.Workflow.Projection/Projectors/WorkflowCatalogCurrentStateProjector.cs",
+      "src/workflow/Aevatar.Workflow.Projection/Workflows/WorkflowCatalogReadModelQueryPort.cs"
     ],
-    "07/02-a2a-interop.md": [
-      "src/Aevatar.Interop.A2A.Abstractions/",
-      "src/Aevatar.Interop.A2A.Application/",
-      "src/Aevatar.Interop.A2A.Hosting/"
+    "06/04-studio-commands-acks-and-readmodels.md": [
+      "src/Aevatar.Studio.Hosting/Endpoints/StudioMemberEndpoints.cs",
+      "src/Aevatar.Studio.Projection/CommandServices/ActorDispatchStudioMemberCommandService.cs",
+      "src/Aevatar.Studio.Projection/QueryPorts/ProjectionStudioMemberQueryPort.cs"
     ],
-    "07/03-chat-routing.md": [
-      "src/Aevatar.ChatRouting.Abstractions/",
-      "src/Aevatar.ChatRouting.Core/",
-      "agents/Aevatar.GAgents.ChatRouting/",
-      "docs/adr/0024-chat-route-policy.md",
-      "docs/adr/0026-tool-first-chat-ingress.md"
+    "06/05-work-orders-and-durable-intent.md": [
+      "agents/Aevatar.GAgents.WorkOrder/work_order_messages.proto",
+      "agents/Aevatar.GAgents.WorkOrder/WorkOrderGAgent.cs",
+      "docs/canon/work-orders.md"
     ],
-    "07/04-voice-presence.md": [
-      "src/Aevatar.Foundation.VoicePresence/",
-      "src/Aevatar.Foundation.VoicePresence.Abstractions/",
-      "src/Aevatar.Foundation.VoicePresence.MiniCPM/",
-      "src/Aevatar.Foundation.VoicePresence.OpenAI/",
-      "docs/canon/voice-presence-integration.md",
-      "docs/adr/0025-voice-router-integration.md",
-      "docs/adr/0031-voice-edge-local-tools.md"
+    "_doc_07": "07 Conversation、NyxIdChat 与 Agent Profile",
+    "07/01-conversation-turn-and-chat-history.md": [
+      "agents/Aevatar.GAgents.ChatHistory/chat_history_messages.proto",
+      "agents/Aevatar.GAgents.ChatHistory/ChatConversationGAgent.cs",
+      "agents/Aevatar.GAgents.ChatHistory/ChatTurnHistoryDeliveryGAgent.cs"
     ],
-    "07/05-studio-and-scripting.md": [
-      "src/Aevatar.Studio.Application/",
-      "src/Aevatar.Studio.Domain/",
-      "src/Aevatar.Studio.Hosting/",
-      "src/Aevatar.Studio.Infrastructure/",
-      "src/Aevatar.Studio.Projection/",
-      "src/Aevatar.Scripting.Core/",
-      "src/Aevatar.Scripting.Hosting/",
-      "agents/Aevatar.GAgents.StudioMember/",
-      "agents/Aevatar.GAgents.StudioTeam/",
-      "docs/canon/scripting.md",
-      "docs/adr/0016-studio-member-first.md",
-      "docs/adr/0017-studio-team-first.md",
-      "docs/adr/0028-studio-team-accepted-receipt-semantics.md"
+    "07/02-nyxid-chat-actor-model-and-progress.md": [
+      "agents/Aevatar.GAgents.NyxidChat/NyxIdChatGAgent.cs",
+      "agents/Aevatar.GAgents.NyxidChat/NyxIdChatProjectionSession.cs",
+      "docs/canon/nyxid-chat-api.md"
     ],
-    "07/06-console-web.md": [
-      "apps/aevatar-console-web/"
+    "07/03-agent-profile-and-immutable-binding.md": [
+      "docs/canon/nyxid-chat-agent-profile-binding.md",
+      "src/Aevatar.AI.Core/AgentProfiles/AgentProfileSnapshotCodec.cs",
+      "agents/Aevatar.GAgents.NyxidChat/AgentProfiles/AgentProfileTurnCatalogMaterializer.cs"
     ],
-    "07/07-observability.md": [
-      "docs/canon/observability.md",
-      "docs/canon/status-dashboard.md",
-      "docs/adr/0022-otel-semantic-conventions.md",
-      "docs/adr/0023-two-level-inspector.md",
-      "tools/ci/inspector_tier_boundary_guard.sh",
-      "tools/ci/catch_exception_observability_guard.sh",
-      "agents/Aevatar.GAgents.StatusDashboard/"
+    "07/04-turn-authority-tool-catalog-and-retry.md": [
+      "src/Aevatar.AI.Core/RoleGAgent.cs",
+      "src/Aevatar.AI.Core/AgentProfiles/AgentProfileTurnCatalog.cs",
+      "agents/Aevatar.GAgents.NyxidChat/AgentProfiles/AgentProfileTurnCatalogMaterializer.cs"
     ],
-    "07/08-lark-end-to-end.md": [
-      "agents/Aevatar.GAgents.NyxidChat/",
-      "agents/channels/Aevatar.GAgents.Channel.NyxIdRelay/",
-      "agents/channels/Aevatar.GAgents.Channel.Lark/",
-      "agents/platforms/Aevatar.GAgents.Platform.Lark/",
-      "src/Aevatar.AI.Core/Tools/ToolCallLoop.cs",
-      "src/Aevatar.AI.ToolProviders.Channel/",
-      "src/Aevatar.AI.ToolProviders.Lark/",
-      "src/Aevatar.AI.ToolProviders.NyxId/",
+    "_doc_08": "08 Ingress、Channel、文件与语音",
+    "08/01-ingress-normalization-and-routing.md": [
+      "agents/Aevatar.GAgents.Channel.Abstractions/protos/chat_activity.proto",
+      "agents/Aevatar.GAgents.Channel.Runtime/ConversationDispatchMiddleware.cs",
+      "src/Aevatar.ChatRouting.Core/ChatRouteResolver.cs"
+    ],
+    "08/02-channel-runtime-and-credential-boundary.md": [
+      "agents/Aevatar.GAgents.Channel.Abstractions/protos/channel_contracts.proto",
+      "agents/Aevatar.GAgents.Channel.Runtime/Conversation/ConversationGAgent.cs",
+      "docs/adr/0012-channel-runtime-credential-boundary.md"
+    ],
+    "08/03-lark-delivery-interaction-and-repair.md": [
+      "agents/channels/Aevatar.GAgents.Channel.NyxIdRelay/ChannelCallbackEndpoints.cs",
+      "agents/channels/Aevatar.GAgents.Channel.NyxIdRelay/ChannelWorkflowResultDeliveryRepairService.cs",
       "docs/canon/lark-reply-completion-semantics.md"
     ],
-    "07/09-voice-presence-edge-brain.md": [
-      "src/Aevatar.Mainnet.Host.Api/Voice/",
-      "src/Aevatar.Foundation.VoicePresence/",
-      "src/Aevatar.Foundation.VoicePresence.Abstractions/",
-      "docs/canon/voice-presence-integration.md",
-      "docs/adr/0025-voice-router-integration.md",
-      "docs/adr/0031-voice-edge-local-tools.md",
-      "docs/adr/0033-voice-provider-nyxid-ephemeral-broker.md"
+    "08/04-file-artifacts-and-attachments.md": [
+      "src/workflow/Aevatar.Workflow.Abstractions/workflow_execution_messages.proto",
+      "src/workflow/Aevatar.Workflow.Infrastructure/CapabilityApi/WorkflowMultipartFileInputParser.cs",
+      "agents/Aevatar.GAgents.Channel.Runtime/protos/conversation_state.proto"
     ],
-
-    "_doc_08": "08 附录:术语表 / 文档索引 / demo cookbook / TODO List / 结晶路线图。",
-
-    "08/01-glossary.md": [
-      "docs/canon/architecture-vocabulary.md"
+    "08/05-voice-control-and-media-planes.md": [
+      "src/Aevatar.Foundation.VoicePresence.Abstractions/Protos/voice_presence.proto",
+      "src/Aevatar.Foundation.VoicePresence.Abstractions/Sessions/IVoiceVolatileMediaStreamPort.cs",
+      "src/Aevatar.Foundation.VoicePresence/Hosting/VoiceVolatileMediaStreamPort.cs",
+      "src/Aevatar.Mainnet.Host.Api/Voice/PolicyAwareVoiceEndpoints.cs"
     ],
-    "08/02-doc-index.md": {
-      "_note": "canon + adr 索引。新增任何 ADR 或 canon 文件都可能需要补索引。宽匹配 docs/adr/ + docs/canon/ 但标为人审。",
-      "paths": [
-        "docs/canon/",
-        "docs/adr/"
-      ]
-    },
-    "08/03-demo-cookbook.md": [
-      "demos/"
+    "_doc_09": "09 Automation、调度与凭证",
+    "09/01-automation-resource-api-and-readmodels.md": [
+      "src/Aevatar.Studio.Hosting/Endpoints/StudioMemberAutomationEndpoints.cs",
+      "src/platform/Aevatar.GAgentService.Abstractions/Schedules/TeamAutomationOperationObservationContracts.cs",
+      "src/platform/Aevatar.GAgentService.Projection/Queries/ScheduledDispatchQueryPort.cs"
     ],
-    "08/04-todo-list.md": {
-      "_note": "设计可疑/未实现组件汇总。受 canon + 核心抽象文件影响。人审优先。",
-      "paths": [
-        "docs/canon/architecture.md",
-        "docs/adr/0034-workflow-saga-compensation-protocol.md",
-        "src/workflow/Aevatar.Workflow.Core/Execution/WorkflowExecutionKernel.cs",
-        "src/Aevatar.AI.Core/Chat/",
-        "src/Aevatar.CQRS.Projection.Core/Orchestration/"
-      ]
-    },
-    "08/05-crystallization-roadmap.md": [
-      "src/Aevatar.Scripting.Core/",
-      "src/Aevatar.Scripting.Abstractions/",
-      "src/Aevatar.AI.ToolProviders.Skills/",
-      "src/workflow/Aevatar.Workflow.Core/Modules/"
+    "09/02-scheduled-actor-callback-and-fire.md": [
+      "src/platform/Aevatar.GAgentService.Core/Schedules/ScheduledDispatchGAgent.cs",
+      "src/Aevatar.Foundation.Runtime.Implementations.Orleans/Grains/Callbacks/RuntimeCallbackSchedulerGrain.cs",
+      "src/platform/Aevatar.GAgentService.Abstractions/Schedules/ScheduledDispatchCalculator.cs"
+    ],
+    "09/03-owner-authorization-and-agent-key.md": [
+      "src/platform/Aevatar.GAgentService.Abstractions/Protos/scheduled_invocation_authorization_plan.proto",
+      "src/platform/Aevatar.GAgentService.Application/Schedules/Authorization/ScheduledInvocationAuthorizationPlanner.cs",
+      "agents/Aevatar.GAgents.Scheduled/Authoring/ScheduledAgentApiKeyIssuer.cs",
+      "src/Aevatar.Studio.Application/Studio/Services/StudioMemberWorkflowSchedulePort.cs",
+      "docs/adr/0041-scheduled-invocation-agent-key-credential-reference.md"
+    ],
+    "09/04-vault-reference-and-revocation-compensation.md": [
+      "src/platform/Aevatar.GAgentService.Core/Schedules/scheduled_dispatch_state.proto",
+      "src/Aevatar.Foundation.Abstractions/Credentials/credential_secret_references.proto",
+      "agents/Aevatar.GAgents.Scheduled/StudioScheduledCredentialMaterializer.cs",
+      "docs/adr/0043-scheduled-credential-lifecycle-compensation.md",
+      "agents/Aevatar.GAgents.Scheduled/protos/user_agent_catalog.proto"
+    ],
+    "09/05-production-canary-and-recovery.md": [
+      "docs/operations/2026-07-23-scheduled-agent-key-production-canary.md",
+      "docs/operations/2026-07-23-scheduled-agent-key-runtime-integrity-rollout.md"
+    ],
+    "_doc_10": "10 分布式与生产运行",
+    "10/01-production-topology-and-configuration.md": [
+      "src/Aevatar.Mainnet.Host.Api/Hosting/MainnetHostBuilderExtensions.cs",
+      "src/Aevatar.Mainnet.Host.Api/README.md",
+      "docs/canon/overview.md"
+    ],
+    "10/02-orleans-runtime.md": [
+      "src/Aevatar.Foundation.Runtime.Implementations.Orleans/Grains/RuntimeActorGrain.cs",
+      "src/Aevatar.Foundation.Runtime.Implementations.Orleans/Actors/OrleansActorRuntime.cs",
+      "src/Aevatar.Foundation.Runtime.Implementations.Orleans/README.md"
+    ],
+    "10/03-garnet-clustering-and-secret-storage.md": [
+      "src/Aevatar.Foundation.Runtime.Persistence.Implementations.Garnet/GarnetEventStore.cs",
+      "src/Aevatar.Foundation.Runtime.Persistence.Implementations.Garnet/GarnetBackedSecretVault.cs",
+      "docs/adr/0032-mainnet-garnet-clustering.md"
+    ],
+    "10/04-streaming-transport-and-kafka.md": [
+      "src/Aevatar.Foundation.Runtime.Implementations.Orleans.Streaming/Streaming/OrleansActorStream.cs",
+      "src/Aevatar.Foundation.Runtime.Implementations.Orleans.Transport.KafkaProvider/Streaming/KafkaProviderQueueAdapter.cs",
+      "docs/adr/0003-kafka-transport.md"
+    ],
+    "10/05-authentication-scope-and-admin-authorization.md": [
+      "src/Aevatar.Authentication.Hosting/AevatarAuthenticationHostExtensions.cs",
+      "src/Aevatar.Authentication.Hosting/DPoPProofValidator.cs",
+      "src/Aevatar.Authentication.Abstractions/IPlatformAdminAuthorizer.cs"
+    ],
+    "10/06-managed-codex-sandbox-and-delegation.md": [
+      "src/Aevatar.AI.Abstractions/CodexExecution/codex_execution.proto",
+      "src/Aevatar.AI.Abstractions/CodexExecution/ICodexExecutionPort.cs",
+      "src/Aevatar.AI.Infrastructure.ChronoSandbox/ChronoSandboxCodexExecutionAdapter.cs",
+      "src/Aevatar.AI.Infrastructure.ChronoSandbox/NyxIdChronoSandboxCodexClient.cs",
+      "docs/canon/managed-codex-execution.md"
+    ],
+    "10/07-observability-status-and-observatory.md": [
+      "docs/canon/observability.md",
+      "src/Aevatar.Mainnet.Host.Api/Status/StatusEndpoints.cs",
+      "src/workflow/Aevatar.Workflow.Infrastructure/CapabilityApi/WorkflowRunObservatoryEndpoints.cs"
+    ],
+    "10/08-architecture-and-security-guards.md": [
+      "tools/ci/architecture_guards.sh",
+      "tools/ci/README.md",
+      "tools/ci/audit_trail_guards.sh"
+    ],
+    "_doc_11": "11 场景教程与 Cookbook",
+    "11/01-run-a-simple-workflow.md": [
+      "workflows/simple_qa.yaml",
+      "src/workflow/Aevatar.Workflow.Host.Api/README.md",
+      "src/workflow/Aevatar.Workflow.Infrastructure/CapabilityApi/ChatEndpoints.cs"
+    ],
+    "11/02-build-a-branching-tool-workflow.md": [
+      "src/workflow/Aevatar.Workflow.Core/Primitives/WorkflowPrimitiveCatalog.cs",
+      "src/workflow/Aevatar.Workflow.Core/Primitives/WorkflowYamlValidatorImpl.cs",
+      "workflows/firecrawl_agent_async_poll.yaml"
+    ],
+    "11/03-create-bind-and-invoke-a-team-member.md": [
+      "src/Aevatar.Studio.Hosting/Endpoints/StudioMemberEndpoints.cs",
+      "src/Aevatar.Studio.Application/Studio/Services/StudioMemberWorkflowBindingPort.cs",
+      "src/platform/Aevatar.GAgentService.Hosting/Endpoints/ScopeServiceEndpoints.cs"
+    ],
+    "11/04-connect-a-channel-and-handle-files.md": [
+      "agents/channels/Aevatar.GAgents.Channel.NyxIdRelay/ChannelCallbackEndpoints.cs",
+      "agents/Aevatar.GAgents.Channel.Abstractions/protos/channel_contracts.proto",
+      "src/workflow/Aevatar.Workflow.Infrastructure/CapabilityApi/WorkflowMultipartFileInputParser.cs"
+    ],
+    "11/05-create-verify-and-troubleshoot-automation.md": [
+      "src/Aevatar.Studio.Hosting/Endpoints/StudioMemberAutomationEndpoints.cs",
+      "src/platform/Aevatar.GAgentService.Projection/Queries/ScheduledDispatchQueryPort.cs",
+      "docs/operations/2026-07-23-scheduled-agent-key-production-canary.md"
+    ],
+    "_doc_12": "12 架构演进、案例与开放缺口",
+    "12/02-issue-decisions-by-theme.md": [
+      "docs/canon/cqrs-projection.md",
+      "docs/canon/nyxid-chat-agent-profile-binding.md"
+    ],
+    "12/04-incident-case-studies.md": [
+      "src/Aevatar.Capabilities/AevatarScopeAccessGuard.cs",
+      "src/platform/Aevatar.GAgentService.Application/Responses/ResponsesToolClassificationService.cs",
+      "src/platform/Aevatar.GAgentService.Application/Responses/LlmSessionRunObservationAccumulator.cs",
+      "src/platform/Aevatar.GAgentService.Core/Schedules/ScheduledDispatchGAgent.cs"
+    ],
+    "_doc_13": "13 术语与事实源索引",
+    "13/01-glossary.md": [
+      "docs/canon/architecture-vocabulary.md",
+      "docs/canon/architecture.md",
+      "docs/canon/cqrs-projection.md"
+    ],
+    "13/02-canon-and-adr-index.md": [
+      "docs/canon/overview.md",
+      "docs/adr/0001-project-split-strategy.md",
+      "docs/adr/0034-workflow-saga-compensation-protocol.md"
+    ],
+    "13/03-chapter-source-matrix.md": [
+      "docs/canon/overview.md",
+      "docs/canon/module-placement-map.md"
+    ],
+    "13/04-issue-evolution-index.md": [
+      "docs/canon/overview.md",
+      "docs/adr/0037-scheduled-invocation-credential-source-model.md",
+      "docs/canon/scheduled-skill-runners.md"
     ]
   }
 }

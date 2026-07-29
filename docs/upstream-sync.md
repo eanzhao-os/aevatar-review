@@ -92,16 +92,18 @@ gh issue list --label upstream-sync --state open
 
 ## 调映射表(最常见的调整)
 
-映射表是 `.config/upstream-sync/chapter-source-map.json`,**单点调整,无需改脚本**。
+映射表是 `.config/upstream-sync/chapter-source-map.json`,**单点调整,无需改脚本**。当前只为 69 篇
+`current` / `mixed` 章节建立映射；`historical` / `target` 不自动从代码变更触发。
 
 ### 误报太多(某章节被频繁触发,但实际不用改)
 
-收紧该章节的路径条目。例如 `00/02-repo-map.md` 当前匹配整个 `src/`(任何 src 改动都触发),如果太吵,可改成只匹配结构性文件:
+收紧该章节的路径条目。例如仓库地图只需匹配结构性文件：
 
 ```json
-"00/02-repo-map.md": {
-  "paths": ["aevatar.slnx", "docs/canon/module-placement-map.md"]
-}
+"00/03-repository-map.md": [
+  "aevatar.slnx",
+  "docs/canon/module-placement-map.md"
+]
 ```
 
 ### 漏报(某章节该触发却没触发)

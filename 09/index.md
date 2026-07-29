@@ -1,34 +1,32 @@
-# 09 方案区
-
-## 事实源/设计抽象(以 ~/Code/aevatar 为准)
-
-> 09 不是某个组件的解读块,而是一个**方案区**:收录跨 aevatar(必要时跨 `~/Code/NyxID` 等周边仓库)的、可落地的**设计方案**。每一份方案是一个**独立单元**(一个子目录 `NN-<slug>/`,内含一篇 `index.md` 概览 + 若干章),自带「事实源/设计抽象」脊柱,论断同样必须回指真实代码路径,不脑补。本区索引页只做导航,不承载论断。
-
+---
+status: index
 ---
 
-## 这个区域是什么
+# 09 Automation、调度与凭证
 
-- **定位**:把"要不要这么做 / 怎么落地 / 现状缺口在哪"这类**方案性**内容,从逐组件解读里分出来,集中呈现。一份方案通常横跨多个层/多个仓库,不适合塞进单个组件章节。
-- **与 00–08 的关系**:00–08 回答"aevatar 是怎么构成、怎么运转的";09 回答"针对某个具体目标,基于现有机制该怎么搭、还差什么"。
-- **诚实口径**:每份方案都按"当前实现 vs 目标态"如实标注,缺口用 ⚠️ 显式列出并登记 TODO,不写"一键打通"的幻觉(仓库写作原则 + 不动点 FI-006)。
+> 解释 Automation 资源、Schedule actor、durable callback、owner 授权、Agent Key、Vault reference 与版本化 canary。
 
-> **SCOPE_EXTEND**:09 区域不在仓库 `PLAN.md` 原始 00–08 清单内,是按"集中呈现方案"的需要新增的横切区,已在 `PLAN.md` 登记。
+## 阅读前提
 
-## 方案清单
+- 先读 `05/02` 与 `06/01–04`，理解 owner、ACK 与 read model。
 
-| # | 方案 | 一句话 | 现状 |
-|---|---|---|---|
-| 01 | [把 Studio workflow 发布成 NyxID 可调用服务](01-workflow-as-nyxid-service/index.md) | aevatar 发布 published service + NyxID 当通用代理;CLI / aevatar nyxid tools / 直连三入口同源 | 两头现役,当中注册一跳手工;⚠️ protobuf↔OpenAPI + scope_id 鉴权缺口 |
-| 02 | [Ingress 工具所有权:自有工具服务端执行、永不上线](02-ingress-tool-ownership/index.md) | 非对称所有权修复 [10/03](../10/03-ingress-own-tool-stream-leak.md)(#2269):自有工具隐形、客户端声明的工具转发;两落点=流式只放 forwarded + typed `owned_tool_names` | 设计已 codex 评审(6 缺口已并入);⚠️ 未实现 |
-| 03 | [NyxID 下的 C1 Provision、C2 观测与 Team Member Automation Agent Key 验证](03-provision-and-observe-via-nyxid/index.md) | C1 `provision-workflow` + C2 Observatory 主链;另含独立 canonical Member Automation Agent Key canary | C1/C2 已上线;Member Automation 功能/audit 已验证,但不代表 C1 credential 升级 |
+## 按序阅读
 
-> 后续方案按 `09/<NN>-<slug>/` 追加(各自一个子区),并在上表登记一行。
+| 顺序 | 章节 | 状态 | 阅读入口 |
+|---:|---|---|---|
+| 1 | [01](01-automation-resource-api-and-readmodels.md) | `current` | Team Member Automation：资源 API、所有权与读模型 |
+| 2 | [02](02-scheduled-actor-callback-and-fire.md) | `current` | Schedule Actor、Durable Callback 与 Fire：唤醒不是执行事实 |
+| 3 | [03](03-owner-authorization-and-agent-key.md) | `current` | Owner 授权与 Agent Key：把无人值守权限固定成可重验计划 |
+| 4 | [04](04-vault-reference-and-revocation-compensation.md) | `current` | Vault Reference 与撤销补偿：秘密不成为业务事实 |
+| 5 | [05](05-production-canary-and-recovery.md) | `mixed` | Production Canary 与恢复：一次执行只能证明它绑定的版本 |
 
-## 怎么新增一份方案
+## 状态图例
 
-1. 建子目录 `09/<NN>-<slug>/`(`<slug>` 用 `[a-z0-9-]+`),放一篇 `index.md`(方案概览:一句话结论 + 导读表 + 设计正当性)。
-2. 章节文件按 `NN-<slug>.md` 命名,每篇带「事实源/设计抽象」入口、配图(mermaid)、给出设计正当性与诚实缺口。
-3. 接线三处:`mkdocs.yml` nav 加一组、`PLAN.md` 的 09 清单加条目、本页方案清单加一行。
-4. 跑 `bash scripts/check-md.sh` 校验(子区章节文件已纳入校验;NyxID 等外仓路径以 `~/Code/<repo>/` 前缀书写以免被当 aevatar 路径校验)。
+- `current`：冻结基线中的当前设计或能力。
+- `mixed`：主体当前有效，但明确隔离历史、生产版本证据或目标态。
+- `historical`：只保留长期设计教训，不作为现行使用指南。
+- `target`：尚未落地，只能作为缺口与退出条件阅读。
 
-⟦AI:AUTO-LOOP⟧
+## 下一步
+
+- 完成本块后进入 [10 分布式与生产运行](../10/index.md)。

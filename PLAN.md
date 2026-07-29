@@ -1,220 +1,137 @@
 # 解读计划与进度
 
-> 自顶向下、以源码为准、配 demo。每篇对应一个可独立阅读的章节,落点明确到文件。
-> 状态图例:⬜ 待写 / 🔄 进行中 / ✅ 已完成
+> 当前权威书目：`00–13` 共 14 个 block、72 篇实质章节；全部章节已完成。
+>
+> 上游事实基线：`f02aa690bbebb9cabeac30a553d737486b0eb661`；核验日期：`2026-07-25`。
 
----
+## 实施原则
 
-## 写作原则
+1. 自顶向下：先建立请求与身份主线，再下钻 Actor、Workflow、CQRS 和生产边界。
+2. 以冻结事实为准：current 论断必须回到 E1；canon、ADR、issue 和生产观察不能替代代码事实。
+3. 设计导向：正文解释职责、协议、状态所有权、不变量和取舍，不把文件名/行号表当作文章。
+4. 示例诚实：只使用 `verified-static`、`verified-local`、`verified-production-versioned`。
+5. 边界清楚：`current`、`mixed`、`historical`、`target` 不混写。
 
-1. **自顶向下**:先讲"一次请求怎么流过去",再逐层下钻。读者可以随时停在任何一层。
-2. **以源码为准**:每篇开头列「关键代码」清单(文件路径 + 行号锚点),论断都指向真实代码或 `docs/canon/*`。
-3. **配 demo**:每个关键概念都给最小可读/可跑示例(优先用 `workflows/` 和 `demos/` 仓库自带的)。
-4. **说清楚边界**:重点讲 aevatar 区别于"普通 Agent 框架"的设计取舍(Actor + ES + CQRS),而不只是 API 用法。
-5. **诚实标注**:对仓库里标 "当前实现 vs 目标态" 的部分(见 README 表格),按代码事实描述,不脑补未来。
+## 章节清单（72/72）
 
----
+### `00` 导读与版本基线（3）
 
-## 总览:5 大块 + 周边
+- [x] [00/01-reading-guide.md](00/01-reading-guide.md) — `current` — 全书阅读指南：三条路线与证据纪律 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/167)
+- [x] [00/02-version-evidence-and-status.md](00/02-version-evidence-and-status.md) — `current` — 版本基线与证据等级：全书论断的可信度规则 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/168)
+- [x] [00/03-repository-map.md](00/03-repository-map.md) — `current` — 仓库地图：100+ 项目面前如何选阅读面 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/169)
 
-```
-00 序章 ─────────── 定位 / 主线 / 怎么跑
-01 宿主与入口 ────── Host / API / SSE-WS
-02 编排层(Workflow) ── YAML + 步骤模块 + Maker
-03 运行内核(Foundation) Actor / Event / State
-04 AI 能力层 ──────── RoleGAgent / LLM / Tool
-05 CQRS 与读侧 ────── 投影 / ReadModel
-06 分布式与生产态 ──── Orleans / Garnet / Kafka
-07 周边 ──────────── Channel / A2A / Voice / 前端
-08 附录 ──────────── 术语表 / 索引 / cookbook
-09 方案区 ────────── 跨仓库设计与落地方案
-10 已知问题 ──────── 运行态与环境已知缺陷
-11 Skills 能力层 ─── 控制面与平台 fallback
-12 问题复盘 ──────── 按周归档的问题复盘
-```
+### `01` 启动与请求全景（4）
 
----
+- [x] [01/01-quick-start.md](01/01-quick-start.md) — `current` — 快速上手:本地启动 Host 并完成第一次请求 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/170)
+- [x] [01/02-hosts-and-composition.md](01/02-hosts-and-composition.md) — `current` — Host 与组合：协议终结与能力装配的边界 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/171)
+- [x] [01/03-chat-conversation-turn-contract.md](01/03-chat-conversation-turn-contract.md) — `current` — Chat / Conversation / Turn 服务端身份契约 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/172)
+- [x] [01/04-request-streaming-lifecycle.md](01/04-request-streaming-lifecycle.md) — `mixed` — 请求与流式生命周期：从 POST/WS 到终态观测 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/173)
 
-## 章节清单
+### `02` Actor 运行内核（6）
 
-说明：反引号路径表示当前已经产出的章节，会被 `scripts/check-md.sh` 纳入校验。
+- [x] [02/01-agent-actor-runtime.md](02/01-agent-actor-runtime.md) — `current` — Agent / Actor / Runtime:三层分离与传输底座 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/174)
+- [x] [02/02-envelope-command-event-query.md](02/02-envelope-command-event-query.md) — `current` — Envelope 消息语义 —— command / reply / signal / domain event / query 的分野 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/175)
+- [x] [02/03-gagent-event-pipeline.md](02/03-gagent-event-pipeline.md) — `current` — GAgent 事件处理管线：一条消息进入 actor 之后 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/176)
+- [x] [02/04-state-event-sourcing-and-guard.md](02/04-state-event-sourcing-and-guard.md) — `current` — 状态与事件溯源：StateEvent、reducer 与 StateGuard — [issue](https://github.com/eanzhao-os/aevatar-review/issues/177)
+- [x] [02/05-dispatch-routing-and-topology.md](02/05-dispatch-routing-and-topology.md) — `current` — Dispatch、路由与拓扑:消息怎么找到 Actor — [issue](https://github.com/eanzhao-os/aevatar-review/issues/178)
+- [x] [02/06-local-runtime-and-lifecycle.md](02/06-local-runtime-and-lifecycle.md) — `current` — Local Runtime 与 Actor 生命周期 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/179)
 
-### 00 · 序章
+### `03` Workflow 编排（7）
 
-- ✅ `00/01-what-is-aevatar.md` — Aevatar 是什么、解决什么问题、与 LangGraph/AutoGen 等的区别定位
-- ✅ `00/02-repo-map.md` — 仓库地图:`aevatar.slnx` + 当前 9 个 `aevatar.*.slnf` 怎么切、`src/` 下 98 个 `.csproj` 的分层归属(对照 `docs/canon/module-placement-map.md`)
-- ✅ `00/03-quick-start.md` — 从零跑起来:配 Key → 起 Mainnet → `simple_qa` → 看 SSE + 看 `artifacts/` 报告
-- ✅ `00/04-chat-request-lifecycle.md` — 主线全景图: 一次 `POST /api/chat` 请求的生命周期与全链路追踪
-- ✅ 00/00-readme-and-plan.md — 即本 README + PLAN(已完成；不是独立章节文件)
+- [x] [03/01-workflow-model-and-identities.md](03/01-workflow-model-and-identities.md) — `current` — Workflow 模型与身份：定义、运行、草稿与发布物不是同一个对象 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/180)
+- [x] [03/02-yaml-schema-and-validation.md](03/02-yaml-schema-and-validation.md) — `current` — Workflow YAML：一个根模式，四道不同的关 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/181)
+- [x] [03/03-execution-kernel-and-outcomes.md](03/03-execution-kernel-and-outcomes.md) — `current` — Workflow 执行内核：把异步步骤收敛成一个 run 终态 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/182)
+- [x] [03/04-primitives-catalog.md](03/04-primitives-catalog.md) — `current` — Workflow 原语目录：canonical type、模块与输出契约 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/183)
+- [x] [03/05-pause-signal-approval-and-resume.md](03/05-pause-signal-approval-and-resume.md) — `current` — Workflow 暂停与恢复：signal、人工审批和 delivery 边界 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/184)
+- [x] [03/06-saga-compensation-and-recovery.md](03/06-saga-compensation-and-recovery.md) — `mixed` — Workflow Saga：反向补偿、OutcomeUncertain 与恢复 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/185)
+- [x] [03/07-connectors-and-capability-admission.md](03/07-connectors-and-capability-admission.md) — `current` — Connector 与外部能力准入：所有权、readiness 和证据时效 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/186)
 
-### 01 · 宿主与入口
+### `04` AI 执行与工具（5）
 
-- ✅ `01/01-hosts-and-composition.md` — `Mainnet.Host.Api` vs `Workflow.Host.Api` 的边界;`AddAevatarMainnetHost` / `AddAevatarPlatform(EnableMakerExtensions)` 的组合过程
-  - 关键代码:`src/Aevatar.Mainnet.Host.Api/Program.cs`、`src/Aevatar.Bootstrap/*`、`docs/canon/overview.md §3`
-- ✅ `01/02-chat-api-and-sse.md` — `POST /api/chat` 协议、请求体(`prompt/workflow/agentId`)、SSE 帧类型(`RUN_STARTED`/步骤完成/消息片段/`RUN_FINISHED`)、`/v1/responses` 与软废弃的 `streaming-proxy` route
-  - 关键代码:`docs/canon/chat-api.md`、`docs/canon/llm-streaming.md`、`README.md` 关于 Sunset 的说明
-- ✅ `01/03-run-semantics.md` — Run 语义:`runId/sessionId` 服务端生成、不按 run 隔离事件流、终止事件收敛、`StartWorkflowEvent` 投影
-  - 关键代码:README §"Run 语义"、`src/workflow/Aevatar.Workflow.Application/*`
-- ✅ `01/04-platform-audit-trail.md` — 平台 Audit Trail:append-only governance artifact、`/api/audit/trail` 查询、actor resolution、endpoint/tool/projection 三采集面与自动告警边界
-  - 事实源脊柱:`docs/canon/audit-trail.md`、`src/Aevatar.Audit.Hosting/AuditTrailEndpoints.cs`、`src/Aevatar.Audit.Abstractions/audit_messages.proto`
+- [x] [04/01-role-agent-and-streaming-run.md](04/01-role-agent-and-streaming-run.md) — `current` — RoleGAgent 与流式执行：actor turn、会话事实和终态重放 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/187)
+- [x] [04/02-llm-providers-and-route-selection.md](04/02-llm-providers-and-route-selection.md) — `current` — LLM Provider 与路由选择：四类身份、owner 覆盖和安全 failover — [issue](https://github.com/eanzhao-os/aevatar-review/issues/188)
+- [x] [04/03-tool-loop-catalog-and-presentation.md](04/03-tool-loop-catalog-and-presentation.md) — `current` — Tool loop、请求目录与展示事实：先冻结权力，再执行调用 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/189)
+- [x] [04/04-tool-approval-and-authorization.md](04/04-tool-approval-and-authorization.md) — `current` — 工具审批与授权：先确定调用者，再等待可恢复的决定 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/190)
+- [x] [04/05-prompt-overlays-and-agent-context.md](04/05-prompt-overlays-and-agent-context.md) — `current` — Prompt overlay 与 Agent context：固定层序不是授权层级 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/191)
 
-### 02 · 编排层(Workflow)★ 重点
+### `05` CQRS、Projection 与 Audit（6）
 
-- ✅ `02/01-yaml-grammar.md` — Workflow YAML 完整语法:`name/roles/steps/routes`、角色定义、`steps[].type` 取值全表(对照 README 表格 + canon)
-  - 关键代码:`src/workflow/Aevatar.Workflow.Core/Primitives/*`、`docs/canon/workflow-primitives.md`
-- ✅ `02/02-definition-and-run-actors.md` — `WorkflowGAgent`(definition actor,只持有 YAML + 编译结果)vs `WorkflowRunGAgent`(run actor,持有全部执行事实)的职责切分
-  - 关键代码:`WorkflowGAgent.cs`、`WorkflowRunGAgent.cs`、`Aevatar.Workflow.Core/README.md`
-- ✅ `02/03-execution-kernel.md` — `WorkflowExecutionKernel` 主循环:current step / variables / retry / timeout 全部在 actor-owned execution state;模块状态通过 `LoadState/SaveState` 落到 `WorkflowRunState.ExecutionStates`
-- ✅ `02/04-step-modules-catalog.md` ★ — 30+ 步骤模块全图:每个配最小 YAML 片段
-  - 关键代码:`src/workflow/Aevatar.Workflow.Core/Modules/*.cs`(逐文件)
-- ✅ `02/05-workflows-walkthrough.md` — 逐个拆 `workflows/` 下 12 个示例(`simple_qa` / `resume_screening` / `invoice_ocr_approval` / `lark_approval_wait` / `petty_cash_approval` / `codex_long_running_handoff` / ...)
-- ✅ `02/06-maker-plugin.md` — Maker 插件边界:`maker_recursive` + `maker_vote`,为什么从"独立 Host"降级成"Workflow 插件",`IWorkflowModulePack` 注册体系,架构门禁为什么禁止 Workflow→Maker 反向依赖
-  - 关键代码:`src/workflow/extensions/Aevatar.Workflow.Extensions.Maker/`、`demos/Aevatar.Demos.Maker/`、`docs/canon/overview.md §4`、`docs/adr/0006-multi-agent-evolution.md`
-- ✅ `02/07-connectors.md` — Connector(HTTP/CLI/MCP)配置与 `connector_call` 执行;role connector allowlist
-  - 关键代码:`docs/canon/connector.md`、`docs/canon/role-model.md`、`src/Aevatar.Configuration/README.md`
-- ✅ `02/08-saga-durable-execution.md` — saga 补偿 + dead-letter + 持久挂起 = 长在 agent 编排上的 durable execution;两阶段账本 / `OutcomeUncertain` 跳过 / ADR-0034 漂移
-  - 事实源脊柱:`src/workflow/Aevatar.Workflow.Core/workflow_state.proto`、`src/workflow/Aevatar.Workflow.Core/WorkflowRunGAgent.cs`、`docs/adr/0034-workflow-saga-compensation-protocol.md`
+- [x] [05/01-command-event-projection-readmodel.md](05/01-command-event-projection-readmodel.md) — `current` — Command、committed fact、Projection 与 ReadModel：把写入结果和查询视图分开 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/192)
+- [x] [05/02-committed-state-and-observation.md](05/02-committed-state-and-observation.md) — `current` — Committed state 与 observation：持久事实和实时可见性不是一回事 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/193)
+- [x] [05/03-projection-lifecycle-and-leases.md](05/03-projection-lifecycle-and-leases.md) — `current` — Projection lifecycle 与 lease：scope actor 拥有状态，handle 只负责清理 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/194)
+- [x] [05/04-readmodel-stores-versioning-and-rebuild.md](05/04-readmodel-stores-versioning-and-rebuild.md) — `mixed` — ReadModel store、versioning 与 rebuild：副本可覆盖，修复必须显式 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/195)
+- [x] [05/05-workflow-agui-and-live-observation.md](05/05-workflow-agui-and-live-observation.md) — `current` — Workflow AGUI 与 live observation：同源映射，不同持久性 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/196)
+- [x] [05/06-audit-trail-lifecycle-and-export.md](05/06-audit-trail-lifecycle-and-export.md) — `current` — Audit Trail：生命周期、追加语义与 CloudEvents 导出 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/197)
 
-### 03 · 运行内核(Foundation)★ 重点
+### `06` 产品资源与身份（5）
 
-- ✅ `03/01-agent-actor-runtime.md` — 核心概念辨析:Agent(业务逻辑)/ Actor(运行容器)/ Runtime(Stream 之上的 Actor 语义层)/ Stream(`EventEnvelope` 传输骨架)
-  - 关键代码:`src/Aevatar.Foundation.Abstractions/*`、`docs/canon/architecture.md §核心概念`
-- ✅ `03/02-event-envelope-vs-state-event.md` ★ — 最容易被混淆的边界:**`EventEnvelope` 是 runtime message envelope(命令/signal/reply/事件都装这里),`StateEvent` + `EventStore` 才是 Event Sourcing 的事实层**。两者关联但不是一回事。
-- ✅ `03/03-gagent-base.md` — `GAgentBase` / `GAgentBase<TState>` / `GAgentBase<TState,TConfig>` 的统一事件 pipeline:静态 `[EventHandler]` + 动态 `IEventModule<IEventHandlerContext>` 按 Priority 合并、双 Hook 通道
-  - 关键代码:`src/Aevatar.Foundation.Core/GAgentBase.cs`、`EventPipelineBuilder`、`docs/canon/architecture.md §Foundation.Core`
-- ✅ `03/04-state-guard-and-event-sourcing.md` — `StateGuard`(`AsyncLocal` 限制状态只在事件处理期写)、`PersistDomainEventAsync`、`TransitionState` reducer、latest-wins `RunManager`
-- ✅ `03/05-routing-and-topology.md` — 拓扑事实收口到 runtime actor 自身(Local 的 `LocalActor` / Orleans 的 `RuntimeActorGrainState`);`DirectRoute` vs `PublicationRoute.topology` vs `PublicationRoute.observer`(只给 projection/live sink)
-- ✅ `03/06-local-runtime-deep-dive.md` — `LocalActorRuntime` / `LocalActor`(邮箱串行)/ `LocalActorPublisher` 的实现,为什么 InMemory 仅限开发测试
-- ✅ `03/07-stream-actor-gagent-facts.md` — Stream × Actor × GAgent 三者关系与逐条事实清单:收口 03 块,纠正"事件都在 stream / stream 都包在 actor 里"两个常见说法
-  - 事实源脊柱:`OrleansGrainEventPublisher.cs`(发布全部落 `ProduceAsync`)、`RuntimeActorGrain.cs`(订阅自身 stream)、`IRuntimeActorGrain.cs`(非事件 RPC 面)、`GAgentBase.cs`(turn 内同步处理)、`ScopeGAgentEndpoints.cs` + `ProjectionSessionEventHub.cs`(actor 外订阅 stream 的反例)
-- ✅ `03/08-event-sourcing-dividends.md` — Event Sourcing 三重红利(唯一事实源 / 确定性重放 / 免费可观测性)+ `StateGuard` 写栅栏纪律
-  - 事实源脊柱:`src/Aevatar.Foundation.Abstractions/Persistence/IEventStore.cs`、`src/Aevatar.Foundation.Core/StateGuard.cs`、`src/Aevatar.Foundation.Core/EventSourcing/StateEventApplierBase.cs`
+- [x] [06/01-scope-team-member-resource-model.md](06/01-scope-team-member-resource-model.md) — `current` — Scope、Team 与 Member：产品资源、归属权威与派生 roster — [issue](https://github.com/eanzhao-os/aevatar-review/issues/198)
+- [x] [06/02-draft-revision-binding-and-published-service.md](06/02-draft-revision-binding-and-published-service.md) — `current` — Draft、Revision、Binding Run 与 Published Service：五种身份，三层完成语义 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/199)
+- [x] [06/03-catalog-visibility-and-scope-authorization.md](06/03-catalog-visibility-and-scope-authorization.md) — `current` — Workflow Catalog 可见性与 Scope 授权：公共模板不是私有可运行资源 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/200)
+- [x] [06/04-studio-commands-acks-and-readmodels.md](06/04-studio-commands-acks-and-readmodels.md) — `current` — Studio Command、ACK 与 Read Model：受理不是提交，查询不是修复 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/201)
+- [x] [06/05-work-orders-and-durable-intent.md](06/05-work-orders-and-durable-intent.md) — `current` — WorkOrder：耐久授权意图，不是通用任务队列 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/202)
 
-### 04 · AI 能力层
+### `07` Conversation、NyxIdChat 与 Agent Profile（4）
 
-- ✅ `04/01-role-gagent.md` — `RoleGAgent` 处理 `ChatRequestEvent`:流式调 LLM、发 AG-UI 事件(`TextMessageStart`→`Content*`→`ToolCall*`→`End`)、role identity 是 typed actor-owned fact
-  - 关键代码:`src/Aevatar.AI.Core/RoleGAgent.cs`
-- ✅ `04/02-llm-providers.md` — Provider 抽象与实现:MEAI / NyxId / Tornado,`ILLMProviderFactory`
-- ✅ `04/03-tool-providers.md` ★ — 工具体系:ToolApprovalHandler(`YieldApprovalHandler` + 远程升级)、20+ ToolProvider(MCP / Skills / Lark / Web / Telegram / Ornn / Channel / Scripting ...),tool allowlist
-  - 关键代码:`src/Aevatar.AI.ToolProviders.*`
-- ✅ `04/04-chat-runtime-and-middleware.md` — `ChatRuntime` / ToolLoop / 中间件管线(`IAgentRunMiddleware` / `IToolCallMiddleware` / `ILLMCallMiddleware`)、可观测性
+- [x] [07/01-conversation-turn-and-chat-history.md](07/01-conversation-turn-and-chat-history.md) — `current` — Conversation、Turn 与耐久聊天历史 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/203)
+- [x] [07/02-nyxid-chat-actor-model-and-progress.md](07/02-nyxid-chat-actor-model-and-progress.md) — `current` — NyxIdChat Actor 模型与已提交进度 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/204)
+- [x] [07/03-agent-profile-and-immutable-binding.md](07/03-agent-profile-and-immutable-binding.md) — `current` — Agent Profile 与不可变会话绑定 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/205)
+- [x] [07/04-turn-authority-tool-catalog-and-retry.md](07/04-turn-authority-tool-catalog-and-retry.md) — `current` — Turn 权威、工具目录与重试 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/206)
 
-### 05 · CQRS 与读侧 ★ 重点
+### `08` Ingress、Channel、文件与语音（5）
 
-- ✅ `05/01-projection-overview.md` — 统一链路:`Command → EventEnvelope → Actor 决策 → 持久化领域事件 → Projection 消费 → ReadModel`;为什么 API 推送(SSE/WS/AGUI)和 CQRS 读模型共享同一条投影输入
-- ✅ `05/02-two-projection-modes.md` ★ — 两条主链:**Durable Materialization**(scope actor,只消费 committed observation)+ **Session Observation**(发布 session event stream,不做生命周期事实);scope actor 是唯一运行态事实源,host 侧只留薄适配
-  - 关键代码:`src/Aevatar.CQRS.Projection.Core/README.md`、`Orchestration/*`
-- ✅ `05/03-readmodel-providers.md` — InMemory(默认)/ Elasticsearch / Neo4j / StateMirror 几种读模型存储,生产怎么换
-- ✅ `05/04-workflow-projection.md` — Workflow 专属:`WorkflowExecutionCurrentStateProjector`(canonical)、`WorkflowRunInsightReport/Timeline/Graph ArtifactProjector`(derived durable)、AGUI 事件映射
+- [x] [08/01-ingress-normalization-and-routing.md](08/01-ingress-normalization-and-routing.md) — `current` — Ingress 规范化与路由：先固定身份，再选择执行意图 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/207)
+- [x] [08/02-channel-runtime-and-credential-boundary.md](08/02-channel-runtime-and-credential-boundary.md) — `current` — Channel Runtime 与凭据边界：current durable write 不保存 raw secret material — [issue](https://github.com/eanzhao-os/aevatar-review/issues/208)
+- [x] [08/03-lark-delivery-interaction-and-repair.md](08/03-lark-delivery-interaction-and-repair.md) — `mixed` — Lark 投递、交互与修复：把意图、送达事实和平台故障分开 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/209)
+- [x] [08/04-file-artifacts-and-attachments.md](08/04-file-artifacts-and-attachments.md) — `current` — 文件工件与附件：让字节停在边界，让引用进入事实层 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/210)
+- [x] [08/05-voice-control-and-media-planes.md](08/05-voice-control-and-media-planes.md) — `mixed` — Voice 控制面与媒体面：actor 记住语义，relay 搬运 PCM — [issue](https://github.com/eanzhao-os/aevatar-review/issues/211)
 
-### 06 · 分布式与生产态
+### `09` Automation、调度与凭证（5）
 
-- ✅ `06/01-current-vs-target.md` — 诚实对比表(README 那张表的展开):ActorRuntime Provider / Orleans Transport / Projection 并发 / LiveSink / ReadModel 存储的"当前实现 vs 目标态"
-- ✅ `06/02-orleans-runtime.md` — `Aevatar.Foundation.Runtime.Implementations.Orleans*`,同一组原语(`IActorRuntime`/`IActorDispatchPort`/`IEventPublisher`)在分布式下的语义(同 actorId 全局单激活 + 邮箱串行)
-- ✅ `06/03-kafka-transport.md` — 可选 `Transport=Kafka`(MassTransit/Kafka)插件,ADR-0003 的设计
-- ✅ `06/04-garnet-clustering.md` — 生产聚类用共享 Garnet 成员资格(ADR-0032)、Garnet 持久化实现
-- ✅ `06/05-architecture-guards.md` — `tools/ci/architecture_guards.sh` / `slow_test_guards.sh` 守卫什么、为什么"禁止 Workflow→Maker 反向依赖"这类规则是 CI 强制的
-- ✅ `06/06-credentials-zero-standing-secrets.md` — Raw credential 不入事实层:subject re-mint、Vault-backed typed locator 与 callback 守卫
-  - 事实源脊柱:`src/Aevatar.Foundation.Runtime.Implementations.Orleans/Grains/Callbacks/DurableCallbackEnvelopeCredentialGuard.cs`、`src/platform/Aevatar.GAgentService.Hosting/DependencyInjection/ServiceCollectionExtensions.cs`、`docs/adr/0018-per-user-nyxid-binding-via-oauth-broker.md`
+- [x] [09/01-automation-resource-api-and-readmodels.md](09/01-automation-resource-api-and-readmodels.md) — `current` — Team Member Automation：资源 API、所有权与读模型 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/212)
+- [x] [09/02-scheduled-actor-callback-and-fire.md](09/02-scheduled-actor-callback-and-fire.md) — `current` — Schedule Actor、Durable Callback 与 Fire：唤醒不是执行事实 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/213)
+- [x] [09/03-owner-authorization-and-agent-key.md](09/03-owner-authorization-and-agent-key.md) — `current` — Owner 授权与 Agent Key：把无人值守权限固定成可重验计划 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/214)
+- [x] [09/04-vault-reference-and-revocation-compensation.md](09/04-vault-reference-and-revocation-compensation.md) — `current` — Vault Reference 与撤销补偿：秘密不成为业务事实 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/215)
+- [x] [09/05-production-canary-and-recovery.md](09/05-production-canary-and-recovery.md) — `mixed` — Production Canary 与恢复：一次执行只能证明它绑定的版本 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/216)
 
-### 07 · 周边
+### `10` 分布式与生产运行（8）
 
-- ✅ `07/01-channels.md` — Channel Runtime(多通道适配:Lark/Telegram/...):多 token 凭证路由、凭证边界、统一入站骨干、交互回复抽象
-- ✅ `07/02-a2a-interop.md` — `Aevatar.Interop.A2A.*`:Agent-to-Agent 互操作
-- ✅ `07/03-chat-routing.md` — `ChatRoutePolicy`(配置 Actor + 边界解析器)、tool-first Ingress
-- ✅ `07/04-voice-presence.md` — `Foundation.VoicePresence*`(MiniCPM / OpenAI)、语音路由
-- ✅ `07/05-studio-and-scripting.md` — `Aevatar.Studio.*`(member-first / team-first 聚合)、`Aevatar.Scripting.*`
-- ✅ `07/06-console-web.md` — 前端控制台 `apps/aevatar-console-web`:技术栈、与后端 SSE 的对接
-- ✅ `07/07-observability.md` — OTel 语义约定 `aevatar.*`、两级 Inspector、`/status` 面板
-- ✅ `07/08-lark-end-to-end.md` — Lark Bot 全链路走查: 消息入站、路由调度、Tool 执行与卡片回传
-- ✅ `07/09-voice-presence-edge-brain.md` — voice-presence 边缘设备与 aevatar 大脑的双工交互与语音路由
-- ✅ `07/10-input-ingress-unification.md` — Input 入站统一规范与归一化逻辑
-- ✅ `07/11-file-handling-end-to-end.md` — 文件全链路走查: 字节不入 Actor 架构、Ingress、DocumentExtract 与 Submit 流程
-- ✅ `07/12-scheduled-tasks.md` — 定时任务全链路: schedule actor、durable callback、Team Member Automation 与 Agent Key credential lifecycle
-- ✅ `07/13-lark-bot-registration.md` — Lark Bot 注册与对接：零凭证架构下的中继入站
+- [x] [10/01-production-topology-and-configuration.md](10/01-production-topology-and-configuration.md) — `current` — 生产拓扑与配置：先选择一致性档位，再组合能力 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/217)
+- [x] [10/02-orleans-runtime.md](10/02-orleans-runtime.md) — `current` — Orleans Runtime：逻辑 Actor、Grain Turn 与可恢复投递 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/218)
+- [x] [10/03-garnet-clustering-and-secret-storage.md](10/03-garnet-clustering-and-secret-storage.md) — `current` — Garnet 聚类与秘密存储：共享后端，不共享语义 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/219)
+- [x] [10/04-streaming-transport-and-kafka.md](10/04-streaming-transport-and-kafka.md) — `mixed` — Streaming Transport 与 Kafka：一个 Stream 身份，一套 Partition 所有权 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/220)
+- [x] [10/05-authentication-scope-and-admin-authorization.md](10/05-authentication-scope-and-admin-authorization.md) — `current` — Authentication、Scope 与 Admin：四道门，不是一枚万能 Token — [issue](https://github.com/eanzhao-os/aevatar-review/issues/221)
+- [x] [10/06-managed-codex-sandbox-and-delegation.md](10/06-managed-codex-sandbox-and-delegation.md) — `mixed` — Managed Codex：把执行、调用凭证与 Sandbox 委托拆成三层 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/222)
+- [x] [10/07-observability-status-and-observatory.md](10/07-observability-status-and-observatory.md) — `current` — Observability、Status 与 Observatory：观测事实，不接管业务事实 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/223)
+- [x] [10/08-architecture-and-security-guards.md](10/08-architecture-and-security-guards.md) — `current` — Architecture 与 Security Guards：把边界写成可失败的规则 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/224)
 
-### 08 · 附录
+### `11` 场景教程与 Cookbook（5）
 
-- ✅ `08/01-glossary.md` — 术语表(对照 `docs/canon/architecture-vocabulary.md`)
-- ✅ `08/02-doc-index.md` — 把 aevatar 仓库 `docs/canon` + `docs/adr` 的索引搬过来并加导读(不复制全文)
-- ✅ `08/03-demo-cookbook.md` — 可复现 demo 合集:Maker sample、CaseProjection、Workflow.Web、Cli、Inspector
-- ✅ `08/04-todo-list.md` — 未来规划·战术 TODO 清单
-- ✅ `08/05-crystallization-roadmap.md` — 未来规划·战略 结晶梯度路线图
+- [x] [11/01-run-a-simple-workflow.md](11/01-run-a-simple-workflow.md) — `current` — 运行最小 Workflow：先证明定义，再观察一次运行 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/225)
+- [x] [11/02-build-a-branching-tool-workflow.md](11/02-build-a-branching-tool-workflow.md) — `current` — 编写分支 Tool Workflow：把结果、路由与副作用分开 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/226)
+- [x] [11/03-create-bind-and-invoke-a-team-member.md](11/03-create-bind-and-invoke-a-team-member.md) — `current` — 创建、绑定并调用 Team Member：沿响应句柄逐层观察 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/227)
+- [x] [11/04-connect-a-channel-and-handle-files.md](11/04-connect-a-channel-and-handle-files.md) — `current` — 连接 Channel 并处理文件：注册、入站、Artifact 与 Delivery 分层验证 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/228)
+- [x] [11/05-create-verify-and-troubleshoot-automation.md](11/05-create-verify-and-troubleshoot-automation.md) — `current` — 创建、验证与排障 Automation：不要把 `202` 当成已经执行 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/229)
 
-### 09 · 方案区
+### `12` 架构演进、案例与开放缺口（5）
 
-- ✅ `09/01-workflow-as-nyxid-service/index.md` — 方案概览: 两头真、当中手工的 Workflow NyxID 服务发布
-- ✅ `09/01-workflow-as-nyxid-service/01-mechanisms.md` — 机制总览: wire proxy 与 API 路由
-- ✅ `09/01-workflow-as-nyxid-service/02-publish-path.md` — 发布路径与 member-first bind 关系
-- ✅ `09/01-workflow-as-nyxid-service/03-register-and-discover.md` — 服务发现与 OpenAPI 穿透
-- ✅ `09/01-workflow-as-nyxid-service/04-calling.md` — 三入口同源调用 (CLI/Tool/MCP)
-- ✅ `09/01-workflow-as-nyxid-service/05-end-to-end-plan.md` — 端到端 12 跳与落地计划
-- ✅ `09/01-workflow-as-nyxid-service/06-auto-registration-plan.md` — 自动注册流程与状态机
-- ✅ `09/01-workflow-as-nyxid-service/07-auto-registration-adr.md` — 配套 ADR 草案 (Proposed)
-- ✅ `09/02-ingress-tool-ownership/index.md` — 方案概览: 自有工具服务端执行与客户端隐形
-- ✅ `09/02-ingress-tool-ownership/01-leak-and-asymmetric-rule.md` — 非对称工具所有权与泄漏分析
-- ✅ `09/02-ingress-tool-ownership/02-fix-and-rollout.md` — 自有工具隔离两落点与修复计划
-- ✅ `09/03-provision-and-observe-via-nyxid/index.md` — 方案概览: NyxID 下的 C1 Provision、C2 观测与 Team Member Automation Agent Key 验证
-- ✅ `09/03-provision-and-observe-via-nyxid/01-end-to-end.md` — 四段全链路与 6 条 live 实测发现根因
-- ✅ `09/03-provision-and-observe-via-nyxid/02-scheduled-agent-key-production-canary.md` — Studio Team Member Automation 使用 Agent Key 的生产证据闭环(#147)
+- [x] [12/01-evolution-method-and-timeline.md](12/01-evolution-method-and-timeline.md) — `historical` — 演进方法与时间线：先分清三套时钟，再解释“为什么变成现在这样” — [issue](https://github.com/eanzhao-os/aevatar-review/issues/230)
+- [x] [12/02-issue-decisions-by-theme.md](12/02-issue-decisions-by-theme.md) — `mixed` — Issue 决策主题图：把 280 个工作项还原成边界迁移 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/231)
+- [x] [12/03-retired-and-superseded-components.md](12/03-retired-and-superseded-components.md) — `historical` — 已退役与被替代组件：删除什么、由谁接管、留下什么约束 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/232)
+- [x] [12/04-incident-case-studies.md](12/04-incident-case-studies.md) — `mixed` — 事故案例：症状相似时，先找到真正拥有事实的边界 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/233)
+- [x] [12/05-open-gaps-and-canon-drift.md](12/05-open-gaps-and-canon-drift.md) — `target` — 开放缺口与 Canon Drift：只登记当前限制，不预支未来能力 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/234)
 
-### 10 · 已知问题
+### `13` 术语与事实源索引（4）
 
-- ✅ `10/01-cli-lark-scope-isolation.md` — CLI 看不到 Lark Bot 创建的 Agent (Scope 隔离)
-- ✅ `10/02-codex-shell-vs-aevatar-tools.md` — shell 工具 vs aevatar 自有工具冲突
-- ✅ `10/03-ingress-own-tool-stream-leak.md` — 自有工具泄漏进客户端流的漏洞与修复
-- ✅ `10/04-responses-llm-run-offactor-and-observation.md` — off-actor 模式下 LLM 执行与四层故障分析
-- ✅ `10/05-lark-delivery-layer-failures.md` — Lark 投递层三类故障:回复错对象 / 截断残片 / 全哑 401
-- ✅ `10/06-lark-identity-and-authorization.md` — Lark 身份与授权:owner-vs-sender 调用身份 / 资源授权降级
-- ✅ `10/07-scheduled-task-not-firing.md` — 定时任务不触发:重激活跳拍 / Garnet 脑裂 / 历史 provision 双凭证冲突
-- ✅ `10/08-observatory-read-side.md` — 观测台读侧:排序缺失 / ES 1000 字段爆表 / 节点卡进行中
-- ✅ `10/09-studio-console-three-traps.md` — Studio 控制台:binding 覆写致 500 / 对话失忆 / chip 溢出
-- ✅ `10/10-voice-cancel-race-and-reconnect.md` — 语音:打断 cancel 竞态被当致命 / `/ws/voice` 重连缺失
-- ✅ `10/11-nyxid-direct-llm-entry.md` — NyxID 直连 LLM 入口:chat/completions 收不到回复 / 不暴露服务工具
-- ✅ `10/12-api-security-audit-and-hardening.md` — API 安全审计与加固:OAuth2/DPoP/脱敏/授权
+- [x] [13/01-glossary.md](13/01-glossary.md) — `current` — 术语表：先找事实 owner，再区分名字相近的协议角色 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/235)
+- [x] [13/02-canon-and-adr-index.md](13/02-canon-and-adr-index.md) — `mixed` — Canon 与 ADR 索引：状态原样保留，current 结论仍回到冻结 E1 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/236)
+- [x] [13/03-chapter-source-matrix.md](13/03-chapter-source-matrix.md) — `current` — 章节—事实源矩阵：72 个阅读入口怎样回到冻结证据 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/237)
+- [x] [13/04-issue-evolution-index.md](13/04-issue-evolution-index.md) — `mixed` — Issue 演进索引：280 个冻结成员，一个都不靠状态猜实现 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/238)
 
-### 11 · Skills 能力层
+## 完成定义
 
-- ✅ `11/01-aevatar-control-plane-skills.md` — 控制面 Skills 体系与 schedule 客户端 REST
-- ✅ `11/02-aevatar-platform-and-probe-skills.md` — 平台 Skills 组合与 fallback 健康体检探针
-
-### 12 · 问题复盘(按周)
-
-- ✅ `12/index.md` — 问题复盘**章索引**:按周归档,逐周 append。
-- ✅ `12/01-2026-06-22-to-06-26.md` — 2026-06-22 → 06-26 周复盘:按主题(Lark/定时/观测台/Studio/语音/直连入口)链到第 10 章各篇 + 横切教训 + 状态总表。
-
----
-
-## 进度看板
-
-| 大块 | 篇数 | 完成 | 状态 |
-|---|---|---|---|
-| 00 序章 | 4 | 4 | ✅ |
-| 01 宿主与入口 | 4 | 4 | ✅ |
-| 02 编排层 | 8 | 8 | ✅ |
-| 03 内核 | 8 | 8 | ✅ |
-| 04 AI 层 | 4 | 4 | ✅ |
-| 05 CQRS 读侧 | 4 | 4 | ✅ |
-| 06 分布式 | 6 | 6 | ✅ |
-| 07 周边 | 13 | 13 | ✅ |
-| 08 附录 | 5 | 5 | ✅ |
-| 09 方案区 | 14 | 14 | ✅ |
-| 10 已知问题 | 12 | 12 | ✅ |
-| 11 Skills 能力层 | 2 | 2 | ✅ |
-| 12 问题复盘 | 1 | 1 | ✅ |
-| **合计** | **85** | **85** | ✅ |
-
-> 更新约定:每完成一篇,把对应行的 ⬜ 改成 ✅,并更新看板数字。
-
----
-
-## 写作顺序建议
-
-不严格按编号写,而是按"读者价值"优先级:
-
-1. **第一批(立主线)**:`00/03-quick-start` → `01/02-chat-api-and-sse` → `03/02-event-envelope-vs-state-event` → `05/02-two-projection-modes`
-   把"请求怎么流过去 + 两个最容易误解的概念"先讲清楚。
-2. **第二批(讲编排)**:`02/01-yaml-grammar` → `02/04-step-modules-catalog` → `02/05-workflows-walkthrough` → `02/06-maker-plugin`
-   这是 aevatar 最有特色、最实用的部分。
-3. **第三批(下钻内核)**:`03/03-gagent-base` → `03/04-state-guard-and-event-sourcing` → `03/05-routing-and-topology`
-4. **其余**:按需推进,AI 层 / 分布式 / 周边。
+- 72 篇实质章节与 14 个 block index 同时存在，路径与 `mkdocs.yml` 一致。
+- 每篇 current/mixed 章节的事实源在冻结 SHA 中可解析；历史和目标态不冒充 current。
+- 154 个 frozen-closed 与 126 个 frozen-open issue 无损分类并可反向查证。
+- 结构、链接、漂移、Mermaid 与 MkDocs 全量门禁通过。
+- 85 个旧路径只在迁移证据完成后删除，不保留“已迁移”空壳。
