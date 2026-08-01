@@ -6,13 +6,13 @@ verified_at: 2026-07-25
 
 # Owner 授权与 Agent Key：把无人值守权限固定成可重验计划
 
-> 版本与结论：本章描述 `current`。Team Member Automation 不保存交互会话的 bearer，也不靠 service slug 猜测权限；它把 exact owner、`UserService.id`、owner LLM selection、catalog authority 与 credential policy 收进一份可重算的 authorization plan。`create` / `reauthorize` 只有在该计划重验通过后才签发一把 dedicated Agent Key；`update` 只重验既有 `PermissionDigest`，不会暗中换 key。
+> 版本与结论：本章描述 `current`。Team Member Automation 不保存交互会话的 bearer，也不靠 service slug 猜测权限；它把 exact `scopeId + teamId + memberId` owner、`UserService.id`、owner LLM selection、catalog authority 与 credential policy 收进一份可重算的 authorization plan。nested member route 只做 preflight，`create` / `reauthorize` 等 lifecycle mutation 走 owner-aware `/api/schedules`；只有计划重验通过后才签发 dedicated Agent Key。`update` 只重验既有 `PermissionDigest`，不会暗中换 key。
 
 ## 设计抽象与事实源
 
-- `src/platform/Aevatar.GAgentService.Abstractions/Protos/scheduled_invocation_authorization_plan.proto:56-60`、`:90-152`：owner LLM route、exact service grant、catalog authority、credential policy 与 `PermissionDigest` 的 typed contract。
-- `src/platform/Aevatar.GAgentService.Application/Schedules/Authorization/ScheduledInvocationAuthorizationPlanner.cs:32-150`、`:283-412`：owner/target/catalog 重验、exact `UserService.id` 选择、slug drift 拒绝与 canonical plan 生成。
-- `agents/Aevatar.GAgents.Scheduled/Authoring/ScheduledAgentApiKeyIssuer.cs:147-255`、`src/Aevatar.Studio.Application/Studio/Services/StudioMemberWorkflowSchedulePort.cs:462-705`、`docs/adr/0041-scheduled-invocation-agent-key-credential-reference.md:24-37`：targeted scope-plan、dedicated key effect、candidate/activation 边界与 typed reference 约束。此处列出三段是因为“授权决定”与“外部签发副作用”跨越 application、agent adapter 和 ADR 三个边界；正文仍按设计链路而非文件逐段展开。
+- `docs/canon/scheduled-skill-runners.md:44-88`、`:135-190`：preflight/lifecycle route 分界、稳定 owner 三元组，以及 owner LLM、exact grant、authorization fact 与 runtime cross-check。
+- `docs/adr/0041-scheduled-invocation-agent-key-credential-reference.md:24-37`：dedicated Agent Key 的 typed reference、raw material 禁入 state/readmodel/API，以及 trusted provisioning 边界。
+- `docs/operations/2026-07-23-scheduled-agent-key-production-canary.md:1210-1460`：版本化 preflight、exact grant、dedicated key activation 与 read-after-write evidence。该 runbook 的 nested create/detail 形状已被更新 canon 替代，正文会显式标注 drift。
 
 ## 权限不是一个字符串，而是三层可核对事实
 
@@ -100,7 +100,7 @@ flowchart LR
 
 `preflight`只从当前read models构造plan，不刷新catalog、不签发key。用户确认`PermissionDigest`后，`create` / `reauthorize`重新解析同一member与prepared revision，并让revalidator重跑planner；target、owner、schema、policy或digest任一变化都返回plan changed。对于可恢复的catalog snapshot问题，写侧至多刷新并再读一次；若committed refresh version尚未投影出来，返回retryable projection-pending，而不是拿旧replica继续。
 
-通过重验后，actor先提交stable operation、idempotency、mutation digest与deterministic credential effect locator。只有获得当前effect attempt ownership的调用者才可执行外部副作用：
+preflight path 与 lifecycle owner 必须携带同一个 exact `(scopeId, teamId, memberId)`；`teamId` 既是 containment 证据，也是持久 owner identity，不能在 create 时省略后再由 member assignment 推断。owner 一旦写入便不可改变。通过重验后，actor先提交stable operation、idempotency、mutation digest与deterministic credential effect locator。只有获得当前effect attempt ownership的调用者才可执行外部副作用：
 
 ```mermaid
 %%{init: {"maxTextSize": 100000, "sequence": {"actorMargin": 26, "messageMargin": 17, "diagramMarginX": 10, "diagramMarginY": 10}, "themeVariables": {"fontSize": "10px"}}}%%
@@ -111,10 +111,10 @@ sequenceDiagram
     participant A as Schedule actor
     participant N as NyxID
     participant V as Vault boundary
-    B->>S: preflight current owner and member
+    B->>S: nested preflight for exact scope team member
     S->>P: pure planning from current replicas
     P-->>B: typed plan and PermissionDigest
-    B->>S: create or reauthorize with confirmed digest
+    B->>S: owner-aware api schedules mutation with confirmed digest
     S->>P: replan and compare exact confirmation
     P-->>S: private validated plan
     S->>A: begin credential operation and deterministic locator
@@ -137,9 +137,11 @@ issuer不会盲信targeted response。它逐项比较authority、authenticated a
 下面只演示协议边界。请求体中的owner身份由认证/绑定层形成；浏览器不提交grants、key ID、secret、allow-all开关或expiry。
 
 ```bash
-BASE="$HOST/api/scopes/$SCOPE/teams/$TEAM/members/$MEMBER/automations"
+PREFLIGHT="$HOST/api/scopes/$SCOPE/teams/$TEAM/members/$MEMBER/automations/preflight"
+SCHEDULES="$HOST/api/schedules"
+OWNER_QUERY="ownerKind=studio_member_automation&ownerScopeId=$SCOPE&ownerTeamId=$TEAM&ownerMemberId=$MEMBER"
 
-plan=$(curl -fsS -X POST "$BASE/preflight" \
+plan=$(curl -fsS -X POST "$PREFLIGHT" \
   -H "Authorization: Bearer $TOKEN" \
   -H 'content-type: application/json' \
   -d '{"scheduleCron":"0 9 * * *","scheduleTimezone":"Asia/Shanghai","enabled":false}')
@@ -154,14 +156,21 @@ jq -e '
   ([.plan.nyxIdServiceGrants[].userServiceId] | all(length > 0))
 ' <<<"$plan"
 
-curl -fsS -X POST "$BASE" \
+receipt=$(curl -fsS -X POST "$SCHEDULES" \
   -H "Authorization: Bearer $TOKEN" \
   -H 'content-type: application/json' \
   -d "$(jq -n \
     --arg digest "$digest" \
     --arg policy "$policy" \
+    --arg scope "$SCOPE" \
+    --arg team "$TEAM" \
+    --arg member "$MEMBER" \
     --arg op "$OPERATION_ID" \
     --arg idem "$IDEMPOTENCY_KEY" '{
+    ownerKind: "studio_member_automation",
+    ownerScopeId: $scope,
+    ownerTeamId: $team,
+    ownerMemberId: $member,
     scheduleCron: "0 9 * * *",
     scheduleTimezone: "Asia/Shanghai",
     confirmedPermissionDigest: $digest,
@@ -170,10 +179,17 @@ curl -fsS -X POST "$BASE" \
     operationId: $op,
     idempotencyKey: $idem,
     enabled: false
-  }')"
+  }')")
+
+schedule=$(jq -er '.scheduleId | select(length > 0)' <<<"$receipt")
+curl -fsS -H "Authorization: Bearer $TOKEN" \
+  "$SCHEDULES/$schedule?$OWNER_QUERY"
 ```
 
-> Demo status：`verified-static`（逐字段核对canonical request/response DTO、planner/revalidator、issuer、materializer及对应冻结tests；本轮没有向真实NyxID签发key，也没有提交production mutation）。示例依赖部署侧已配置的HTTP认证与NyxID identity binding；这两项是外部前置条件，不在请求体里伪造。
+> Demo status：`verified-static`（按 controller 固定 end-range canon 核对 nested preflight、owner-aware `/api/schedules` create/read、稳定 owner 三元组与 typed credential boundary；本轮没有向真实 NyxID 签发 key，也没有提交 production mutation）。示例依赖部署侧已配置的 HTTP 认证与 NyxID identity binding；这两项是外部前置条件，不在请求体里伪造。
+
+!!! warning "固定事实源的 lifecycle route drift"
+    固定 production runbook 的第 14/15 节仍以 nested route 创建、读取和 run-now；更新后的 `docs/canon/scheduled-skill-runners.md:44-82` 已将 nested surface 收窄为 preflight，并把 lifecycle 统一到 owner-aware `/api/schedules`。因此 runbook 只证明其记录版本的 canary 步骤，不能覆盖 current HTTP 契约；上面的 demo 已按 canon 改写。
 
 成功的mutation receipt仍只是admission。要证明专用key已激活，应读取canonical detail/list并观察更高`stateVersion`、`active`与credential generation；要证明key实际被使用或已撤销，还需要 [09/05](05-production-canary-and-recovery.md) 的版本化canary与 [09/04](04-vault-reference-and-revocation-compensation.md) 的双轨终态。
 
@@ -194,12 +210,14 @@ curl -fsS -X POST "$BASE" \
 3. interactive readiness成功为什么不能直接授权durable automation？
 4. `create` / `reauthorize`与`update`在credential副作用上有什么根本差异？
 5. targeted scope-plan漂移时，为什么issuer必须在key creation之前停止？
+6. 为什么 nested route 只保留 preflight，而 create/read/action 必须携带完整 owner 三元组进入 `/api/schedules`？
 
 <details>
 <summary>论断—冻结证据映射</summary>
 
 | 论断 | 冻结证据 |
 |---|---|
+| nested route只做preflight；lifecycle走owner-aware `/api/schedules`；稳定owner精确包含scope/team/member | `docs/canon/scheduled-skill-runners.md:44-88` |
 | plan包含exact grants、catalog authority、owner/authenticated actor、owner LLM selection与`PermissionDigest` | `src/platform/Aevatar.GAgentService.Abstractions/Protos/scheduled_invocation_authorization_plan.proto:90-152` |
 | catalog lifecycle、owner、freshness与重算`ContentDigest`不满足即拒绝 | `src/platform/Aevatar.GAgentService.Application/Schedules/Authorization/ScheduledInvocationAuthorizationPlanner.cs:40-97` |
 | NyxId owner LLM selection把exact ID加入required grants，slug只校验该ID的route snapshot | `src/platform/Aevatar.GAgentService.Application/Schedules/Authorization/ScheduledInvocationAuthorizationPlanner.cs:283-412` |

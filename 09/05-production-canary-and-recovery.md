@@ -10,7 +10,7 @@ verified_at: 2026-07-25
 
 ## 设计抽象与事实源
 
-- `docs/operations/2026-07-23-scheduled-agent-key-production-canary.md:9-31`、`:36-89`、`:2002-2085`：首次生产结果、secret-safe gate、ambiguous-create/revocation recovery与cleanup顺序。
+- `docs/operations/2026-07-23-scheduled-agent-key-production-canary.md:9-31`、`:36-89`、`:1625-1851`、`:2002-2100`：首次生产结果、secret-safe gate、同一 canonical DELETE 重放、ambiguous-create/revocation recovery 与 cleanup 顺序。
 - `docs/operations/2026-07-23-scheduled-agent-key-runtime-integrity-rollout.md:14-30`、`:32-109`、`:111-168`：old-binary drain、atomic release provenance、live contract、key-use与双轨验收。
 - 本仓库 [受保护工作区账本 §7](../migration/2026-07-25-protected-worktree.md)：退役 canary 输入的第二/三/四次 owner-only evidence、真实 cron、audit 缺口、前置失败与恢复矩阵已逐节迁入本章和 `12/04`；源内容由 Git 历史归档，复核 SHA-256 为 `cb2ae417ad2d3bf7796b91a7a5f6a3620bb6623dc574312f58efb02d6dbb5d8e`。
 
@@ -111,7 +111,7 @@ flowchart TD
     Read --> Run
     Run --> Del["Delete and keep same cleanup operation"]
     Del --> T{"Both tracks terminal and exact key absent?"}
-    T -->|"no"| Retry["Fresh bearer retry-revocation\nsame operation and idempotency"] --> T
+    T -->|"no"| Retry["Refresh bearer then replay same DELETE\nsame owner reason operation idempotency"] --> T
     T -->|"yes"| Clean["Revision member draft Team cleanup\nfinal read-only assertions"]
 ```
 
@@ -122,7 +122,7 @@ flowchart TD
 | create response丢失 | 用原`operationId/idempotencyKey`与deterministic schedule/key identity查询 | 换ID再create，制造第二把key |
 | member/draft已建但automation未知 | 从owner-only ledger读exact identities，确认automation/key实际状态后决定继续或逆序清理 | 猜ID、按名字批量删 |
 | run receipt已接受或cron到点后结果未知 | 查exact fire、run终态与same key `last_used_at` | 再跑一次掩盖第一次未知 |
-| revocation pending/failed | fresh owner bearer调用`retry-revocation`，复用原delete operation/idempotency | 新delete operation、先删member/draft |
+| revocation pending/failed | 刷新 owner bearer，原样重放同一 `DELETE /api/schedules/{scheduleId}` body，复用 owner/reason/delete operation/idempotency | 换 owner/body/operation、调用不存在的旁路、先删member/draft |
 | audit缺失 | 降级为functional/terminal triangulation并登记observability gap | 用单独`202`、模型输出或单独`404`冒充`6202` |
 | 前置探针失败且零mutation | 记录`FAIL/not_evaluated`与独立零资源readback | 标成cleanup incomplete，或绕过trusted-time gate继续 |
 
@@ -166,7 +166,7 @@ jq -e '
 2. 为什么首次canary有完整audit仍不能称无例外strict provenance？
 3. 第三次缺`6202`时，哪些terminal结论仍可由owner view与exact key交叉支持？
 4. 第四次为什么是`FAIL/not_evaluated`而不是`CLEANUP_INCOMPLETE`或“reminder修复失败”？
-5. 网络中断后为什么必须复用checkpoint ledger里的operation/idempotency，而不能重新开始？
+5. 网络中断或 revocation track 未完成后，为什么必须用 checkpoint ledger 原样重放同一 owner-aware DELETE（只刷新 bearer），而不能换 operation/idempotency 重新开始？
 
 <details>
 <summary>论断—冻结与版本化证据映射</summary>
@@ -176,7 +176,7 @@ jq -e '
 | 首次生产canary的source/image、exact key transition、6201/6202与cleanup | `docs/operations/2026-07-23-scheduled-agent-key-production-canary.md:9-31`、`:36-59` |
 | strict rollout要求old-binary drain、atomic image set、live sensitive-field gate与完整key/revocation proof | `docs/operations/2026-07-23-scheduled-agent-key-runtime-integrity-rollout.md:32-168` |
 | 第二/三/四次证据等级、版本、时间、缺口与owner-only artifact hash | [受保护工作区账本 §7](../migration/2026-07-25-protected-worktree.md) 的逐节迁移与 SHA-256 记录；源内容由 Git 历史归档 |
-| ambiguous create、run unknown、revocation pending与audit缺失的恢复规则 | `docs/operations/2026-07-23-scheduled-agent-key-production-canary.md:2002-2085`、[受保护工作区账本 §7](../migration/2026-07-25-protected-worktree.md) |
+| ambiguous create、run unknown、revocation pending与audit缺失的恢复规则；pending revocation只重放同一 canonical DELETE | `docs/canon/scheduled-skill-runners.md:63-82`、`docs/operations/2026-07-23-scheduled-agent-key-production-canary.md:1625-1851`、`:2002-2100`、[受保护工作区账本 §7](../migration/2026-07-25-protected-worktree.md) |
 | cleanup必须先完成credential terminal，再按revision/member/draft/Team收尾 | `docs/operations/2026-07-23-scheduled-agent-key-production-canary.md:1624-1953` |
 | phased Responses不能依赖`previous_response_id`保存history | [受保护工作区账本 §7](../migration/2026-07-25-protected-worktree.md) 所登记的 2026-07-27 production observation；源内容由 Git 历史归档 |
 
