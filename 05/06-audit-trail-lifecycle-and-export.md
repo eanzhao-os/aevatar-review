@@ -11,7 +11,7 @@ verified_at: 2026-07-25
 ## 设计抽象与事实源
 
 - `src/Aevatar.Audit.Abstractions/audit_messages.proto:55`、`:62`、`:70`、`:153`：定义 capture plane、lifecycle、terminal outcome 与 audit artifact wire contract。
-- `src/Aevatar.Audit.Core/CommittedFacts/CommittedAuditArtifactMaterializer.cs:38`、`:43`、`:51`、`:86`：committed-fact capture只消费标准 committed envelope，由显式 translator产出治理记录。
+- `src/Aevatar.Audit.Core/CommittedFacts/CommittedAuditArtifactMaterializer.cs:39`、`:44`、`:58`、`:94`：committed-fact capture只消费标准 committed envelope，由显式 translator产出治理记录。
 - `docs/canon/audit-trail.md:11`、`:25`、`:55`、`:205`：治理边界是不替代业务权威、不把 boundary receipt冒充执行成功、不创建第二条投影主链。
 
 ## 一份治理 artifact，三类 producer
@@ -40,7 +40,7 @@ flowchart LR
     D -. "never decides commands" .-> R
 ```
 
-三类 producer共享存储契约，不共享事实所有权。Boundary只拥有某次 HTTP request 的尝试与结果；tool middleware只拥有某次 tool receipt；projection translator只拥有它认识的 committed event到治理语义的映射。没有 translator的 committed event被跳过，而不是被通用 mapper猜成安全事件。
+三类 producer共享存储契约，不共享事实所有权。Boundary只拥有某次 HTTP request 的尝试与结果；tool middleware只拥有某次 tool receipt；projection translator只拥有它认识的 committed event到治理语义的映射。没有 translator的 committed event被跳过，而不是被通用 mapper猜成安全事件；维护性 republish 的合成 event id 也会在 translator 查找前直接跳过（`CommittedStateRepublish.IsRepublishEventId`，`CommittedAuditArtifactMaterializer.cs:55`），不产生重复治理记录——republish 动作本身由调用它的 admin endpoint 审计。
 
 | capture plane | producer拥有的 subject | lifecycle来源 | provenance强度 | 当前缺失时的行为 |
 |---|---|---|---|---|
@@ -227,13 +227,13 @@ export_page:
 | v1 proto显式区分capture plane、lifecycle、terminal outcome、failure、provenance、redaction与committed reference | E1 | `src/Aevatar.Audit.Abstractions/audit_messages.proto:55`、`:62`、`:70`、`:117`、`:125`、`:133`、`:147`、`:153` |
 | sanitizer强制current schema、terminal/failure组合、provenance一致与redaction metadata，并拒绝部分secret carrier | E1 | `src/Aevatar.Audit.Core/Sanitization/AuditRecordSanitizer.cs:40`、`:92`、`:126`、`:164`、`:193`、`:305` |
 | appender按去除recorded_at后的semantic hash判断duplicate/conflict，既有artifact不覆盖 | E1 | `src/Aevatar.Audit.Core/Projection/AuditRecordContentHasher.cs:8`、`:12`；`src/Aevatar.Audit.Core/Projection/ProjectionAuditTrailAppender.cs:24`、`:48`、`:49`、`:52` |
-| committed capture只解包标准committed envelope并调用显式translator，附event id与state version | E1 | `src/Aevatar.Audit.Core/CommittedFacts/CommittedAuditArtifactMaterializer.cs:38`、`:43`、`:49`、`:51`、`:74`；`src/Aevatar.Audit.Core/CommittedFacts/CommittedAuditRecordFactory.cs:107`、`:109`、`:112` |
+| committed capture只解包标准committed envelope并调用显式translator，附event id与state version | E1 | `src/Aevatar.Audit.Core/CommittedFacts/CommittedAuditArtifactMaterializer.cs:39`、`:44`、`:50`、`:59`、`:82`；`src/Aevatar.Audit.Core/CommittedFacts/CommittedAuditRecordFactory.cs:107`、`:109`、`:112` |
 | endpoint capture对2xx分类accepted，attempt/result best-effort append且不改变原异常/响应 | E1 | `src/Aevatar.Bootstrap/Hosting/EndpointAuditOutcomeClassifier.cs:30`、`:36`；`src/Aevatar.Bootstrap/Hosting/EndpointAuditCaptureMiddleware.cs:41`、`:67`、`:74`、`:84`、`:180` |
 | tool middleware在finally产出finalized receipt audit，append异常仅告警；缺appender/hasher时装配null observer | E1 | `src/Aevatar.AI.Core/Middleware/ToolExecutionAuditMiddleware.cs:25`、`:40`、`:46`、`:54`；`src/Aevatar.AI.Core/Auditing/ToolExecutionAuditServiceCollectionExtensions.cs:24`、`:26`、`:28` |
 | actor identity使用host key做HMAC-SHA256并保存active key id，verify使用fixed-time comparison | E1 | `src/Aevatar.Audit.Core/Identity/AuditActorIdentityHasher.cs:9`、`:30`、`:37`、`:45`、`:60`、`:77` |
 | audit HTTP默认caller scope，跨scope/all需admin，缺query/admin能力返回503且不旁路读取 | E1 | `src/Aevatar.Audit.Hosting/AuditTrailEndpoints.cs:35`、`:41`、`:47`、`:153`、`:156`、`:164`、`:181`、`:308` |
-| response暴露coverage；没有真实complete-through时bounded window只能unknown或behind watermark | E1 | `src/Aevatar.Audit.Abstractions/Models/AuditTrailPage.cs:11`、`:20`、`:40`、`:48`、`:51`；`src/Aevatar.Mainnet.Host.Api/Hosting/MainnetAgentProjectionDocumentStoresExtensions.cs:412`、`:419`、`:420`、`:462` |
+| response暴露coverage；没有真实complete-through时bounded window只能unknown或behind watermark | E1 | `src/Aevatar.Audit.Abstractions/Models/AuditTrailPage.cs:11`、`:20`、`:40`、`:48`、`:51`；`src/Aevatar.Mainnet.Host.Api/Hosting/MainnetAgentProjectionDocumentStoresExtensions.cs:435`、`:442`、`:443`、`:485` |
 | CloudEvents export映射稳定stored fields，使用batch content type并把coverage放响应headers | E1 | `src/Aevatar.Audit.Hosting/AuditTrailResponseMapper.cs:9`、`:17`、`:63`、`:68`、`:79`；`src/Aevatar.Audit.Hosting/AuditTrailEndpoints.cs:218`、`:221`、`:342` |
-| mainnet按provider注册InMemory或Elasticsearch audit artifact/query store，ES额外参与startup reconcile但不进入read-model inventory | E1 | `src/Aevatar.Mainnet.Host.Api/Hosting/MainnetAgentProjectionDocumentStoresExtensions.cs:119`、`:139`、`:193`、`:203`、`:205`、`:207`、`:211` |
+| mainnet按provider注册InMemory或Elasticsearch audit artifact/query store，ES额外参与startup reconcile但不进入read-model inventory | E1 | `src/Aevatar.Mainnet.Host.Api/Hosting/MainnetAgentProjectionDocumentStoresExtensions.cs:120`、`:140`、`:195`、`:205`、`:207`、`:209`、`:213` |
 
 </details>

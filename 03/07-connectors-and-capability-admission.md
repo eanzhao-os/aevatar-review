@@ -22,7 +22,7 @@ flowchart LR
     Y["Workflow YAML\nexact static reference"]
     E["Dependency evaluator\ncollect exact capability set"]
     H["Host Connector authority\ndeployment catalog + operation allowlist"]
-    N["NyxID authority\nUserService + OpenAPI + credential/node facts"]
+    N["NyxID authority\nconnected service MCP catalog + credential/node facts"]
     R["Typed readiness\nstatus + blockers + source stamps"]
     P["Admission plan\ndefinition/mode/capabilities/sources/owner digests"]
     D["Definition actor\nrecompute + atomic bind"]
@@ -42,18 +42,18 @@ flowchart LR
 | 能力种类 | 权威所有者 | exact ref | readiness 主要证明 | 不应被改写成 |
 |---|---|---|---|---|
 | Host Connector | 当前部署的 Connector catalog | `connector_capability_ref + operation_id + contract_digest` | connector 存在、启用、operation 仍在 allowlist、contract 未漂移 | 某个用户的 NyxID service，仅因为 connector 带认证 |
-| NyxID UserService | NyxID 的个人/组织 service、credential、node 与 OpenAPI authority | `user_service_id + service_slug_snapshot + operation_id + method + path_template + contract_digest` | 精确 service 可见且可用、credential/node 条件满足、OpenAPI operation 未漂移 | Host Connector，仅因为 operation 看起来像普通 HTTP |
+| NyxID UserService | NyxID 的 connected service、MCP operation catalog 与 credential/node authority | `user_service_id + endpoint_id`（`NyxIdOperationSelector`） | 精确 connected service 可见且可用、credential/node 条件满足、endpoint contract 未漂移 | Host Connector，仅因为 operation 看起来像普通 HTTP |
 
-`service_slug_snapshot` 只用于可读性和漂移检测；`user_service_id` 才是实例身份。两个用户服务可以有相同 slug，不能按显示名合并。Host Connector 也不是任意 URL：ref 指向部署 catalog 中已发布的命名 operation。
+NyxID 的身份维度已从 operation_id/OpenAPI 时代收敛为 `user_service_id + endpoint_id`：identity 由 connected service 的 MCP operation catalog 给出，endpoint 是 catalog 里一个可寻址 operation。两个用户服务可以有相同 slug，不能按显示名合并。Host Connector 也不是任意 URL：ref 指向部署 catalog 中已发布的命名 operation。
 
 ## 从 YAML 提取的是静态 capability set
 
 准入服务不信任调用者提交的“我需要哪些能力”清单。它重新 parse root、inline workflow 或 bundle，再从所有顶层和嵌套 step 提取依赖：
 
-- canonical `connector_call` 必须有静态 `connector`；`operation/action` 缺省为 `__default__`，`contract_digest` 也进入 exact tuple。包含 `${...}` 的动态 connector identity 会被拒绝。
-- NyxID 路径是 `tool_call` + `tool: nyxid_proxy`；`arguments` 必须是静态 JSON object，并同时给出 `service_id`、`slug`、`operation_id`、`method`、`path`、`contract_digest`。
+- canonical `connector_call` 必须有静态 `connector`；`operation/action` 缺省为 `__default__`，`contract_digest` 可选（缺省为空串）。包含 `${...}` 的动态 connector identity 会被拒绝。
+- NyxID 路径是 `tool_call` + `tool: nyxid_proxy`，identity 放在 step 级 `capability: {nyxid_operation: {user_service_id, endpoint_id}}`；`arguments` 必须是静态 JSON object，且只允许运行时参数 `path_params`、`query`、`headers`、`body`、`response_mode`。
 - NyxID YAML 不能携带 `Authorization`、cookie、API key 或 token 类敏感 header。credential 属于运行边界，不属于 definition。
-- 所有 exact refs 按 canonical key 去重和排序；root 与 inline definition 一起进入 `definition_digest`，不能只替换子 workflow 后继续沿用旧 plan。
+- 所有 invocation 按 `call_site_id` 排序且必须唯一；root 与 inline definition 一起进入 `definition_digest`，不能只替换子 workflow 后继续沿用旧 plan。
 
 冻结实现还有一个不能隐藏的覆盖缺口：`secure_connector_call` 虽与 `connector_call` 共用 `ConnectorCallModule`，但 canonical type 保持独立，而 dependency evaluator 只匹配 `connector_call`。因此 `secure_connector_call` 当前不会贡献 Host Connector capability，也不会因它本身要求 admission plan；不能把本章的 connector 准入口径泛化到这个 primitive。
 
@@ -68,7 +68,7 @@ source_kind + source_id + source_version
 observed_at + fresh_until + content_digest
 ```
 
-Host source 从 Connector catalog 读 enabled connectors 和 allowlisted operations，冻结实现给 evidence 五分钟 freshness window。NyxID source 读取 caller-visible UserServices 及每个 service 的 OpenAPI；它不缓存结果，operation contract digest 绑定 method、path、参数和 request-body schema。`READY` 只有在 returned execution mode、selected ref、required source kinds 与请求完全匹配时才会被准入服务接受。
+Host source 从 Connector catalog 读 enabled connectors 和 allowlisted operations，冻结实现给 evidence 五分钟 freshness window。NyxID source 读取 NyxID live MCP operation catalog（connected services + endpoints，source kind 为 `NYX_ID_MCP_CONFIG`）；`HasRequiredSourceEvidence` 只认 `NyxIdMcpConfig`，durable 时再加 `DurableAuthorizationCatalog`。operation contract digest 绑定整个 operation contract（method/path/参数/request-body/response/execution policy），schema 只支持受控关键字子集、深度不超过 16，composed schema（oneOf/anyOf/allOf/not）fail closed 为 `ENDPOINT_CONTRACT_REQUIRED`。`READY` 只有在 returned execution mode、selected ref、required source kinds 与请求完全匹配时才会被准入服务接受。
 
 常见 fail-closed 状态包括 `CONNECTOR_NOT_FOUND`、`CONTRACT_DRIFT`、`CREDENTIAL_CONNECTION_REQUIRED`、`NODE_BINDING_REQUIRED`、`ENDPOINT_CONTRACT_REQUIRED`、`SOURCE_STALE` 与 `DURABLE_AUTHORIZATION_UNAVAILABLE`。remediation 只返回可信 locator，例如 `studio:connectors`；它不是在 Chat 或 query path 中接收 secret 的入口。
 
@@ -84,8 +84,10 @@ Host source 从 Connector catalog 读 enabled connectors 和 allowlisted operati
 
 | 模式 | Host Connector | NyxID UserService | 持久化 owner |
 |---|---|---|---|
-| `INTERACTIVE` | 当前 Host catalog proof | 可使用当前 caller/session credential 读取 service 与 OpenAPI readiness | 不写 durable owner |
-| `DURABLE` | 仍由当前 Host catalog proof | 除 service + OpenAPI 外，必须有 caller-owned `DurableAuthorizationCatalog` proof | 当前实现固定为 `authority=nyxid`、`owner_kind=personal`、`owner_subject=verified caller id` |
+| `INTERACTIVE` | 当前 Host catalog proof | 可使用当前 caller/session credential 读取 service 与 MCP catalog readiness | 不写 durable owner |
+| `DURABLE` | 仍由当前 Host catalog proof | 除 MCP catalog 外，必须有 caller-owned `DurableAuthorizationCatalog` proof，且 operation 的 `execution_policy` 必须声明允许 Durable | 当前实现固定为 `authority=nyxid`、`owner_kind=personal`、`owner_subject=verified caller id` |
+
+operation-level `execution_policy`（risk/approval/enforcement_owner/allowed_execution_modes）是 durable catalog 之外的另一个准入 gate：Write/Destructive 强制 `approval=REQUIRED` 且不允许 Durable，enforcement_owner 必须为 Aevatar；不满足时分别以 `NYXID_OPERATION_DURABLE_EXECUTION_NOT_ALLOWED` 等稳定状态 fail closed。
 
 durable catalog 必须 activated、未 invalidated/cleaned、digest 可重算、仍在 freshness window，并且包含唯一匹配 service 的 permitted grant。catalog source id 还必须等于这个 personal owner 的 canonical actor id；把 caller A 的 plan 改成 caller B，即使重算 admission digest，也会因 owner/source mismatch 被拒绝。
 
@@ -123,11 +125,13 @@ sequenceDiagram
 
 ### 1. 应用层 admission
 
-scope workflow、scope binding、Studio member binding、Studio provisioning 和 service revision prepare 都走同一个 admission service。没有 existing plan 时，`AdmitAsync` 实时 inspect 每个 exact capability；有 plan 时，`RevalidatePersistedAsync` 检查：
+scope workflow、scope binding、Studio member binding、Studio provisioning 和 service revision prepare 都走同一个 admission service。没有 existing plan 时，`AdmitAsync` 实时 inspect 每个 exact capability，并按 call site 逐条生成 `invocation_admissions`；有 plan 时，`RevalidatePersistedAsync` 检查：
 
-- schema、`definition_digest`、expected execution mode 和 exact capability set；
+- schema（`external-capability-admission.v4`）、`definition_digest`、expected execution mode 和 call-site invocation 集合；
 - required source kinds、durable owner/catalog source 一致性；
 - `admission_digest` 完整性及每个 source 的当前 freshness。
+
+v2/v3 旧 plan 在 `RevalidatePersistedAsync`/`ValidateOrThrow` 直接抛 `AdmissionRebindRequired`（remediation = `REBIND_WORKFLOW`），不会静默迁移。
 
 `RevalidatePersistedAsync` **不会**重新读取外部 source；冻结测试明确断言 revalidation 不增加 readiness port call。它证明“这份仍在有效期内的 evidence 没被换 definition/mode/owner”，不是 refresh。source 已过期时必须先走新 admission 获得新 evidence。
 
@@ -139,9 +143,9 @@ definition actor 重新从 root + inline definitions 计算 authorization depend
 
 ### 3. Runtime activation 与 run startup
 
-service activation 把 prepared revision 中的 plan 原样传给 definition provisioning，definition actor 再做上述 integrity gate。run provisioning 要求已存在、scope/name/definition payload 匹配的 definition actor，随后创建 run 并 dispatch execution request。
+service activation 把 prepared revision 中的 plan 原样传给 definition provisioning，definition actor 再做上述 integrity gate。definition provisioning 路径比较 `IsSameDefinition`（含 `AdmissionDigest`），不一致会重新 bind。run provisioning 要求已存在、scope/name/definition payload 匹配的 definition actor，随后创建 run 并 dispatch execution request。
 
-冻结代码没有在每个 run startup 调用 `RevalidatePersistedAsync`，run resolution 只比较 workflow name/YAML/inline YAML，不重新读取 Connector/NyxID catalogs，也不比较传入 plan 与已绑定 plan 的 `admission_digest`。因此正确口径是：**write/prepare 时验证 freshness，bind 时验证 sealed plan 完整性，startup 只依赖已准备的 revision 与既有 definition payload**。不能写成“每次运行都会刷新 readiness”。对长期存活 deployment，如何在每次 run 前强制 source freshness 并再次确认 plan identity，是当前边界，而不是本章替实现补出的保证。
+冻结代码没有在每个 run startup 调用 `RevalidatePersistedAsync`：run resolution 只比较 workflow name/YAML/inline YAML，不重新读取 Connector/NyxID catalogs，也不比较传入 plan 与已绑定 plan 的 `admission_digest`（digest 比对发生在 definition provisioning 路径）。因此正确口径是：**write/prepare 时验证 freshness，bind 时验证 sealed plan 完整性，startup 只依赖已准备的 revision 与既有 definition payload**。不能写成“每次运行都会刷新 readiness”。对长期存活 deployment，如何在每次 run 前强制 source freshness 并再次确认 plan identity，是当前边界，而不是本章替实现补出的保证。
 
 ## 最小 YAML：exact ref 来自查询结果
 
@@ -167,10 +171,16 @@ name: nyxid_service_example
 steps:
   - id: list_items
     type: tool_call
+    capability:
+      nyxid_operation:
+        user_service_id: us-home-alpha
+        endpoint_id: ep-list-items
     parameters:
       tool: nyxid_proxy
-      arguments: '{"service_id":"us-home-alpha","slug":"home-assistant","operation_id":"list-items","method":"GET","path":"/api/items","contract_digest":"sha256:home-v1"}'
+      arguments: '{"query":{"limit":10}}'
 ```
+
+`capability.nyxid_operation` 承载身份（`user_service_id + endpoint_id`，来自 list/inspect 返回的 catalog 条目）；`arguments` 只允许运行时参数。把 `service_id`、`slug`、`operation_id`、`method`、`path`、`contract_digest` 写进 arguments 会被 evaluator 以 `NYXID_OPERATION_AUTHORING_MIGRATION_REQUIRED` 拒绝。
 
 真实 authoring 必须把 list/inspect 返回的整个 exact ref 原样映射进 YAML，不能手猜 digest，也不能只保留 slug。`verified-static` 只证明 YAML 能被当前 dependency evaluator 解析；是否 ready 要由目标环境的 source stamps 决定。
 
@@ -208,16 +218,16 @@ steps:
 
 | 论断 | 等级 | 证据 |
 |---|---|---|
-| proto 区分两类 exact capability、两种 execution mode、typed readiness、source stamp 与 plan | E1 | `src/workflow/Aevatar.Workflow.Abstractions/workflow_capability_admission.proto:9`、`:67`、`:101`、`:127` |
+| proto 区分两类 exact capability、两种 execution mode、typed readiness、source stamp 与 v4 call-site invocation plan | E1 | `src/workflow/Aevatar.Workflow.Abstractions/workflow_capability_admission.proto:9`、`:70-109`、`:130-135`、`:267-277` |
 | YAML evaluator 从 nested steps 提取静态 connector/NyxID ref，并拒绝动态 identity 与敏感 header | E1 | `src/workflow/Aevatar.Workflow.Core/WorkflowAuthorizationDependencyEvaluator.cs:16` |
 | evaluator 只匹配 canonical `connector_call`；`secure_connector_call` 共用执行模块却未进入 capability set | E1 | `src/workflow/Aevatar.Workflow.Core/WorkflowAuthorizationDependencyEvaluator.cs:39`、`src/workflow/Aevatar.Workflow.Core/WorkflowCoreModulePack.cs:23` |
 | Connector source 只读 catalog，验证 enabled/operation/digest，并产生五分钟 source stamp | E1 | `src/Aevatar.Studio.Application/Studio/Services/ConnectorExternalWorkflowCapabilitySource.cs:26`、`:42`、`:128` |
-| NyxID source 不缓存，读取 UserService/OpenAPI；durable 另查 owner-bound authorization catalog | E1 | `src/Aevatar.AI.ToolProviders.NyxId/NyxIdExternalWorkflowCapabilitySource.cs:13`、`:298` |
-| list/inspect tools 标为只读，并只调用 list/readiness ports | E1 | `src/Aevatar.AI.ToolProviders.Binding/Tools/ListExternalWorkflowCapabilitiesTool.cs:20`、`src/Aevatar.AI.ToolProviders.Binding/Tools/InspectExternalWorkflowCapabilityReadinessTool.cs:18` |
+| NyxID source 不缓存，读取 MCP operation catalog；durable 另查 owner-bound authorization catalog，并受 operation execution policy 门控 | E1 | `src/Aevatar.AI.ToolProviders.NyxId/NyxIdExternalWorkflowCapabilitySource.cs:12-17`、`:42-86`、`:276-301`；`src/workflow/Aevatar.Workflow.Abstractions/WorkflowCapabilityAdmissionPlanIntegrity.cs:277-312` |
+| list/inspect tools 标为只读，并只调用 list/readiness ports | E1 | `src/Aevatar.AI.ToolProviders.Binding/Tools/ListExternalWorkflowCapabilitiesTool.cs:39`、`src/Aevatar.AI.ToolProviders.Binding/Tools/InspectExternalWorkflowCapabilityReadinessTool.cs:56` |
 | Admit 重新 parse definition，要求 exact READY proof、required sources 与 freshness，再 seal owner/digests | E1 | `src/workflow/Aevatar.Workflow.Application/ExternalCapabilities/WorkflowExternalCapabilityAdmissionService.cs:25` |
-| persisted revalidation 检查 integrity/owner/freshness，但不重复 readiness read | E1 | `src/workflow/Aevatar.Workflow.Application/ExternalCapabilities/WorkflowExternalCapabilityAdmissionService.cs:73`、`test/Aevatar.Workflow.Application.Tests/WorkflowExternalCapabilityAdmissionServiceTests.cs:323` |
-| definition actor 重算 dependencies，缺 plan 或 plan 不匹配时在 commit 前拒绝 | E1 | `src/workflow/Aevatar.Workflow.Core/WorkflowGAgent.cs:21`、`:172` |
-| runtime activation 传递 sealed plan；run provisioning 只匹配已存在 definition payload，不比较 plan digest，也不重新读取 sources | E1 | `src/platform/Aevatar.GAgentService.Infrastructure/Activation/DefaultServiceRuntimeActivator.cs:123`、`src/workflow/Aevatar.Workflow.Infrastructure/Runs/WorkflowRunActorPort.cs:266`、`:302` |
+| persisted revalidation 检查 integrity/owner/freshness，但不重复 readiness read；v2/v3 旧 plan 直接要求 rebind | E1 | `src/workflow/Aevatar.Workflow.Application/ExternalCapabilities/WorkflowExternalCapabilityAdmissionService.cs:73`、`test/Aevatar.Workflow.Application.Tests/WorkflowExternalCapabilityAdmissionServiceTests.cs:588-605` |
+| definition actor 重算 dependencies，缺 plan 或 plan 不匹配时在 commit 前拒绝 | E1 | `src/workflow/Aevatar.Workflow.Core/WorkflowGAgent.cs:21`、`:178-197` |
+| runtime activation 传递 sealed plan；run resolution 只匹配已存在 definition payload，不比较 plan digest，也不重新读取 sources；provisioning 路径按 AdmissionDigest 比对并 rebind | E1 | `src/platform/Aevatar.GAgentService.Infrastructure/Activation/DefaultServiceRuntimeActivator.cs:123`、`src/workflow/Aevatar.Workflow.Infrastructure/Runs/WorkflowRunActorPort.cs:268-314`、`:490-501` |
 | fresh caller token issuance 已进入 connector/LLM/tool runtime 边界 | E1 | `src/platform/Aevatar.GAgentService.Infrastructure/Credentials/NyxIdWorkflowCallerAccessTokenProvider.cs:1` |
 
 </details>

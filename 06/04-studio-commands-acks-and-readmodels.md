@@ -10,7 +10,7 @@ verified_at: 2026-07-25
 
 ## 设计抽象与事实源
 
-- `src/Aevatar.Studio.Hosting/Endpoints/StudioMemberEndpoints.cs:46`、`:52`、`:154`、`:174`、`:343`、`:444`、`:456`、`:469`：Member 路由、bind/PATCH/DELETE 的 HTTP receipt 与稳定 observation Location。
+- `src/Aevatar.Studio.Hosting/Endpoints/StudioMemberEndpoints.cs:47`、`:53`、`:155`、`:175`、`:348`、`:449`、`:461`、`:474`：Member 路由、bind/PATCH/DELETE 的 HTTP receipt 与稳定 observation Location。
 - `src/Aevatar.Studio.Projection/CommandServices/ActorDispatchStudioMemberCommandService.cs:35`、`:76`、`:259`、`:273`、`:289`、`:404`：command adapter 规范化 identity、ensure authority actor 并只做 dispatch。
 - `src/Aevatar.Studio.Projection/QueryPorts/ProjectionStudioMemberQueryPort.cs:37`、`:47`、`:70`、`:77`、`:89`、`:98`：Member list/detail 只读 document store，scope/team filter 在分页前下推。
 
@@ -80,7 +80,7 @@ Studio Member mutation的共同骨架是：
 | `POST /api/scopes/{scopeId}/members` | `201 Created` + locally built summary | create event已dispatch，返回稳定Member Location | Member event已commit、Member document已可读、Team roster已收敛 | Member Location |
 | `PATCH .../members/{memberId}` | `202 Accepted` + `status/scopeId/memberId/ackedAt` | 所请求的dispatch调用已返回 | 所有字段原子提交、投影已更新 | Member Location |
 | `DELETE .../members/{memberId}` | `202 Accepted` + `delete_accepted` | delete request已dispatch | tombstone已commit、document已移除、service artifacts已清理 | Member Location |
-| `PUT .../members/{memberId}/binding` | `202 Accepted` + `bindingRunId`、`ackStage=dispatch_accepted` | candidate binding-run已dispatch | Member已admit、platform bind成功、Member已ack、service已ready | binding-run Location |
+| `PUT .../members/{memberId}/binding` | `202 Accepted` + `bindingRunId`、`ackStage=dispatch_accepted`；capability admission 不通过时直接 `400 STUDIO_MEMBER_EXTERNAL_CAPABILITY_NOT_READY`（body 含 readiness 详情，发生在 run 创建之前，**没有** accepted receipt） | candidate binding-run已dispatch | Member已admit、platform bind成功、Member已ack、service已ready | binding-run Location |
 
 Create的`201`与summary也不能被扩大解释为read-model-ready：summary直接由规范化输入与current convention构造。PATCH/DELETE的公开`StudioMemberCommandResponse`没有暴露内部`CommandId/CorrelationId`；bind则用独立`bindingRunId`作为长流程观察身份，不等于dispatch command ID。
 
@@ -269,14 +269,15 @@ Content-Type: application/json
 
 | 论断 | 等级 | 证据 |
 |---|---|---|
-| Member create/list/detail/bind/binding-run/PATCH/DELETE均以scope+member寻址，bind/PATCH/DELETE返回各自receipt与Location | E1 | `src/Aevatar.Studio.Hosting/Endpoints/StudioMemberEndpoints.cs:46`、`:48`、`:50`、`:52`、`:57`、`:75`、`:77`、`:173`、`:174`、`:439`、`:444`、`:468`、`:469` |
+| Member create/list/detail/bind/binding-run/PATCH/DELETE均以scope+member寻址，bind/PATCH/DELETE返回各自receipt与Location | E1 | `src/Aevatar.Studio.Hosting/Endpoints/StudioMemberEndpoints.cs:47`、`:49`、`:51`、`:53`、`:58`、`:76`、`:78`、`:174`、`:175`、`:444`、`:449`、`:473`、`:474` |
+| bind 的 capability admission 失败映射为 `400 STUDIO_MEMBER_EXTERNAL_CAPABILITY_NOT_READY`，无 accepted receipt | E1 | `src/Aevatar.Studio.Hosting/Endpoints/StudioMemberEndpoints.cs:179-182`；`src/Aevatar.Studio.Hosting/Endpoints/StudioExternalCapabilityAdmissionHttpMapper.cs:14-33`、`:70-98` |
 | runtime dispatch admission只代表accepted，内部携CommandId/AckedAt/ActorId/CorrelationId | E1 | `src/Aevatar.Foundation.Abstractions/IActorDispatchPort.cs:3`、`:6`、`:24`、`:38`、`:50`、`:55` |
 | Studio command dispatch内部生成receipt与command context，但Member command adapter只ensure actor并丢弃返回receipt | E1 | `src/Aevatar.Studio.Projection/CommandServices/StudioProjectionActorCommandDispatch.cs:14`、`:36`、`:70`、`:92`、`:117`、`:134`、`:143`；`src/Aevatar.Studio.Projection/CommandServices/ActorDispatchStudioMemberCommandService.cs:404`、`:411`、`:412` |
 | create summary由输入构造，PATCH可顺序dispatch多个字段且公开receipt没有command/version，delete先读Member projection | E1 | `src/Aevatar.Studio.Projection/CommandServices/ActorDispatchStudioMemberCommandService.cs:53`、`:62`、`:76`、`:100`；`src/Aevatar.Studio.Application/Studio/Services/StudioMemberService.cs:328`、`:374`、`:383`、`:392`、`:404`、`:413`、`:420`、`:428`、`:432` |
 | bind生成独立bindingRunId并返回dispatch_accepted candidate receipt，不以Member projection做存在性预检 | E1 | `src/Aevatar.Studio.Application/Studio/Services/StudioMemberService.cs:95`、`:103`、`:105`、`:139`、`:141`、`:150`；`src/Aevatar.Studio.Application.Abstractions/Studio/Contracts/MemberContracts.cs:32`、`:45`、`:50`、`:329`、`:335`、`:337` |
 | binding-run command只ensure run/member actors并dispatch，ACK不代表readmodel materialization | E1 | `src/Aevatar.Studio.Projection/CommandServices/ActorDispatchStudioMemberCommandService.cs:259`、`:265`、`:268`、`:272`、`:273`、`:274`、`:278`、`:289` |
 | binding-run projector只消费committed state并写StateVersion/LastEventId，query按scope/member/run复核document | E1 | `src/Aevatar.Studio.Projection/Projectors/StudioMemberBindingRunCurrentStateProjector.cs:39`、`:50`、`:55`、`:56`、`:58`、`:70`；`src/Aevatar.Studio.Projection/QueryPorts/ProjectionStudioMemberBindingRunQueryPort.cs:25`、`:34`、`:36`、`:40`、`:56`、`:61` |
-| missing binding-run document返回null并被Host映射为typed 404，未区分尚未物化 | E1 | `src/Aevatar.Studio.Projection/QueryPorts/ProjectionStudioMemberBindingRunQueryPort.cs:36`、`:37`；`src/Aevatar.Studio.Application/Studio/Services/StudioMemberService.cs:172`、`:179`、`:180`；`src/Aevatar.Studio.Hosting/Endpoints/StudioMemberEndpoints.cs:215`、`:228`、`:230`、`:508` |
+| missing binding-run document返回null并被Host映射为typed 404，未区分尚未物化 | E1 | `src/Aevatar.Studio.Projection/QueryPorts/ProjectionStudioMemberBindingRunQueryPort.cs:36`、`:37`；`src/Aevatar.Studio.Application/Studio/Services/StudioMemberService.cs:172`、`:179`、`:180`；`src/Aevatar.Studio.Hosting/Endpoints/StudioMemberEndpoints.cs:220`、`:233`、`:235`、`:513` |
 | Member query只读document，scope/team filter在分页前下推，detail按canonical ID读取并复核scope | E1 | `src/Aevatar.Studio.Projection/QueryPorts/ProjectionStudioMemberQueryPort.cs:10`、`:24`、`:37`、`:47`、`:57`、`:70`、`:77`、`:89`、`:96`、`:98`、`:102` |
 | list/get Member tools从caller context取scope、拒绝scope参数并直接消费Member query port | E1 | `src/Aevatar.AI.ToolProviders.StudioProvisioning/StudioQueryTools.cs:194`、`:204`、`:208`、`:231`、`:236`、`:269`、`:302`、`:312`、`:316`、`:333`、`:338`、`:366` |
 | Studio resolver优先读取Member authority-backed service ID，missing/empty时fallback到memberId，并在Studio Host替换default resolver | E1 | `src/Aevatar.Studio.Application/Studio/Services/StudioAwareMemberPublishedServiceResolver.cs:42`、`:54`、`:57`、`:58`、`:59`、`:60`、`:62`、`:64`；`src/Aevatar.Studio.Application/Studio/DependencyInjection/ServiceCollectionExtensions.cs:80`、`:84` |

@@ -12,7 +12,7 @@ verified_at: 2026-07-25
 
 - `src/Aevatar.Studio.Hosting/Endpoints/StudioMemberAutomationEndpoints.cs:19-47`、`:50-167`、`:203-400`、`:558-598`：owner-scoped route、请求 contract、`202` receipt 与动作边界。
 - `src/platform/Aevatar.GAgentService.Projection/Queries/ScheduledDispatchQueryPort.cs:16-49`、`:158-250`：projected summary、fire record 与 `manual` 事实的内部读模型边界。
-- `docs/operations/2026-07-23-scheduled-agent-key-production-canary.md:1208-1324`、`:1414-1622`、`:1624-1855`：精确 preflight、active/run/key-use 证据、双轨撤销与恢复顺序。
+- `docs/operations/2026-07-23-scheduled-agent-key-production-canary.md:1227-1343`、`:1433-1641`、`:1643-1874`：精确 preflight、active/run/key-use 证据、双轨撤销与恢复顺序。
 
 ## 一项 automation 跨越多个事实所有者
 
@@ -408,7 +408,7 @@ jq -e --arg operation "$ENABLE_OPERATION_ID" '
 
 ## 步骤 6：删除、观察双轨，必要时复用原 identity 重试
 
-delete body 只创建一次。若后续需要 `retry-revocation`，必须原样复用这个文件；只刷新 owner bearer：
+delete body 只创建一次。若后续需要恢复撤销，**Studio 的 `retry-revocation` 端点已不再读取 body**：服务端从 schedule 持久化的 `TeamAutomationOperationId` 恢复原 operation（`StudioMemberAutomationEndpoints.cs:363-400`、`StudioMemberWorkflowSchedulePort.cs:373`、`:571`），调用只需 fresh owner bearer，receipt 的 `operationId` 仍等于原删除操作：
 
 ```bash
 export DELETE_OPERATION_ID="tutorial-delete-$(uuidgen | tr '[:upper:]' '[:lower:]')"
@@ -449,8 +449,6 @@ jq -e '
 
 curl --fail-with-body -sS \
   -H "Authorization: Bearer $TOKEN" \
-  -H 'Content-Type: application/json' \
-  -d @/tmp/aevatar-automation-delete.json \
   "$AUTOMATION_BASE/$SCHEDULE_ID/retry-revocation" \
   > /tmp/aevatar-automation-retry-revocation-response.json
 
@@ -464,7 +462,7 @@ jq -e \
   ' /tmp/aevatar-automation-retry-revocation-response.json
 ```
 
-不要为 cleanup 生成第二组 operation/idempotency；这会把恢复误建模成新删除。两条 track terminal 后，canonical detail 应变为 owner-correct `404`，list 中 exact `scheduleId` 消失。public disappearance 证明 committed visibility，不单独证明 NyxID key 已失效或 `6202` 已被观察。生产 cleanup 还应验证 exact key absent/inactive，并用 allowlisted operational audit 将同一 `scope/team/member/schedule/operation` 关联到 `Completed/Completed`。
+不要为 cleanup 生成第二组 operation/idempotency；这会把恢复误建模成新删除（服务端会用 schedule 持久化的原 operation identity 续跑）。生产 canary 证据路径也已从 Studio retry-revocation 切换为**重放同一 canonical DELETE**：平台级 `DELETE /api/schedules/{scheduleId}`（`ScheduledDispatchEndpoints.cs:46`，body 含 `reason` + `owner{kind,scopeId,teamId,memberId}` + `operationId` + `idempotencyKey`），pending/failed track 时用同一 `delete.json` 重放，delete 侧以 exact owner/operation/idempotency/reason 幂等续跑（含 healing partial delete）。两条 track terminal 后，canonical detail 应变为 owner-correct `404`，list 中 exact `scheduleId` 消失。public disappearance 证明 committed visibility，不单独证明 NyxID key 已失效或 `6202` 已被观察。生产 cleanup 还应验证 exact key absent/inactive，并用 allowlisted operational audit 将同一 `scope/team/member/schedule/operation` 关联到 `Completed/Completed`。
 
 ## 证据梯度：每层只能回答一个问题
 
@@ -521,12 +519,13 @@ sequenceDiagram
 | scope `403` / owner-hidden `404` | exact scope claim、Team 与 Member binding | 回到 authority response 恢复真实 IDs | 猜 ID、放宽 owner filter |
 | preflight `success=false` | `failureCode/detail`、catalog snapshot、Member readiness | 修复 binding/catalog/owner LLM 后重新 preflight | 自行删 grant 或改 digest |
 | `503 ...PROJECTION_PENDING` | `requiredStateVersion` 与 catalog projection | 有界等待后重试 read/preflight 或同一 mutation identity | 刷新多次制造竞争 catalog operation |
-| `409 ...PLAN_CHANGED/REAUTHORIZATION_REQUIRED` | response 的 `preflightLocator` | fresh preflight；已有 automation 用 `reauthorize` 提交新确认 | 沿用旧 digest/policy |
+| `409 ...PLAN_CHANGED/REAUTHORIZATION_REQUIRED` | response 的 `preflightLocator`（含 `authorizationPlanMismatchReason`） | fresh preflight；已有 automation 用 `reauthorize` 提交新确认 | 沿用旧 digest/policy |
 | create/reauthorize response 丢失或超时 | canonical list/detail、原 operation/idempotency | 先读后决定；重放时只用原 identity | 换 ID 再 create，制造第二把 key |
 | PUT/pause/resume response 丢失 | canonical detail 的 definition、`enabled/stateVersion` | 先读取目标状态；必要时再发明确的新操作 | 假定 request 中的 idempotency key 已进入底层主链 |
 | `active` 但没有 run | enabled、`nextFireAt`、Member runs、dispatch/run logs | 区分 manual 与 cron 实验后沿 exact schedule 排查 | 用第二次 run-now 掩盖第一次未知 |
 | run terminal 但 key 未使用 | exact key ID/name 与 `last_used_at`、owner LLM route | 排查 runtime credential selection | 用成功文本冒充 Agent Key proof |
-| `revocation_pending` | 两条 track 值、原 delete identity、bearer freshness | fresh bearer + `retry-revocation`，复用原 body | 新 delete operation、先删 Member/Team |
+| `revocation_pending` | 两条 track 值、原 delete identity、bearer freshness | fresh bearer + `retry-revocation`（无需 body，服务端按持久化原 operation 续跑），或重放同一 canonical DELETE | 新 delete operation、先删 Member/Team |
+| `409 TEAM_AUTOMATION_AUTHORIZATION_BINDING_REQUIRED` | NyxID binding、authorization plan 状态 | Reconnect NyxID to authorize this automation 后重新 preflight/提交 | 绕过 binding 直接复用旧 credential |
 | delete 后 detail `404` | list、`6202`、exact key、checkpoint ledger | 继续 read-only 交叉验证，再清理上游资源 | 单独 `404` 就宣称 audited cleanup |
 
 pause/resume 只切换 recurring enablement 并保留 credential，适合短暂停止自动 fire；它们不是 authorization 修复，也不是撤销手段。`needs_authorization` 应 fresh preflight + `reauthorize`，不是反复 resume。
@@ -592,12 +591,12 @@ jq -e '
 |---|---|
 | Studio routes、camelCase request 与严格拒绝额外 mutation 字段 | `src/Aevatar.Studio.Hosting/Endpoints/StudioMemberAutomationEndpoints.cs:19-47`、`:404-423`、`:558-598`；`src/Aevatar.Studio.Hosting/StudioHostingServiceCollectionExtensions.cs:36-43` |
 | create/reauthorize 需要 fresh owner、digest、policy 与 dedicated provisioning kind，receipt 只返回五个安全字段 | `src/Aevatar.Studio.Hosting/Endpoints/StudioMemberAutomationEndpoints.cs:50-167`；`src/Aevatar.Studio.Application.Abstractions/Provisioning/StudioMemberWorkflowScheduleContracts.cs:55-75`、`:154-159` |
-| public automation view 字段、生命周期名称与 sensitive exclusions | `src/Aevatar.Studio.Application.Abstractions/Provisioning/StudioMemberWorkflowScheduleContracts.cs:109-159`；`src/Aevatar.Studio.Application/Studio/Services/StudioMemberWorkflowSchedulePort.cs:1023-1068` |
+| public automation view 字段、生命周期名称与 sensitive exclusions | `src/Aevatar.Studio.Application.Abstractions/Provisioning/StudioMemberWorkflowScheduleContracts.cs:109-159`；`src/Aevatar.Studio.Application/Studio/Services/StudioMemberWorkflowSchedulePort.cs:1170-1210` |
 | pause/resume、run-now、delete 与 retry-revocation 的不同 credential/owner 要求 | `src/Aevatar.Studio.Application/Studio/Services/StudioMemberWorkflowSchedulePort.cs:349-459` |
 | update 会重验证授权，但 caller idempotency key 未进入底层 update dispatch | `src/Aevatar.Studio.Application/Studio/Services/StudioMemberWorkflowSchedulePort.cs:281-346`；`src/platform/Aevatar.GAgentService.Application/Schedules/ScheduledDispatchApplicationService.cs:89-125` |
 | internal projection 保存 recent fire 与 `manual`，Studio view 只映射 summary | `src/platform/Aevatar.GAgentService.Projection/Queries/ScheduledDispatchQueryPort.cs:158-250`；`src/Aevatar.Studio.Application/Studio/Services/StudioMemberWorkflowSchedulePort.cs:265-279` |
-| 通用 schedule detail 可返回 fire record，但冻结 route 未把 caller claim 与 query scope 做 Studio 等价校验 | `src/platform/Aevatar.GAgentService.Hosting/Endpoints/Schedules/ScheduledDispatchEndpoints.cs:193-238`；`src/Aevatar.Authentication.Hosting/AevatarAuthenticationHostExtensions.cs:149-156` |
+| 通用 schedule detail 可返回 fire record，但冻结 route 未把 caller claim 与 query scope 做 Studio 等价校验 | `src/platform/Aevatar.GAgentService.Hosting/Endpoints/Schedules/ScheduledDispatchEndpoints.cs:57-63`、`:371-395`；`src/Aevatar.Authentication.Hosting/AevatarAuthenticationHostExtensions.cs:149-156` |
 | owner-scoped Member runs 可按 `scheduleId` 查询 terminal Workflow run | `src/platform/Aevatar.GAgentService.Hosting/Endpoints/ScopeServiceEndpoints.cs:1218-1289`、`:3414-3449` |
-| 精确 preflight、disabled create、active、run/key-use 与双轨撤销的 production procedure | `docs/operations/2026-07-23-scheduled-agent-key-production-canary.md:1208-1622`、`:1624-1855` |
+| 精确 preflight、disabled create、active、run/key-use 与双轨撤销的 production procedure | `docs/operations/2026-07-23-scheduled-agent-key-production-canary.md:1227-1641`、`:1643-1874` |
 
 </details>

@@ -6,7 +6,7 @@ verified_at: 2026-07-25
 
 # 快速上手:本地启动 Host 并完成第一次请求
 
-> 版本与结论:本章描述 `current`;当前行为以 `f02aa690` 为准。核心结论:框架学习面的本地入口是 `Aevatar.Workflow.Host.Api` 的 `POST /api/chat`(SSE);Mainnet Host 是 `aevatar app` 的产品后端,其正式契约是 scope-first,`/api/chat` 在 Mainnet 上只是物理存在、契约已退役的遗留面。
+> 版本与结论:本章描述 `current`;当前行为以 `f02aa690` 为准。核心结论:框架学习面的本地入口是 `Aevatar.Workflow.Host.Api` 的 `POST /api/chat`(SSE);Mainnet Host 是 `aevatar app` 的产品后端,其正式契约是 scope-first,`POST /api/chat` 由 `MainnetChatEndpoints` facade 提供——workflow 类请求仍转发给 Workflow capability 实现,带 assistant `type` 的请求转发给 NyxID Chat v1,契约地位已退役。
 
 ## 设计抽象与事实源
 
@@ -20,7 +20,7 @@ verified_at: 2026-07-25
 
 - `Aevatar.Workflow.Host.Api` 是**协议层宿主**:不承载业务编排,只做协议适配与依赖组合,`/api/chat`(SSE)与 `/api/ws/chat`(WebSocket)是它的正式面。它依赖面最小,是观察框架运行内核最短的链路。
 - `Aevatar.Mainnet.Host.Api` 是 `aevatar app` 的**唯一后端 API 面**,用户面 contract 已收敛为 scope-first(`/api/scopes/{scopeId}/...`);其 README 明确声明旧的 `/api/chat`、`/api/ws/chat` 不再是 `aevatar app` 的正式运行时 contract(`src/Aevatar.Mainnet.Host.Api/README.md:214`)。
-- 两个 Host 都经 `AddAevatarPlatform()` 装配,而 workflow capability 端点是在平台装配内部统一挂载的(`src/workflow/extensions/Aevatar.Workflow.Extensions.Hosting/AevatarPlatformHostBuilderExtensions.cs:119`),所以 `/api/chat` 在两个进程里**物理上都存在**;差别是契约地位,不是路由是否存在。
+- 两个 Host 都经 `AddAevatarPlatform()` 装配,但 `POST /api/chat` 的实现不同:Workflow Host 直接挂载 Workflow Chat capability 的 `ChatEndpoints` 路由组(SSE),挂载由开关控制——`POST /api/chat` 被包进 `if (mapChatPost)`(`src/workflow/Aevatar.Workflow.Infrastructure/CapabilityApi/ChatEndpoints.cs:36-40`,`GET /api/ws/chat` 在块外不受影响),开关由 `AddWorkflowCapabilityBundle(options.MapWorkflowChatPost)` 传入(`src/workflow/extensions/Aevatar.Workflow.Extensions.Hosting/AevatarPlatformHostBuilderExtensions.cs:121`,默认 `true`)。Mainnet 显式 `MapWorkflowChatPost=false`(`src/Aevatar.Mainnet.Host.Api/Hosting/MainnetHostBuilderExtensions.cs:144`)不让该路由组挂载,改由 `MainnetChatEndpoints` facade 提供同一路径(`src/Aevatar.Mainnet.Host.Api/Chat/MainnetChatEndpoints.cs:37`):form 或无 `type` 的 JSON 转发给 `WorkflowCapabilityEndpoints.HandleChatPostAsync`,带 `type`(`text`/`task.stop`/`step.retry`/...)的请求转发给 NyxID Chat v1。所以 `/api/chat` 在 Mainnet 上仍然物理存在,但 Workflow Chat 只是其中契约已退役的一个分支。
 
 本地组成与配置来源:
 
@@ -46,7 +46,7 @@ flowchart TB
 
 端口契约要分清两个层级:
 
-- Mainnet 的 `http://127.0.0.1:5080` 是**代码常量**(`src/Aevatar.Mainnet.Host.Api/Hosting/MainnetHostBuilderExtensions.cs:87`),是仓库给出的契约。
+- Mainnet 的 `http://127.0.0.1:5080` 是**代码常量**(`src/Aevatar.Mainnet.Host.Api/Hosting/MainnetHostBuilderExtensions.cs:90`),是仓库给出的契约。
 - Workflow Host 项目内没有 `launchSettings.json`、没有 `appsettings.json`、组合代码也不调用 `UseUrls`,所以仓库**没有为它钉死端口**:不显式配置时由 ASP.NET Core 默认监听地址决定,以启动日志 `Now listening on:` 为准;建议用 `ASPNETCORE_URLS` 显式固定,demo 才有确定性。
 
 workflow 名称解析方面,`workflow: "simple_qa"` 命中的是**文件加载注册表**:workflow capability 启动时会把若干目录注册为 YAML 来源,其中包含仓库根的 `workflows` 目录(`src/workflow/Aevatar.Workflow.Infrastructure/DependencyInjection/WorkflowCapabilityServiceCollectionExtensions.cs:79-86`;仓库根定位见 `src/Aevatar.Configuration/AevatarPaths.cs:108`)。所以从仓库根启动 Host,`workflows/simple_qa.yaml` 自动可引用,不需要拷贝到 `~/.aevatar`。
@@ -55,7 +55,7 @@ workflow 名称解析方面,`workflow: "simple_qa"` 命中的是**文件加载�
 
 一次 `POST /api/chat` 在框架内部的完整链路(Host README 的运行语义,`src/workflow/Aevatar.Workflow.Host.Api/README.md:63`):
 
-1. **Host 边界**:提取 caller credential(缺失按"无凭证"处理,不是错误;格式非法的 bearer 才报 400 `INVALID_CALLER_CREDENTIAL`,见 `src/workflow/Aevatar.Workflow.Infrastructure/CapabilityApi/WorkflowCallerCredentialExtractor.cs:206`),再按 Content-Type 分派 JSON 或 multipart 解析。
+1. **Host 边界**:提取 caller credential(缺失按"无凭证"处理,不是错误;格式非法的 bearer 才报 400 `INVALID_CALLER_CREDENTIAL`,见 `src/workflow/Aevatar.Workflow.Infrastructure/CapabilityApi/WorkflowCallerCredentialExtractor.cs:221`),再按 Content-Type 分派 JSON 或 multipart 解析。
 2. **规范化**:输入被规范化为应用命令模型 `WorkflowChatRunRequest`。
 3. **CQRS 命令骨架**:`target resolve -> command context -> envelope -> dispatch port -> accepted receipt`;命令被包装成 `EventEnvelope` 投递给新创建的 run actor。
 4. **accepted 即开流**:收到 accepted receipt 后,Host 在响应头写入 `X-Correlation-Id`(`src/workflow/Aevatar.Workflow.Infrastructure/CapabilityApi/CapabilityTraceContext.cs:32`),把响应切换为 SSE,并先写一帧 `CUSTOM: aevatar.run.context`(携带 `actorId` / `workflowName` / `commandId`,构造点见 `src/workflow/Aevatar.Workflow.Infrastructure/CapabilityApi/ChatEndpoints.cs:776`)。
@@ -94,9 +94,9 @@ sequenceDiagram
 
 - scope-first 路径的前置概念多:scope、binding、revision 激活、NyxID 认证 token,每一层都是产品治理概念;第一课就学它,会把"框架怎么跑"淹没在"产品怎么管"里。
 - `/api/chat` 的最小请求只有两个字段(`prompt` + `workflow`),匿名即可调用,且一条请求直接暴露框架的三件内核:CQRS 命令骨架、run actor、SSE 投影流。学习收益与前置成本的比值最高。
-- 不变量与代价:这条路径学到的是**框架层协议**——canon 文档的标题就是"Workflow Chat API 能力说明(框架层)"(`docs/canon/chat-api.md:7`)。它不是任何产品的规范 API;迁到产品面时,scope-first 的治理概念仍然要重新学。这是有意的取舍:本章优化的是"最快看到运行内核",不是"最快接入 app"。
+- 不变量与代价:这条路径学到的是**框架层协议**——canon 文档的标题是"Chat API 能力说明(Mainnet 与 Workflow)"(`docs/canon/chat-api.md:7`),同一份说明同时覆盖 Mainnet 面与框架面。它不是任何产品的规范 API;迁到产品面时,scope-first 的治理概念仍然要重新学。这是有意的取舍:本章优化的是"最快看到运行内核",不是"最快接入 app"。
 
-**为什么不图省事,直接在 Mainnet 上调 `/api/chat`?** 物理可行(同一份 capability 端点也挂在 Mainnet 上),但两个理由不选它:契约上它已被 Mainnet README 声明退役,把第一课的肌肉记忆建立在一个遗留面上会误导后续章节;环境上 Mainnet 默认认证开启,免认证调试必须 `ASPNETCORE_ENVIRONMENT=Development` 并显式关闭认证开关(该开关只在 Development 生效),日常启动推荐走 `src/Aevatar.Mainnet.Host.Api/boot.sh` 注入一组 Development-only 默认值——这些都偏离"最小依赖面"的目标。
+**为什么不图省事,直接在 Mainnet 上调 `/api/chat`?** 它虽然仍物理存在(facade 转发),但两个理由不选它:契约上它已被 Mainnet README 声明退役,把第一课的肌肉记忆建立在一个遗留面上会误导后续章节;环境上 Mainnet 默认认证开启,免认证调试必须 `ASPNETCORE_ENVIRONMENT=Development` 并显式关闭认证开关(该开关只在 Development 生效),日常启动推荐走 `src/Aevatar.Mainnet.Host.Api/boot.sh` 注入一组 Development-only 默认值——这些都偏离"最小依赖面"的目标。
 
 ## 协议与状态深入
 
@@ -122,7 +122,7 @@ SSE 写出器的实现(`src/workflow/Aevatar.Workflow.Infrastructure/CapabilityA
 | `commandId` | 追踪这一次命令 | `aevatar.run.context` 帧;accepted receipt |
 | `correlationId` | 追踪消息链 | 响应头 `X-Correlation-Id` |
 | `runId` | 标识这一次执行 | `RUN_STARTED` 帧的 `runId` 字段(`workflow_run_events.proto:43-46`) |
-| `conversationId` | 拥有多轮历史的会话 | `aevatar.chat.context` 帧(receipt 携带 chat context 时先于 run.context 发出;调用点时序 `ChatEndpoints.cs:331-332` 与 `:342-343`,帧构造点 `:792`) |
+| `conversationId` | 拥有多轮历史的会话 | `aevatar.chat.context` 帧(receipt 携带 chat context 时先于 run.context 发出;调用点时序 `ChatEndpoints.cs:341-343` 与 `:352-353`,帧构造点 `:802`) |
 | `turnId` | 标识一次用户回合 | 同上帧(`workflow_run_events.proto:159-164`) |
 
 `actorId + commandId` 是客户端后续观察 run 输出与读模型查询的会话句柄:`commandId` 负责追踪,`actorId` 负责定位(`src/workflow/Aevatar.Workflow.Host.Api/README.md:77`)。任何 `accepted` 语义都只应理解为"请求已被系统接受并可追踪",不代表领域事件已提交、不代表读模型已可见。
@@ -189,7 +189,7 @@ curl http://127.0.0.1:5000/api/workflow-actors/{actorId}/current-state
 
 - **current(本章全部内容)**:Workflow Host 的协议层定位、`/api/chat` 请求/帧契约、端口与配置来源、`simple_qa` 的文件加载解析。
 - **产品面(current,非本章主题)**:Mainnet 的正式契约是 scope-first(`/api/scopes/{scopeId}/workflow/draft-run`、`/binding`、`/invoke/chat:stream` 等,`src/Aevatar.Mainnet.Host.Api/README.md:137`),本地有三种 profile:脚本默认 `local`(全临时态,重启即清空)、`PersistentLocal`(Orleans + Garnet 保 actor 态,读侧仍临时)、`Distributed`(Kafka + Elasticsearch + Neo4j)。
-- **historical**:Mainnet 上的 `/api/chat`、`/api/ws/chat`、`/api/workflows/resume|signal|stop` 作为 `aevatar app` 运行时 contract 已退役(`src/Aevatar.Mainnet.Host.Api/README.md:214`);框架面上这些端点仍由 Workflow Host 正式提供,结构切换前 Quick Start 的"起 Mainnet 调 `/api/chat`"口径因此被本章替换。
+- **historical**:Mainnet 上的 `/api/chat`、`/api/ws/chat`、`/api/workflows/resume|signal|stop` 作为 `aevatar app` 运行时 contract 已退役(`src/Aevatar.Mainnet.Host.Api/README.md:214`);Mainnet 的 `POST /api/chat` 现由 `MainnetChatEndpoints` facade 提供,Workflow Chat capability 的路由组不再直接挂载(`MapWorkflowChatPost=false`)。框架面上这些端点仍由 Workflow Host 正式提供,结构切换前 Quick Start 的"起 Mainnet 调 `/api/chat`"口径因此被本章替换。
 - **open gap**:Workflow Host 没有仓库钉死的监听地址契约(无 `launchSettings.json` / `UseUrls`),端口只能以启动日志或显式 `ASPNETCORE_URLS` 为准;文档无法给出"默认端口"的硬承诺。
 
 ## 读完应能回答
@@ -206,24 +206,24 @@ curl http://127.0.0.1:5000/api/workflow-actors/{actorId}/current-state
 | 论断 | 等级 | 证据 |
 |---|---|---|
 | Workflow Host 是协议层宿主,只做 HTTP/SSE/WebSocket 适配与依赖组合 | E1 | `src/workflow/Aevatar.Workflow.Host.Api/README.md:3` |
-| Mainnet 本地默认监听 `http://127.0.0.1:5080`,外部 URL 配置优先 | E1 | `src/Aevatar.Mainnet.Host.Api/README.md:5`、`src/Aevatar.Mainnet.Host.Api/Hosting/MainnetHostBuilderExtensions.cs:87` |
+| Mainnet 本地默认监听 `http://127.0.0.1:5080`,外部 URL 配置优先 | E1 | `src/Aevatar.Mainnet.Host.Api/README.md:5`、`src/Aevatar.Mainnet.Host.Api/Hosting/MainnetHostBuilderExtensions.cs:90` |
 | Mainnet 是 app 唯一后端 API 面,契约收敛为 scope-first | E1 | `src/Aevatar.Mainnet.Host.Api/README.md:137` |
 | Mainnet 上 `/api/chat` 等旧端点不再是 app 正式运行时 contract | E1 | `src/Aevatar.Mainnet.Host.Api/README.md:214` |
-| workflow capability 端点由平台装配统一挂载,两 Host 都物理存在 `/api/chat` | E1 | `src/workflow/extensions/Aevatar.Workflow.Extensions.Hosting/AevatarPlatformHostBuilderExtensions.cs:119`、`src/workflow/Aevatar.Workflow.Infrastructure/CapabilityApi/ChatEndpoints.cs:34` |
+| `POST /api/chat` 在 Workflow Host 由 capability 路由组挂载(开关 `MapWorkflowChatPost` 默认开);Mainnet 显式关并改由 `MainnetChatEndpoints` facade 提供(workflow 类请求仍转发同一实现) | E1 | `src/workflow/extensions/Aevatar.Workflow.Extensions.Hosting/AevatarPlatformHostBuilderExtensions.cs:121`、`src/workflow/Aevatar.Workflow.Infrastructure/CapabilityApi/ChatEndpoints.cs:36-40`、`src/Aevatar.Mainnet.Host.Api/Hosting/MainnetHostBuilderExtensions.cs:144`、`src/Aevatar.Mainnet.Host.Api/Chat/MainnetChatEndpoints.cs:37`、`:50-96` |
 | 仓库根 `workflows` 目录被注册为 YAML 文件来源,`simple_qa` 可按名引用 | E1 | `src/workflow/Aevatar.Workflow.Infrastructure/DependencyInjection/WorkflowCapabilityServiceCollectionExtensions.cs:79-86`、`src/Aevatar.Configuration/AevatarPaths.cs:108`、`workflows/simple_qa.yaml:1-9` |
 | LLM Key 来自 `~/.aevatar` secrets 或 `DEEPSEEK_API_KEY` / `OPENAI_API_KEY` | E1 | `src/workflow/Aevatar.Workflow.Host.Api/Program.cs:8-9` |
-| 缺失 Authorization 头按"无凭证"处理而非错误 | E1 | `src/workflow/Aevatar.Workflow.Infrastructure/CapabilityApi/WorkflowCallerCredentialExtractor.cs:206` |
+| 缺失 Authorization 头按"无凭证"处理而非错误 | E1 | `src/workflow/Aevatar.Workflow.Infrastructure/CapabilityApi/WorkflowCallerCredentialExtractor.cs:221` |
 | 命令走 CQRS 骨架 target resolve → envelope → dispatch → accepted receipt | E1 | `src/workflow/Aevatar.Workflow.Host.Api/README.md:63` |
 | SSE 响应头(含 `Pragma: no-cache`)、`data:` 帧格式、15s `: keepalive` 心跳 | E1 | `src/workflow/Aevatar.Workflow.Infrastructure/CapabilityApi/ChatSseResponseWriter.cs:17-18,44-47,56` |
 | 帧体是 `WorkflowRunEventEnvelope` 的 protobuf JSON,事件类型看 oneof 字段 | E1 | `src/workflow/Aevatar.Workflow.Application.Abstractions/Runs/workflow_run_events.proto:22-41` |
 | accepted 后先发 `aevatar.run.context`(actorId/workflowName/commandId) | E1 | `src/workflow/Aevatar.Workflow.Infrastructure/CapabilityApi/ChatEndpoints.cs:776`、`src/workflow/Aevatar.Workflow.Application.Abstractions/Runs/workflow_run_events.proto:153-157` |
-| `aevatar.chat.context` 携带 scopeId/conversationId/turnId/stateVersion,且先于 run.context 发出 | E1 | `src/workflow/Aevatar.Workflow.Infrastructure/CapabilityApi/ChatEndpoints.cs:331-332,342-343,792`、`src/workflow/Aevatar.Workflow.Application.Abstractions/Runs/workflow_run_events.proto:159-164` |
+| `aevatar.chat.context` 携带 scopeId/conversationId/turnId/stateVersion,且先于 run.context 发出 | E1 | `src/workflow/Aevatar.Workflow.Infrastructure/CapabilityApi/ChatEndpoints.cs:341-343,352-353,802`、`src/workflow/Aevatar.Workflow.Application.Abstractions/Runs/workflow_run_events.proto:159-164` |
 | `X-Correlation-Id` 响应头在 accepted 时写入 | E1 | `src/workflow/Aevatar.Workflow.Infrastructure/CapabilityApi/CapabilityTraceContext.cs:32` |
 | 事件类型常量 SSOT(14 个 typed 常量) | E1 | `src/workflow/Aevatar.Workflow.Application.Abstractions/Runs/WorkflowRunEventTypes.cs:5-18` |
 | `RUN_STARTED` payload 携带 `threadId` / `runId` | E1 | `src/workflow/Aevatar.Workflow.Application.Abstractions/Runs/workflow_run_events.proto:43-46` |
 | `actorId + commandId` 是观察句柄;accepted 只表示"已接受可追踪" | E1 | `src/workflow/Aevatar.Workflow.Host.Api/README.md:77` |
 | 单次请求在终止事件(`RUN_FINISHED`/`RUN_ERROR`)后收尾 | E1 | `src/workflow/Aevatar.Workflow.Host.Api/README.md:79` |
-| canon 将 `/api/chat` 定位为框架层能力说明 | E1 | `docs/canon/chat-api.md:7` |
+| canon 统一说明 Chat API 能力(Mainnet 与 Workflow) | E1 | `docs/canon/chat-api.md:7` |
 | 读模型查询真实路由是 `GET /api/workflow-actors/{actorId}/current-state` | E1 | `src/workflow/Aevatar.Workflow.Infrastructure/CapabilityApi/ChatQueryEndpoints.cs:36` |
 | 旧 `/api/actors/{actorId}` 查询形态已退役,README 第 80 行口径滞后于端点代码 | E1 | `src/workflow/Aevatar.Workflow.Infrastructure/CapabilityApi/ChatEndpoints.cs:765`、`src/workflow/Aevatar.Workflow.Infrastructure/CapabilityApi/ChatQueryEndpoints.cs:128-129` |
 | SDK 版本钉 `10.0.100` | E1 | `global.json:3` |

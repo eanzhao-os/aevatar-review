@@ -11,7 +11,7 @@ verified_at: 2026-07-25
 ## 设计抽象与事实源
 
 - `src/Aevatar.AI.Core/RoleGAgent.cs:39`：role actor 持有身份、配置、session、stream 映射、终态与完成通知恢复。
-- `src/Aevatar.AI.Abstractions/ai_messages.proto:363`：定义 session start/progress/completion、typed outcome、run context 与重放协议。
+- `src/Aevatar.AI.Abstractions/ai_messages.proto:388`：定义 session start/progress/completion、typed outcome、run context 与重放协议。
 - `src/Aevatar.AI.Core/Chat/ChatRuntime.cs:95`：实时公共面只暴露 `ChatStreamAsync`，并在同一 stream flow 中驱动 middleware、LLM 与 tool rounds。
 
 ## 一次 role turn 的所有权
@@ -95,7 +95,7 @@ RoleGAgent 会把不同 chunk 映射成不同的事实与展示：
 - tool arguments 在 receipt 要求 redaction 时不会进入对 parent 的 `ToolCallEvent`；
 - usage、model、final content、reasoning、output parts、tool calls/results/receipts 最终收进 session completion。
 
-terminal outcome 只有 `Completed`、`Failed`、`Blocked` 三类。`Blocked` 当前用于 typed authorization requirement。`ApprovalRequired` 则先持久化独立的 pending approval 与 progress，随后当前 chat session 仍可能以 `Completed` 关闭；这里的 `Completed` 只表示当前 chat turn / handoff 已结束，不证明 approval 已通过、tool 已执行或副作用成功。审批通过后会执行 yielded tool 并向自身 inbox 投递新的 continuation turn；拒绝或 continuation 失败则另行提交 `Failed` 终态。完整 continuation 见 `04/04-tool-approval-and-authorization.md`。
+terminal outcome 只有 `Completed`、`Failed`、`Blocked` 三类。`Blocked` 当前用于 typed authorization requirement。`ApprovalRequired` 则先持久化独立的 pending approval 与 progress，随后当前 chat session 仍可能以 `Completed` 关闭；这里的 `Completed` 只表示当前 chat turn / handoff 已结束，不证明 approval 已通过、tool 已执行或副作用成功。顺序上先落 `RoleChatToolApprovalRequiredProgress`，pending approval 事实由 `SuspendForToolApprovalAsync` 随后持久化并发布 approval request、调度超时；approval 通过后的 continuation request 携带 `WorkflowLlmToolApprovalContinuation`（`ai_messages.proto` 新增 `workflow_llm_tool_approval_continuation=15` 与同名 message，`PendingToolApprovalState` 新增 `workflow_llm_continuation=16`）。审批通过后会执行 yielded tool 并向自身 inbox 投递新的 continuation turn；拒绝或 continuation 失败则另行提交 `Failed` 终态。完整 continuation 见 `04/04-tool-approval-and-authorization.md`。
 
 ### 先提交终态，再发布结束帧
 
@@ -182,14 +182,14 @@ ChatRequestEvent
 
 | 论断 | 等级 | 证据 |
 |---|---|---|
-| RoleGAgent 持有 typed role identity、session、pending approval 与配置 state | E1 | `src/Aevatar.AI.Core/RoleGAgent.cs:39`、`src/Aevatar.AI.Abstractions/ai_messages.proto:787` |
-| `session_id` 是幂等 turn，`command_attempt_id` 是投递尝试；冲突 input 被拒绝 | E1 | `src/Aevatar.AI.Abstractions/ai_messages.proto:53`、`src/Aevatar.AI.Core/RoleGAgent.cs:2239` |
+| RoleGAgent 持有 typed role identity、session、pending approval 与配置 state | E1 | `src/Aevatar.AI.Core/RoleGAgent.cs:39`、`src/Aevatar.AI.Abstractions/ai_messages.proto:812` |
+| `session_id` 是幂等 turn，`command_attempt_id` 是投递尝试；冲突 input 被拒绝 | E1 | `src/Aevatar.AI.Abstractions/ai_messages.proto:53`、`src/Aevatar.AI.Core/RoleGAgent.cs:2263` |
 | ChatRuntime 实时公共面只暴露 stream，并直接拥有 middleware/provider/tool flow | E1 | `src/Aevatar.AI.Core/Chat/ChatRuntime.cs:95`、`:230` |
-| RoleGAgent 将 stream chunk 提交为 typed progress 并发布 text/media/tool presentation | E1 | `src/Aevatar.AI.Core/RoleGAgent.cs:1321` |
-| `ApprovalRequired` 持久化 pending approval，但当前 session 仍可为 `Completed`；`Blocked` 只由 typed authorization requirement 决定 | E1 | `src/Aevatar.AI.Core/RoleGAgent.cs:531`、`:1088`、`:1528` |
-| terminal fact 先提交，再发布 missing content、usage 与 text end | E1 | `src/Aevatar.AI.Core/RoleGAgent.cs:1118`、`src/Aevatar.AI.Abstractions/ai_messages.proto:404` |
-| completed session 重试走 snapshot replay，不重复调用 provider | E1 | `src/Aevatar.AI.Core/RoleGAgent.cs:982`、`:1854` |
-| completion notification 状态可重试/过期，并在 activation 恢复 | E1 | `src/Aevatar.AI.Core/RoleGAgent.cs:105`、`:1988`、`src/Aevatar.AI.Abstractions/ai_messages.proto:506` |
+| RoleGAgent 将 stream chunk 提交为 typed progress 并发布 text/media/tool presentation | E1 | `src/Aevatar.AI.Core/RoleGAgent.cs:1343` |
+| `ApprovalRequired` 持久化 pending approval，但当前 session 仍可为 `Completed`；`Blocked` 只由 typed authorization requirement 决定 | E1 | `src/Aevatar.AI.Core/RoleGAgent.cs:532`、`:1127`、`:1550` |
+| terminal fact 先提交，再发布 missing content、usage 与 text end | E1 | `src/Aevatar.AI.Core/RoleGAgent.cs:1140`、`src/Aevatar.AI.Abstractions/ai_messages.proto:429` |
+| completed session 重试走 snapshot replay，不重复调用 provider | E1 | `src/Aevatar.AI.Core/RoleGAgent.cs:1021`、`:1878` |
+| completion notification 状态可重试/过期，并在 activation 恢复 | E1 | `src/Aevatar.AI.Core/RoleGAgent.cs:105`、`:2012`、`src/Aevatar.AI.Abstractions/ai_messages.proto:529` |
 | Responses direct run 经有界 queue 在 worker 执行，并用 typed Record commands 回 session actor | E1 | `src/platform/Aevatar.GAgentService.Application/Responses/LlmRunExecutionQueue.cs:7`、`src/platform/Aevatar.GAgentService.Hosting/Responses/LlmRunExecutionWorker.cs:9`、`src/platform/Aevatar.GAgentService.Application/Responses/LlmRunExecutor.cs:161` |
 
 </details>

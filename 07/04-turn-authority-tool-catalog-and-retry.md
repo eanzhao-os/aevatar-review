@@ -6,13 +6,13 @@ verified_at: 2026-07-25
 
 # Turn 权威、工具目录与重试
 
-> 版本与结论：本章描述 `current`。Direct NyxIdChat 的重试身份首先由 actor 中的 `sessionId = turnId` 记录判定；绑定 `ENFORCED` profile 时，actor 还为当前 incomplete turn 提交一条单调收窄的 authority fence。只有 authority `RECONCILE` 已提交且 active reconciliation key 仍匹配时，对应的 volatile catalog 才能进入 LLM schema 和工具执行。
+> 版本与结论：本章描述 `current` 但机制范围已收窄：turn-authority/catalog 机制现在只存在于 legacy `NyxIdChatGAgent`（RoleGAgent 子类，scoped 兼容路径）的执行路径。该路径下，Direct NyxIdChat 的重试身份首先由 actor 中的 `sessionId = turnId` 记录判定；绑定 `ENFORCED` profile 时，actor 还为当前 incomplete turn 提交一条单调收窄的 authority fence。只有 authority `RECONCILE` 已提交且 active reconciliation key 仍匹配时，对应的 volatile catalog 才能进入 LLM schema 和工具执行。新 Mainnet controller/turn 模型（`NyxIdChatConversationGAgent` + `NyxIdChatTurnGAgent`，均不继承 RoleGAgent）的重试/恢复语义是 operation key 与 typed retry/skip 可用性，见 [NyxIdChat Actor 模型与已提交进度](02-nyxid-chat-actor-model-and-progress.md) 与 `docs/canon/nyxid-chat-api.md:78-84`。
 
 本章不把 Channel `AgentRunGAgent` 的 empty-reply recovery、delivery retry 或 run cleanup 借给 direct HTTP。conversation、turn 与 progress 的基础身份见 [NyxIdChat Actor 模型与已提交进度](02-nyxid-chat-actor-model-and-progress.md)，profile snapshot 与 SHADOW/ENFORCED 绑定见 [Agent Profile 与不可变会话绑定](03-agent-profile-and-immutable-binding.md)。
 
 ## 设计抽象与事实源
 
-- `src/Aevatar.AI.Core/RoleGAgent.cs:963`：先按已提交 session 输入判定 conflict、completed replay 或 incomplete resume，再建立 actor-owned turn authority。
+- `src/Aevatar.AI.Core/RoleGAgent.cs:1007`：先按已提交 session 输入判定 conflict、completed replay 或 incomplete resume，再建立 actor-owned turn authority（该机制现只服务 legacy `NyxIdChatGAgent` 路径）。
 - `src/Aevatar.AI.Core/AgentProfiles/AgentProfileTurnCatalog.cs:28`：request-local immutable catalog 同时冻结 allowed names、exact tool objects、visibility 与 prompt layers。
 - `agents/Aevatar.GAgents.NyxidChat/AgentProfiles/AgentProfileTurnCatalogMaterializer.cs:39`：prepare 不做 exact I/O，materialize 只在 committed authority ceiling 内读取并继续降权。
 
@@ -196,7 +196,7 @@ Channel 的 `empty_reply_retry` 是 run step 状态，保留 channel routing/con
 - session 被 `MaxTrackedSessions` 裁剪后，相同 deterministic turnId 可能重新进入新执行；authority fence 不把 actor replay cache 变成永久 exactly-once 存储。
 - completed replay 在 authority establishment 之前短路；它不会为 replay 增加 attempt、重新 fetch Ornn 或重新 reconcile catalog。
 - runContext mismatch 当前不是 `IDEMPOTENCY_CONFLICT` typed rejection，而是 invalid operation。不能把 prompt/input conflict 的 presentation 合同外推到这一分支。
-- stop、steering、reconnect cursor 与 typed task steps 在冻结基线不存在；authority attempt 只 fence materialization retry，不是用户可见 task attempt。
+- stop、steering、reconnect cursor 与 typed task steps 属于新 controller/turn 模型（`NyxIdChatEndpoints.Controls.cs`、`NyxIdChatTaskLifecycle.cs`、`NyxIdChatTaskTransitionPolicy.cs`、`protos/nyxid_chat_task.proto`），不属于 legacy RoleGAgent authority 路径；本章 authority attempt 只 fence materialization retry，不是用户可见 task attempt。
 
 ## 读完应能回答
 
@@ -211,14 +211,14 @@ Channel 的 `empty_reply_retry` 是 run step 状态，保留 channel routing/con
 
 | 论断 | 等级 | 证据 |
 |---|---|---|
-| actor 比较 prompt、inputParts、runContext；completed same-input 短路为 replay | E1 | `src/Aevatar.AI.Core/RoleGAgent.cs:963`、`:982`、`:1002`、`:2239`、`:2247`、`:2254`、`:2261` |
-| 新 turn 原子提交 session-started + INITIAL，incomplete exact turn 重入先 commit RETRY_STARTED | E1 | `src/Aevatar.AI.Core/RoleGAgent.cs:1142`、`:1160`、`:1168`、`:1182`、`:1194`、`:1210`、`:1215` |
-| catalog 只在 materialize 后 commit RECONCILE，且 active key 仍匹配时才返回 | E1 | `src/Aevatar.AI.Core/RoleGAgent.cs:1224`、`:1233`、`:1241`、`:1246`、`:1247` |
-| reducer 要求 active incomplete session、attempt/kind 合法，并对 retry/reconcile 执行 exact identity 与单调 ceiling 检查 | E1 | `src/Aevatar.AI.Core/RoleGAgent.cs:2386`、`:2397`、`:2407`、`:2459`、`:2478`、`:2490`、`:2548` |
-| legacy missing authority 只前向建立 restricted-empty fence | E1 | `src/Aevatar.AI.Core/RoleGAgent.cs:1194`、`:1201`、`:1288` |
+| actor 比较 prompt、inputParts、runContext；completed same-input 短路为 replay（legacy 路径） | E1 | `src/Aevatar.AI.Core/RoleGAgent.cs:1002-1030`、`:2263-2292` |
+| 新 turn 原子提交 session-started + INITIAL，incomplete exact turn 重入先 commit RETRY_STARTED（仅当 frozen exact ref） | E1 | `src/Aevatar.AI.Core/RoleGAgent.cs:1164-1244`（INITIAL 原子提交）、`:1232-1243`（RETRY_STARTED） |
+| catalog 只在 materialize 后 commit RECONCILE，且 active key 仍匹配时才返回 | E1 | `src/Aevatar.AI.Core/RoleGAgent.cs:1246-1272` |
+| reducer 要求 active incomplete session、attempt/kind 合法，并对 retry/reconcile 执行 exact identity 与单调 ceiling 检查 | E1 | `src/Aevatar.AI.Core/RoleGAgent.cs:2410-2587`（INITIAL :2433-2437、RETRY :2438-2442、RECONCILE :2443-2447、Canonicalize :2533-2551） |
+| legacy missing authority 只前向建立 restricted-empty fence | E1 | `src/Aevatar.AI.Core/RoleGAgent.cs:2564-2570` |
 | materialization 不能给 catalog 授予 proposal ceiling 外的工具 | E1 | `src/Aevatar.AI.Core/AgentProfiles/AgentProfileTurnCatalogMaterialization.cs:47`、`:54`、`:58` |
 | request builder 交集 visibility、合并 exact objects，并在 middleware 后按 object identity 重施 authorization fence | E1 | `src/Aevatar.AI.Core/Chat/ChatRuntimeRequestBuilder.cs:34`、`:53`、`:63`、`:173`、`:206`、`:218` |
 | ChatRuntime 从每个最终 request tools 建 request-local manager，final-no-tools 使用 null | E1 | `src/Aevatar.AI.Core/Chat/ChatRuntime.cs:375`、`:396`、`:413`、`:753`、`:760`、`:767` |
-| Channel AgentRun empty reply 有独立 one-shot recovery marker 与 step path | E1 | `agents/Aevatar.GAgents.NyxidChat/protos/agent_run.proto:227`；`agents/Aevatar.GAgents.NyxidChat/AgentRunGAgent.cs:775`、`:822`、`:855`、`:961` |
+| Channel AgentRun empty reply 有独立 one-shot recovery marker 与 step path | E1 | `agents/Aevatar.GAgents.NyxidChat/protos/agent_run.proto:228-231`；`agents/Aevatar.GAgents.NyxidChat/AgentRunGAgent.cs:788`、`:828`、`:866`、`:971` |
 
 </details>

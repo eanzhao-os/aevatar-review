@@ -190,7 +190,7 @@ steps:
 | parser 与 Studio profile 消费同一根模式，authorable 字段是 accepted 字段的子集 | E1 | `src/workflow/Aevatar.Workflow.Abstractions/Workflows/WorkflowYamlRootSchema.cs:11`、`src/Aevatar.Studio.Domain/Studio/Compatibility/WorkflowCompatibilityProfile.cs:172` |
 | parser 在 typed deserialize 前拒绝未知根字段 | E1 | `src/workflow/Aevatar.Workflow.Core/Primitives/WorkflowParser.cs:86` |
 | roles、steps、configuration 与路由被映射成 typed definition | E1 | `src/workflow/Aevatar.Workflow.Core/Primitives/WorkflowParser.cs:90`、`src/workflow/Aevatar.Workflow.Core/Primitives/WorkflowParser.cs:170` |
-| scalar 以稳定字符串保存，mapping/list 递归规范化为 JSON | E1 | `src/workflow/Aevatar.Workflow.Core/Primitives/WorkflowParser.cs:910`、`src/workflow/Aevatar.Workflow.Core/Primitives/WorkflowParser.cs:1239` |
+| scalar 以稳定字符串保存，mapping/list 递归规范化为 JSON | E1 | `src/workflow/Aevatar.Workflow.Core/Primitives/WorkflowParser.cs:932`、`src/workflow/Aevatar.Workflow.Core/Primitives/WorkflowParser.cs:1261` |
 | 结构校验检查 step/role/next/branch/compensation 关系 | E1 | `src/workflow/Aevatar.Workflow.Core/Validation/WorkflowValidator.cs:28` |
 | definition bind 记录编译结果；有效定义在提交前提取依赖并校验 admission plan | E1 | `src/workflow/Aevatar.Workflow.Core/WorkflowGAgent.cs:45`、`src/workflow/Aevatar.Workflow.Core/WorkflowGAgent.cs:89`、`src/workflow/Aevatar.Workflow.Core/WorkflowGAgent.cs:172` |
 | run 侧会结合真实模块集合拒绝未知原语 | E1 | `src/workflow/Aevatar.Workflow.Core/WorkflowRunDefinitionValidationSupport.cs:9` |

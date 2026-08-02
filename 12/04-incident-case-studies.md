@@ -12,7 +12,7 @@ verified_at: 2026-07-25
 
 - `src/Aevatar.Capabilities/AevatarScopeAccessGuard.cs:18-44`、`:57-75`、`:98-140`：scope claim 唯一性与 requested scope 严格相等的 current trust boundary。
 - `src/platform/Aevatar.GAgentService.Application/Responses/ResponsesToolClassificationService.cs:56-170`、`src/platform/Aevatar.GAgentService.Application/Responses/LlmSessionRunObservationAccumulator.cs:18-52`：server-owned 与 client-forwarded tool 分类，以及只在 completion 暴露 forwarded calls 的 current ownership boundary。
-- `src/platform/Aevatar.GAgentService.Core/Schedules/ScheduledDispatchGAgent.cs:50-72`、`:904-1008`、`:1833-1854`：重激活按已武装时刻恢复、manual/scheduled fire 分流与 overdue catch-up 的 current schedule owner。
+- `src/platform/Aevatar.GAgentService.Core/Schedules/ScheduledDispatchGAgent.cs:50-72`、`:941-1008`、`:1877-1908`：重激活按已武装时刻恢复、manual/scheduled fire 分流与 overdue catch-up 的 current schedule owner。
 
 这里按 scope、tool ownership、schedule 三个事故边界分组；第二项同时列出分类与 observation accumulator，因此共有四条路径。它们只属于事实源清单，不构成正文骨架。
 
@@ -255,7 +255,7 @@ printf '%s\n' 'incident-evidence: protected hashes and frozen owners verified'
 | tool ownership | `src/platform/Aevatar.GAgentService.Application/Responses/ResponsesToolClassificationService.cs:56-170`；`src/platform/Aevatar.GAgentService.Application/Responses/LlmSessionRunObservationAccumulator.cs:18-52`；`#2451` |
 | projection/index drift | `src/Aevatar.CQRS.Projection.Providers.Elasticsearch/Stores/ElasticsearchIndexLifecycleManager.cs:87-263`；`docs/adr/0040-current-state-readmodel-dr-rebuild.md:9-56`；protected canary §5.4/§6 |
 | delivery repair | `agents/channels/Aevatar.GAgents.Channel.NyxIdRelay/ChannelWorkflowResultDeliveryRepairService.cs:71-382`；`docs/canon/lark-reply-completion-semantics.md:25-155`；`#2355`、`#2862` |
-| schedule callback / credential | `src/platform/Aevatar.GAgentService.Core/Schedules/ScheduledDispatchGAgent.cs:50-72`、`:904-1008`、`:1833-1854`；`src/Aevatar.Foundation.Runtime.Implementations.Orleans/Grains/Callbacks/RuntimeCallbackSchedulerGrain.cs:30-145`；四次 E3 见 [09/05](../09/05-production-canary-and-recovery.md) |
+| schedule callback / credential | `src/platform/Aevatar.GAgentService.Core/Schedules/ScheduledDispatchGAgent.cs:50-72`、`:941-1008`、`:1877-1908`；`src/Aevatar.Foundation.Runtime.Implementations.Orleans/Grains/Callbacks/RuntimeCallbackSchedulerGrain.cs:30-145`；四次 E3 见 [09/05](../09/05-production-canary-and-recovery.md) |
 | voice cancel / reconnect | `src/Aevatar.Foundation.VoicePresence.OpenAI/OpenAIRealtimeProvider.cs:135-162`；`src/Aevatar.Foundation.VoicePresence/Transport/WebSocketVoiceTransport.cs:84-140`；[08/05](../08/05-voice-control-and-media-planes.md) |
 | 受保护输入完整性 | [受保护工作区账本 §7](../migration/2026-07-25-protected-worktree.md) 与本章 demo中的四个 SHA-256 |
 

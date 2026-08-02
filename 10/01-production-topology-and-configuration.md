@@ -10,7 +10,7 @@ verified_at: 2026-07-25
 
 ## 设计抽象与事实源
 
-- `src/Aevatar.Mainnet.Host.Api/Hosting/MainnetHostBuilderExtensions.cs:91-152`、`:481-506`：Mainnet 的组合顺序、DI fail-fast、禁止本地 secrets/scripting 与容器监听策略。
+- `src/Aevatar.Mainnet.Host.Api/Hosting/MainnetHostBuilderExtensions.cs:94-155`、`:484-509`：Mainnet 的组合顺序、DI fail-fast、禁止本地 secrets/scripting 与容器监听策略。
 - `src/Aevatar.Mainnet.Host.Api/README.md:15-49`、`:61-129`：Distributed、local 与 PersistentLocal 三种运行档位及各自依赖、持久性限制。
 - `docs/canon/overview.md:71-101`：Host、Application、Infrastructure、Domain 的职责边界，以及 Local 与生产 runtime 的共同抽象。
 
@@ -147,8 +147,8 @@ runtime、stream、persistence、read side 与 clustering 是一组耦合的一�
 
 | 论断 | 冻结证据 |
 |---|---|
-| Mainnet 强制 DI build/scope validation、禁止本地 secret store 与生产 scripting | `src/Aevatar.Mainnet.Host.Api/Hosting/MainnetHostBuilderExtensions.cs:97-141` |
-| Orleans 必须先 Active，随后才启动 grain-calling hosted services | `src/Aevatar.Mainnet.Host.Api/Hosting/MainnetHostBuilderExtensions.cs:104-119` |
+| Mainnet 强制 DI build/scope validation、禁止本地 secret store 与生产 scripting | `src/Aevatar.Mainnet.Host.Api/Hosting/MainnetHostBuilderExtensions.cs:100-144` |
+| Orleans 必须先 Active，随后才启动 grain-calling hosted services | `src/Aevatar.Mainnet.Host.Api/Hosting/MainnetHostBuilderExtensions.cs:107-122` |
 | Distributed profile 选择 Orleans/KafkaProvider/Garnet 与 durable projection providers | `src/Aevatar.Mainnet.Host.Api/appsettings.Distributed.json:2-60` |
 | local 与 PersistentLocal 的不同持久性和限制 | `src/Aevatar.Mainnet.Host.Api/README.md:61-129` |
 | Distributed JSON 后重加环境变量，Orleans provider 才装 silo，Kafka backend 才装 adapter | `src/Aevatar.Mainnet.Host.Api/Hosting/MainnetDistributedHostBuilderExtensions.cs:19-67` |

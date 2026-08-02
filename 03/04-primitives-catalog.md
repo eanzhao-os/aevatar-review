@@ -12,7 +12,7 @@ verified_at: 2026-07-25
 
 - `src/workflow/Aevatar.Workflow.Core/Primitives/WorkflowPrimitiveCatalog.cs:12`：集中拥有 alias → canonical 映射，并从两个 seed 集合及 alias values 派生 33 项基础集合。
 - `src/workflow/Aevatar.Workflow.Core/WorkflowCoreModulePack.cs:8`：把 Core runtime module 注册到一个或多个 step type 名称。
-- `docs/canon/workflow-primitives.md:148`：按 data/control/AI/composition/integration/human 解释参数、行为与最小用法。
+- `docs/canon/workflow-primitives.md:152`：按 data/control/AI/composition/integration/human 解释参数、行为与最小用法。
 
 ## 先建立模型
 

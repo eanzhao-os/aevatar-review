@@ -129,8 +129,8 @@ stateDiagram-v2
     reserved --> abandoned: workflow dispatch not accepted
     bound --> abandoned: explicit abandon before append
     [*] --> failed: invalid reserve
-    reserved --> failed: missing conversation or append dispatch rejected
-    bound --> failed: missing conversation or append dispatch rejected
+    reserved --> failed: missing conversation or append dispatch rejected（create_conversation_if_missing=true 时 conversation 不存在会被创建后继续 append，不进入 failed）
+    bound --> failed: missing conversation or append dispatch rejected（同上例外）
     append_dispatched --> append_committed: conversation accepted exact turn
     append_dispatched --> append_rejected: conversation rejected exact turn
     append_committed --> [*]
@@ -255,12 +255,12 @@ Continue(conversationId, minimumStateVersion=7)
 | Delivery 对 Workflow terminal 校验 publisher/identity，将 terminal 转成 append 并等待 result | E1 | `agents/Aevatar.GAgents.ChatHistory/ChatTurnHistoryDeliveryGAgent.cs:120`、`:126`、`:145`、`:153`、`:173`、`:186`、`:202`、`:239`、`:322` |
 | append result 只核对 delivery/conversation/turn，不验证 publisher 或 exact predecessor；abandon guard 未覆盖 committed/rejected | E1 | `agents/Aevatar.GAgents.ChatHistory/ChatTurnHistoryDeliveryGAgent.cs:267`、`:271`、`:278`、`:286`、`:216`、`:222`、`:490`、`:495` |
 | Conversation append validation 未把命令 scope/conversation 与已有 state/actor identity 再绑定，也未校验 publisher | E1 | `agents/Aevatar.GAgents.ChatHistory/ChatConversationGAgent.cs:28`、`:31`、`:103`、`:107`、`:112` |
-| Create identity 确定性派生，conversation actor ID 使用长度前缀 tuple hash 并保留 legacy read fallback | E1 | `agents/Aevatar.GAgents.ChatHistory/ChatHistoryActorIds.cs:9`、`:12`、`:18`、`:21`、`:24`；`src/Aevatar.Studio.Infrastructure/ActorBacked/ActorBackedChatHistoryStore.cs:220` |
+| Create identity 确定性派生，conversation actor ID 使用长度前缀 tuple hash 并保留 legacy read fallback | E1 | `agents/Aevatar.GAgents.ChatHistory/ChatHistoryActorIds.cs:9`、`:12`、`:18`、`:21`、`:24`；`src/Aevatar.Studio.Infrastructure/ActorBacked/ActorBackedChatHistoryStore.cs:307-308` |
 | Continue 只读 projection，校验归属与水位并最多保留最近 24 条非空消息 | E1 | `src/Aevatar.Studio.Infrastructure/ActorBacked/ProjectionChatConversationContinuationAdmissionReader.cs:20`、`:31`、`:34`、`:43`、`:48`、`:61`、`:69`、`:74` |
 | Index 下推 scope/deleted filter，按 updated desc + id asc 游标分页，默认 50、最大 200 | E1 | `src/Aevatar.Studio.Infrastructure/ActorBacked/ActorBackedChatHistoryStore.cs:23`、`:43`、`:52`、`:55`、`:57`、`:72`、`:85`、`:89` |
 | Message query 按 turn sequence 展开并返回 conversation projection StateVersion，不激活 actor | E1 | `src/Aevatar.Studio.Infrastructure/ActorBacked/ActorBackedChatHistoryStore.cs:97`、`:100`、`:107`、`:109`、`:113` |
-| Create recovery 以 scope+commandId 建索引，保留身份、fingerprint、status 与 state version；重试先做 fingerprint 冲突检查 | E1 | `src/Aevatar.Studio.Projection/Projectors/ChatHistoryCreateRecoveryCurrentStateProjector.cs:34`、`:41`、`:51`、`:58`、`:65`；`src/workflow/Aevatar.Workflow.Application/Runs/WorkflowChatRunInteractionService.cs:247`、`:259`、`:269`、`:275`、`:282`、`:290` |
-| Recovery StateVersion 属于 delivery actor，却被恢复 receipt 与 Console local state 当作 chat context version；它不等于 conversation continuation watermark | E1 | `src/Aevatar.Studio.Projection/Projectors/ChatHistoryCreateRecoveryCurrentStateProjector.cs:51`、`:55`；`src/workflow/Aevatar.Workflow.Application/Runs/WorkflowChatRunInteractionService.cs:300`、`:304`；`apps/aevatar-console-web/src/pages/chat/index.tsx:307`、`:316` |
+| Create recovery 以 scope+commandId 建索引，保留身份、fingerprint、status 与 state version；重试先做 fingerprint 冲突检查；delivery reserve 支持 `create_conversation_if_missing` 例外 | E1 | `src/Aevatar.Studio.Projection/Projectors/ChatHistoryCreateRecoveryCurrentStateProjector.cs:34`、`:41`、`:51`、`:58`、`:65`；`src/workflow/Aevatar.Workflow.Application/Runs/WorkflowChatRunInteractionService.cs:253`、`:262`、`:272`、`:280`、`:286`、`:294`；`agents/Aevatar.GAgents.ChatHistory/ChatTurnHistoryDeliveryGAgent.cs:195`、`:207`；`agents/Aevatar.GAgents.ChatHistory/chat_history_messages.proto:181` |
+| Recovery StateVersion 属于 delivery actor，却被恢复 receipt 与 Console local state 当作 chat context version；它不等于 conversation continuation watermark | E1 | `src/Aevatar.Studio.Projection/Projectors/ChatHistoryCreateRecoveryCurrentStateProjector.cs:51`、`:55`；`src/workflow/Aevatar.Workflow.Application/Runs/WorkflowChatRunInteractionService.cs:313`、`:317`；`apps/aevatar-console-web/src/pages/chat/index.tsx:307`、`:316` |
 | `#2792/#2874/#2876/#2888/#2920` 已有冻结实现证据；`#481` 仍是运行时缺口 | E5 | 本仓库 issue 演进账本的对应冻结成员行；current 结论由本表 E1 支撑 |
 
 </details>

@@ -6,15 +6,15 @@ verified_at: 2026-07-25
 
 # Managed Codex：把执行、调用凭证与 Sandbox 委托拆成三层
 
-> 版本与结论：本章是 `mixed`。冻结代码已经落地 runtime-neutral `codex_exec` contract、Aevatar 自有的 per-user credential actor/Vault lifecycle，以及经 NyxID 固定路由调用 Chrono Sandbox 的 adapter；内部 canary 当前仍依赖长期 per-user agent key、可变的 UserService forwarding policy 与约五分钟 `proxy:*` delegation。它只适合显式 allowlist 的内部用户，不能描述为面向所有 workflow 用户的安全通用执行面。
+> 版本与结论：本章是 `mixed`。代码已经落地 runtime-neutral `codex_exec` contract、Aevatar 自有的 per-user credential actor/Vault lifecycle，以及由 coordinator 协调 execution readiness、transport 经 NyxID 固定路由调用 Chrono Sandbox 的执行面；内部 canary 当前仍依赖长期 per-user agent key、可变的 UserService forwarding policy 与约五分钟 `proxy:*` delegation。它只适合显式 eligibility 的内部用户，不能描述为面向所有 workflow 用户的安全通用执行面。
 
 ## 设计抽象与事实源
 
 - `src/Aevatar.AI.Abstractions/CodexExecution/codex_execution.proto:7-27`、`src/Aevatar.AI.Abstractions/CodexExecution/ICodexExecutionPort.cs:3-90`：typed target/workspace、runtime-neutral port、lifecycle event与稳定failure contract。
-- `src/Aevatar.AI.Infrastructure.ChronoSandbox/ChronoSandboxCodexExecutionAdapter.cs:26-95`、`src/Aevatar.AI.Infrastructure.ChronoSandbox/NyxIdChronoSandboxCodexClient.cs:31-100`：managed target adapter、Vault late resolution、固定NyxID proxy request与sanitized terminal mapping。
-- `docs/canon/managed-codex-execution.md:16-115`：Aevatar、NyxID、Chrono Sandbox、operations之间的所有权、当前gVisor/direct-token选择与延期安全边界。
+- `src/Aevatar.AI.Application.CodexExecution/ManagedCodex/ManagedCodexExecutionCoordinator.cs:11-38`、`src/Aevatar.AI.Infrastructure.ChronoSandbox/NyxIdManagedCodexChronoTransport.cs:12-31`：managed coordinator 读 committed per-user credential descriptor、评估 execution readiness 并只执行一次；transport 接收已权威的 credential descriptor，做 Vault late resolution、固定NyxID proxy request与sanitized terminal mapping。
+- `docs/canon/managed-codex-execution.md:16-54`：Aevatar、NyxID、Chrono Sandbox、operations之间的所有权、当前gVisor/direct-token选择与延期安全边界。
 
-这里按 runtime-neutral contract、managed adapter、治理边界三个设计面分组；前两项分别成对列出 wire/port 与 adapter/client，因此共有五条路径。它们只属于事实源清单，不构成正文骨架。
+这里按 runtime-neutral contract、managed 编排与 transport、治理边界三个设计面分组；前两项分别成对列出 wire/port 与 coordinator/transport，因此共有五条路径。它们只属于事实源清单，不构成正文骨架。
 
 ## 一个业务入口，两种基础设施 Target
 
@@ -27,14 +27,14 @@ flowchart LR
     C["CodexExecutionRequest\ntarget workspace prompt timeout caller"]
     P{"Target oneof"}
     S["Private SSH adapter\ncaller-owned service"]
-    M["Chrono Sandbox adapter\nmanaged_sandbox"]
+    M["Chrono Sandbox transport\nmanaged_sandbox"]
     W["Workflow run actor\nstep and terminal authority"]
     T --> C --> P
     P -->|"private_ssh"| S --> W
     P -->|"managed_sandbox plus empty_git"| M --> W
 ```
 
-为什么把target做成typed port，而不是让workflow直接调用Chrono HTTP？workflow需要稳定的是started/output/completed/failed语义与typed failure，不是provider route。adapter拥有transport与isolation细节，workflow run actor仍拥有step lifecycle和终态；以后替换managed runtime不会改变YAML工具参数或把基础设施异常变成业务协议。
+为什么把target做成typed port，而不是让workflow直接调用Chrono HTTP？workflow需要稳定的是started/output/completed/failed语义与typed failure，不是provider route。coordinator拥有readiness编排，transport拥有NyxID路由与isolation细节，workflow run actor仍拥有step lifecycle和终态；以后替换managed runtime不会改变YAML工具参数或把基础设施异常变成业务协议。
 
 为什么不开放任意container spec？Codex执行本身就是高权限边界。让模型选择image、command、network或credential会把“数据输入”升级成“基础设施控制面”。当前contract刻意把可变面压到prompt与bounded timeout，runner与隔离由Chrono部署固定。
 
@@ -47,7 +47,7 @@ managed路径不是拿interactive workflow bearer直接访问Chrono。用户以�
 - 冻结内部canary要求`delegation_token_scope=proxy:*`；
 - readiness中存在唯一可用的`chrono-llm-public` route。
 
-随后Aevatar为该用户签发一把有限期agent key。它只有`proxy` scope、`allow_all_services=false`、只允许该用户精确的`chrono-sandbox` UserService ID、无node grant。raw key唯一持久副本进入`ISecretVault`；actor event/read model/API只保存key ID、expiry、service ID与typed `SecretReference`。
+随后Aevatar为该用户签发一把有限期agent key。它只有`proxy` scope、`allow_all_services=false`、只允许该用户精确的`chrono-sandbox`与`chrono-llm-public`两个UserService ID、无node grant。raw key唯一持久副本进入`ISecretVault`；actor event/read model/API只保存key ID、expiry、service ID与typed `SecretReference`。
 
 ```mermaid
 %%{init: {"maxTextSize": 100000, "sequence": {"actorMargin": 26, "messageMargin": 17, "diagramMarginX": 10, "diagramMarginY": 10}, "themeVariables": {"fontSize": "10px"}}}%%
@@ -76,7 +76,7 @@ mutation response是accepted receipt，不是actor commit或projection完成。�
 
 ## 一次执行：Persistent Key 止于 NyxID，短委托进入 gVisor
 
-执行时client先从credential projection读取active descriptor，核对owner、expiry、service slug、reference purpose/owner/version/fingerprint，再从Vault late-resolve raw key。随后只发一条server-fixed请求：
+执行时coordinator先从credential current-state read model读取active descriptor，经typed readiness评估核对owner、expiry、service binding与reference purpose/owner/version/fingerprint；transport随后从Vault late-resolve raw key。随后只发一条server-fixed请求：
 
 ```text
 POST /api/v1/proxy/s/chrono-sandbox/codex/execute?_nyxid_via=<exact-user-service-id>
@@ -108,7 +108,7 @@ flowchart LR
 
 ## Failure Contract 与 Kill Switch
 
-adapter总是先产出`Started`，再收敛到一个`Completed`或`Failed`。功能关闭返回`managed_target_disabled`；caller identity、credential descriptor/Vault resolve、proxy response shape、response size、timeout、cancellation分别映射稳定failure code。raw upstream body和基础设施exception text既不返回给workflow，也不写日志。
+coordinator总是先产出`Started`，再收敛到一个`Completed`或`Failed`。功能关闭返回`managed_target_disabled`；caller identity、credential descriptor/Vault resolve、proxy response shape、response size、timeout、cancellation分别映射稳定failure code。raw upstream body和基础设施exception text既不返回给workflow，也不写日志。
 
 `Enabled=false` 是全局kill switch：阻止managed execution、provision与rotation，但保留status和revoke，使operator可以先停止新风险再回收已发key。它不影响private SSH target，因为两种target共享业务contract，不共享transport、credential或isolation。
 
@@ -121,28 +121,28 @@ set -euo pipefail
 
 src="$AEVATAR_SRC"
 proto="$src/src/Aevatar.AI.Abstractions/CodexExecution/codex_execution.proto"
-client="$src/src/Aevatar.AI.Infrastructure.ChronoSandbox/NyxIdChronoSandboxCodexClient.cs"
+transport="$src/src/Aevatar.AI.Infrastructure.ChronoSandbox/NyxIdManagedCodexChronoTransport.cs"
 policy="$src/src/Aevatar.AI.Application.CodexExecution/ManagedCodex/ManagedCodexNyxIdCatalogResolver.cs"
 
 rg -Fq 'CodexManagedSandboxTarget managed_sandbox' "$proto"
 rg -Fq 'CodexEmptyGitWorkspace empty_git' "$proto"
-rg -Fq 'workspace = "empty_git"' "$client"
-rg -Fq 'CredentialSecretPurposes.ManagedCodexInvocationAgentKey' "$client"
+rg -Fq 'workspace = "empty_git"' "$transport"
+rg -Fq 'CredentialSecretPurposes.ManagedCodexInvocationAgentKey' "$transport"
 rg -Fq 'ForwardAccessToken != false' "$policy"
 rg -Fq 'DelegationTokenScope, "proxy:*"' "$policy"
 
 printf 'managed-codex-contract: verified-static\n'
 ```
 
-> Demo status：`verified-static`（本轮执行了等价contract断言，并核对port、tool admission、credential lifecycle、Vault client、Chrono adapter、canon/ADR与冻结tests；没有签发真实key、调用NyxID、创建sandbox或宣称production E2E）。
+> Demo status：`verified-static`（本轮执行了等价contract断言，并核对port、tool admission、credential lifecycle、Vault client、Chrono transport、canon/ADR与冻结tests；没有签发真实key、调用NyxID、创建sandbox或宣称production E2E）。
 
 ## 边界与演进
 
-冻结E1足以证明#2896的Vault-backed per-user credential lifecycle与#2897的Chrono/NyxID delegation adapter已经落地。#2783则只证明Ornn sample/setup skill发布与其readiness验证；它**不证明**某个allowlisted账号已经从workflow穿过Aevatar、NyxID、Chrono到runner完成`managed_sandbox` E2E。
+冻结E1足以证明#2896的Vault-backed per-user credential lifecycle与#2897的Chrono/NyxID delegation transport已经落地。#2783则只证明Ornn sample/setup skill发布与其readiness验证；它**不证明**某个eligible账号已经从workflow穿过Aevatar、NyxID、Chrono到runner完成`managed_sandbox` E2E。
 
 仍开放的门槛必须逐项保留：
 
-- **#2782 / #2881**：`ProvisioningAllowedNyxIdUserIds` 是内部P0静态allowlist，不是由authority、service ownership和broker capability共同决定的typed eligibility policy；不能推广到所有workflow用户。
+- **#2782 / #2881**：eligibility已由内部P0静态allowlist演进为typed `ManagedCodexEligibilityOptions`（`Allowlist`/`All`模式；`All`只准入已有personal `chrono-sandbox`与可用`chrono-llm-public` UserService的用户），启用还需显式`RolloutBoundary=InternalOnly`确认；在delegation仍为`proxy:*`时不能推广到所有workflow用户。
 - **#2784**：缺绑定具体账号、版本、环境和cleanup的managed-sandbox workflow E2E证明；private SSH成功或独立Chrono smoke都不能替代。
 - **#2786**：operations必须提供gVisor、quota、resource/cancellation/cleanup与IP级egress边界；Mainnet默认disabled。
 - **#2898**：部署与internal canary仍是版本化运维证据任务，代码landed不等于production ready。
@@ -165,13 +165,13 @@ printf 'managed-codex-contract: verified-static\n'
 |---|---|
 | port只暴露target kind和typed lifecycle，workflow run保留终态所有权 | `src/Aevatar.AI.Abstractions/CodexExecution/ICodexExecutionPort.cs:3-90` |
 | managed target只接受empty_git且调用者不能提供infra控制面 | `src/Aevatar.AI.Abstractions/CodexExecution/codex_execution.proto:7-27`；`src/Aevatar.AI.ToolProviders.NyxId/Tools/NyxIdCodexExecTool.cs:104-131`、`:277-307` |
-| feature默认关闭，开启时必须配置显式内部user allowlist | `src/Aevatar.AI.Application.CodexExecution/ManagedCodex/ManagedCodexOptions.cs:5-55` |
+| feature默认关闭，开启时必须配置显式内部 eligibility（`Allowlist`/`All` 模式 + `RolloutBoundary=InternalOnly`） | `src/Aevatar.AI.Application.CodexExecution/ManagedCodex/ManagedCodexOptions.cs:5-55`、`src/Aevatar.AI.Application.CodexExecution/ManagedCodex/ManagedCodexCredentialReadiness.cs:14-38` |
 | eligibility要求唯一personal sandbox service、delegation policy与LLM route readiness | `src/Aevatar.AI.Application.CodexExecution/ManagedCodex/ManagedCodexNyxIdCatalogResolver.cs:5-68` |
-| self-service identity必须与NyxID current user一致，allowlist不命中则拒绝 | `src/Aevatar.AI.Application.CodexExecution/ManagedCodex/ManagedCodexCredentialLifecycle.cs:449-469` |
-| key签发使用proxy scope、单service grant、无allow-all | `src/Aevatar.AI.Application.CodexExecution/ManagedCodex/ManagedCodexCredentialLifecycle.cs:501-510` |
-| raw key late-resolve后只做固定proxy request，response按上限检查 | `src/Aevatar.AI.Infrastructure.ChronoSandbox/NyxIdChronoSandboxCodexClient.cs:31-100` |
+| self-service identity必须与NyxID current user一致，typed eligibility不命中则拒绝 | `src/Aevatar.AI.Application.CodexExecution/ManagedCodex/ManagedCodexCredentialLifecycle.cs:1893-1909` |
+| key签发使用proxy scope、精确双service grant、无allow-all | `src/Aevatar.AI.Application.CodexExecution/ManagedCodex/ManagedCodexCredentialLifecycle.cs:1994-2009` |
+| raw key late-resolve后只做固定proxy request，response按上限检查 | `src/Aevatar.AI.Infrastructure.ChronoSandbox/NyxIdManagedCodexChronoTransport.cs:27-99` |
 | actor拥有descriptor与独立NyxID/Vault cleanup tracks，projection是非secret query | `agents/Aevatar.GAgents.Channel.Identity/ManagedCodex/ManagedCodexCredentialGAgent.cs:14-210`；`agents/Aevatar.GAgents.Channel.Identity.Abstractions/ManagedCodex/IManagedCodexCredentialPorts.cs:6-63` |
 | gVisor直接注入五分钟proxy:*，无sandbox Vault/Landlock/credential proxy | `docs/adr/0044-managed-codex-gvisor-direct-token.md:19-84` |
-| internal canary仍受allowlist、mutable policy与wide delegation限制 | `docs/canon/managed-codex-execution.md:111-115`；`docs/operations/2026-07-16-managed-codex-exec-rollout.md:1-46` |
+| internal canary仍受typed eligibility（InternalOnly）、mutable policy与wide delegation限制 | `docs/canon/managed-codex-execution.md:96-101`、`:113-120`；`docs/operations/2026-07-16-managed-codex-exec-rollout.md:1-46` |
 
 </details>

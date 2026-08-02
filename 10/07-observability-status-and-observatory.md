@@ -6,12 +6,12 @@ verified_at: 2026-07-25
 
 # Observability、Status 与 Observatory：观测事实，不接管业务事实
 
-> 版本与结论：本章描述冻结基线的 `current` 观测模型。OTel trace/metric记录进程内刚发生的信号；Status把周期probe outcome提交到独立HealthProbe actor并投影成依赖健康快照；Workflow Observatory只读current-state与artifact read model，为有权限的调用者组织run列表、timeline、graph与diagnostics。三者都帮助回答“系统发生了什么、现在能否服务、已投影出什么”，但都不取代业务actor的event/state事实所有权。
+> 版本与结论：本章描述 `current` 观测模型。OTel trace/metric记录进程内刚发生的信号；Status把周期probe outcome提交到独立HealthProbe actor并覆盖写入可丢弃的运维健康快照；Workflow Observatory只读current-state与artifact read model，为有权限的调用者组织run列表、timeline、graph与diagnostics。三者都帮助回答“系统发生了什么、现在能否服务、已观测出什么”，但都不取代业务actor的event/state事实所有权。
 
 ## 设计抽象与事实源
 
 - `docs/canon/observability.md:9-45`、`:253-356`：`Aevatar.Agents` / `Aevatar.GenAI` 信号面、sampling与infallible emission边界。
-- `docs/canon/status-dashboard.md:103-143`、`:175-233`：Status的executor、鉴权模式、真实成功判定、凭证门控target与查询面边界。
+- `docs/canon/status-dashboard.md:76-102`、`:103-156`、`:157-175`：Status的probe actor与ephemeral tick、executor/鉴权模式/凭证门控target，以及operational snapshot覆盖写与查询面边界。
 - `src/workflow/Aevatar.Workflow.Infrastructure/CapabilityApi/WorkflowRunObservatoryEndpoints.cs:15-137`、`:149-388`：GET-only查询面、own-scope默认路径、platform-admin跨scope支路与审计边界。
 
 ## 四个问题，四个不同答案
@@ -21,7 +21,7 @@ verified_at: 2026-07-25
 | 面 | 回答的问题 | 数据寿命与权威性 | 典型消费者 |
 |---|---|---|---|
 | OTel live signals | 刚才哪一段执行慢、失败或被调用？ | 可采样、可丢；是观察，不是业务事实 | collector、Jaeger/Tempo、metrics backend |
-| Status probes | 某依赖最近是否可达/新鲜，连续失败多少次？ | HealthProbe actor拥有probe outcome事实；不拥有被测系统真相 | `/api/status`、`/status` |
+| Status probes | 某依赖最近是否可达/新鲜，连续失败多少次？ | HealthProbe actor维护probe outcome并覆盖写operational snapshot；不拥有被测系统真相 | `/api/status`、`/status` |
 | Canonical read models | committed actor事实当前投影成什么？ | 可重建、最终一致，以`StateVersion`标识进度 | API、查询service、repair工具 |
 | Observatory | 有权限的读者怎样定位和解释某次run？ | 只组合read models，不dispatch、不修状态 | operator、开发者、support |
 
@@ -34,8 +34,8 @@ flowchart LR
     R[("Current-state and artifact read models")]
     O["Workflow Observatory\nfiltered read-only views"]
     T["OTel spans and metrics\nlive sampled observations"]
-    H["HealthProbe actors\ncommitted probe outcomes"]
-    S[("Health target read models")]
+    H["HealthProbe actors\nprobe outcome runtime state"]
+    S[("Health target operational snapshots")]
     D["Status JSON and page"]
     B --> E --> P --> R --> O
     B -. "execution observation" .-> T
@@ -60,30 +60,29 @@ OTel emission必须对业务路径infallible：typed helper集中创建activity/
 
 ## Status：Probe Outcome 的 Actor 化
 
-Status不是每次`GET /api/status`都同步戳一遍所有依赖。manifest为每个target建立HealthProbe actor；callback触发executor后，actor提交`HealthProbeObserved`，维护last outcome、consecutive failures与bounded recent outcomes，再由projector写`HealthProbeTargetDocument`。页面和JSON endpoint只通过`IHealthStatusQueryPort`读取这些投影。
+Status不是每次`GET /api/status`都同步戳一遍所有依赖。manifest为每个target建立HealthProbe actor，配置由`HealthProbeConfigured`持久化；startup service投递configure后，actor用ephemeral delayed self-message编排周期tick，executor完成或超时后在单线程turn中更新last outcome、consecutive failures与bounded recent outcomes，并把`HealthProbeOperationalSnapshot`覆盖写入snapshot store。页面和JSON endpoint只通过`IHealthStatusQueryPort`读取这些快照；快照无`StateVersion`、可覆盖可丢失，重启后从配置重放重新采样。
 
 ```mermaid
 %%{init: {"maxTextSize": 100000, "sequence": {"actorMargin": 27, "messageMargin": 17, "diagramMarginX": 10, "diagramMarginY": 10}, "themeVariables": {"fontSize": "10px"}}}%%
 sequenceDiagram
-    participant C as Durable callback
+    participant C as Startup configure and tick
     participant H as HealthProbe actor
     participant X as Probe executor
-    participant P as Projector
+    participant S as Snapshot store
     participant Q as Status query port
     participant U as Status client
-    C->>H: wake target generation
+    C->>H: configure target and start tick chain
     H->>X: execute configured probe
     X-->>H: outcome status latency detail time
-    H->>H: commit observed fact and failure count
-    H-->>P: committed state event
-    P->>P: upsert target document by StateVersion
+    H->>H: update last outcome and failure count
+    H->>S: overwrite operational snapshot
     U->>Q: GET current target snapshots
     Q-->>U: overall counts targets history
 ```
 
 roll-up只统计enabled且known的target。critical target为`down`才把overall置为`down`；非critical down或任何degraded把overall置为`degraded`；unknown不把未配置canary强行染红。availability只在最近最多120个样本中的known outcome上计算，当前snapshot没有history时才用last outcome补一个样本。
 
-这个模型避免慢依赖拖住status request，也保留连续失败与历史。但“probe ok”只表示该探针在某个时间按某个检查通过，不证明一次业务交易完成；“unknown”也不是healthy。operator必须同时看`last_check_at`、probe kind、target severity与projection freshness。
+这个模型避免慢依赖拖住status request，也保留连续失败与历史。但“probe ok”只表示该探针在某个时间按某个检查通过，不证明一次业务交易完成；“unknown”也不是healthy。operator必须同时看`last_check_at`/`last_success_at`/`updated_at_utc`、probe kind、target severity与snapshot freshness。
 
 ### 真实健康不是“认证墙还在”
 
@@ -241,8 +240,8 @@ printf 'observation-boundaries: verified-static\n'
 |---|---|
 | Host收集Aevatar activity source/meters，sampler/exporter不改变业务事实 | `src/workflow/Aevatar.Workflow.Host.Api/ObservabilityExtensions.cs:13-62`；`docs/canon/observability.md:253-356` |
 | typed OTel helper集中activity/tag并安全设置状态 | `src/Aevatar.Foundation.Abstractions/Observability/AevatarActivitySource.cs:11-245` |
-| HealthProbe actor提交outcome、连续失败和bounded history | `agents/Aevatar.GAgents.StatusDashboard/HealthProbeTargetGAgent.cs:26-139`、`:348-426` |
-| projector只从committed state event生成HealthProbeTargetDocument | `agents/Aevatar.GAgents.StatusDashboard/HealthProbeTargetProjector.cs:11-77` |
+| HealthProbe actor在turn内维护outcome、连续失败和bounded history并覆盖写snapshot | `agents/Aevatar.GAgents.StatusDashboard/HealthProbeTargetGAgent.cs:34-123`、`:230-259`、`:328-359` |
+| probe采样结果不进入EventStore/Projection pipeline，只按slug覆盖写可丢失的operational snapshot | `agents/Aevatar.GAgents.StatusDashboard/HealthProbeStartupService.cs:53-95`、`:206-215`；`src/Aevatar.Mainnet.Host.Api/Status/ElasticsearchHealthProbeOperationalSnapshotStore.cs:14-33`、`:70-98` |
 | Status只读query port，unknown不参与overall且critical down才整体down | `src/Aevatar.Mainnet.Host.Api/Status/StatusEndpoints.cs:31-126` |
 | scope service token按scope短期签发并缓存；scope为空、provider缺失或返回空token时不发送匿名探针 | `src/Aevatar.Mainnet.Host.Api/Status/ScopeServiceProbeTokenProvider.cs:7-46`；`agents/Aevatar.GAgents.StatusDashboard/Executors/StatusProbeAuthorizationResolver.cs:38-80` |
 | 默认编排与Observatory探针携带scope token断言200，LLM canary由专用bearer门控 | `agents/Aevatar.GAgents.StatusDashboard/Configuration/StatusDashboardManifest.cs:177-258` |

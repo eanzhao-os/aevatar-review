@@ -10,7 +10,7 @@ verified_at: 2026-07-25
 
 ## 设计抽象与事实源
 
-- `src/Aevatar.Studio.Application/Studio/Services/StudioMemberWorkflowBindingPort.cs:33`、`:70`、`:89`、`:117`、`:129`：按 Member 的已发布状态选择首次 binding run 或复用其 persisted service identity 做 save-and-bind。
+- `src/Aevatar.Studio.Application/Studio/Services/StudioMemberWorkflowBindingPort.cs:33`、`:70`、`:89`、`:118`、`:130`：按 Member 的已发布状态选择首次 binding run 或复用其 persisted service identity 做 save-and-bind。
 - `agents/Aevatar.GAgents.StudioMember/StudioMemberBindingRunGAgent.cs:29`、`:55`、`:213`、`:233`、`:379`：一次 binding attempt 由独立 actor 持有，可在 activation 后恢复，并以 Member terminal acknowledgement 收口。
 - `src/platform/Aevatar.GAgentService.Abstractions/Protos/service_revision.proto:31`、`:64`、`:107`、`:117`：revision 有独立 identity、implementation spec、prepared artifact 与 lifecycle，不是 draft 或 service 的别名。
 
@@ -63,7 +63,7 @@ flowchart LR
 
 | 当前分支 | 判定 | 写入协议 | immediate result | 后续观察 |
 |---|---|---|---|---|
-| unpublished / Member read model missing | 没有 last binding，或 Member尚不可见 | `IStudioMemberService.BindAsync` 创建新的 `bindingRunId` | `accepted + bindingRunId + memberId` | binding-run status、Member binding view、readiness |
+| unpublished / Member read model missing | 没有 last binding，或 Member尚不可见 | `IStudioMemberService.BindAsync` 创建新的 `bindingRunId`；首次 binding 可携带可选 `revisionId`，适配器透传后平台 binding 优先使用该显式 revision（不给时仍从 run identity 派生），并参与 request hash | `accepted + bindingRunId + memberId` | binding-run status、Member binding view、readiness |
 | published | `LastBinding != null` 或 `LastBoundRevisionId`存在 | 读取 Member保存的 `publishedServiceId`，执行 Workflow save + service bind，再 dispatch `RecordPublishedBinding` | `save_and_bind + acceptanceStage + workflowId + revisionId` | Workflow/service read models、Member last binding、readiness |
 
 “Member read model missing”在适配器中被当作 unpublished fallback。这不会让 draft Workflow成为 Member：首次 path仍把显式 `memberId=m-alpha`交给 Member binding admission，Member authority不存在时会在 run 内 `rejected`。HTTP层的accepted只说明新run已启动，不证明 admission通过。
@@ -241,9 +241,9 @@ notProven:
 
 | 论断 | 等级 | 证据 |
 |---|---|---|
-| Member workflow binding adapter在unpublished与published分支间选择不同协议 | E1 | `src/Aevatar.Studio.Application/Studio/Services/StudioMemberWorkflowBindingPort.cs:33`、`:70`、`:72`、`:73`、`:83`、`:117` |
-| unpublished分支创建binding run并只返回accepted + run identity | E1 | `src/Aevatar.Studio.Application/Studio/Services/StudioMemberWorkflowBindingPort.cs:89`、`:90`、`:105`；`src/Aevatar.Studio.Application/Studio/Services/StudioMemberService.cs:95`、`:139`、`:141`、`:150` |
-| published分支从Member读取service ID，save-and-bind后dispatch resolved binding回Member | E1 | `src/Aevatar.Studio.Application/Studio/Services/StudioMemberWorkflowBindingPort.cs:129`、`:136`、`:137`、`:146`、`:153`、`:167` |
+| Member workflow binding adapter在unpublished与published分支间选择不同协议 | E1 | `src/Aevatar.Studio.Application/Studio/Services/StudioMemberWorkflowBindingPort.cs:33`、`:70`、`:72`、`:73`、`:83`、`:118` |
+| unpublished分支创建binding run并只返回accepted + run identity | E1 | `src/Aevatar.Studio.Application/Studio/Services/StudioMemberWorkflowBindingPort.cs:89`、`:90`、`:94`、`:106`；`src/Aevatar.Studio.Application/Studio/Services/StudioMemberService.cs:95`、`:139`、`:141`、`:150` |
+| published分支从Member读取service ID，save-and-bind后dispatch resolved binding回Member | E1 | `src/Aevatar.Studio.Application/Studio/Services/StudioMemberWorkflowBindingPort.cs:130`、`:137`、`:138`、`:147`、`:154`、`:168` |
 | save-and-bind生成一个revision ID并强制Workflow result与binding result一致 | E1 | `src/platform/Aevatar.GAgentService.Application/Workflows/ScopeWorkflowSaveAndBindApplicationService.cs:31`、`:33`、`:66`、`:81`、`:96`、`:102` |
 | Member admission校验自身identity、kind、active/superseded run，并从authority state给出published service ID | E1 | `agents/Aevatar.GAgents.StudioMember/StudioMemberGAgent.cs:151`、`:168`、`:175`、`:186`、`:196`、`:202`、`:215` |
 | binding-run actor按中间状态恢复，terminal状态不续跑 | E1 | `agents/Aevatar.GAgents.StudioMember/StudioMemberBindingRunGAgent.cs:29`、`:33`、`:36`、`:499` |

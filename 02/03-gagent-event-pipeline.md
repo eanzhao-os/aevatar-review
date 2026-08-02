@@ -213,7 +213,7 @@ public sealed class DemoGAgent : GAgentBase<DemoState>
 | 基线真实用法中两个开关成对出现 | E1 | `src/Aevatar.AI.Core/RoleGAgent.cs:297` |
 | 动态模块的注册 / 批量替换 API 与管线缓存失效 | E1 | `src/Aevatar.Foundation.Core/GAgentBase.cs:252-302` |
 | 双 hook 通道与 enter/exit 顺序 | E1 | `src/Aevatar.Foundation.Core/GAgentBase.cs:160-185` |
-| DI hook best-effort，失败只记 warning | E1 | `src/Aevatar.Foundation.Core/GAgentBase.cs:400-410` |
+| DI hook best-effort，失败只记 warning | E1 | `src/Aevatar.Foundation.Core/GAgentBase.cs:404-414` |
 | 异常默认 fail-fast，ShouldSuppressHandlerException 可 opt-in | E1 | `src/Aevatar.Foundation.Core/GAgentBase.cs:174-175` |
 | 无匹配 envelope 静默丢弃、Debug 日志 | E1 | `src/Aevatar.Foundation.Core/GAgentBase.cs:188-197` |
 | mailbox 为 single-reader 无界 channel，一条一 turn，失败不杀 pump | E1 | `src/Aevatar.Foundation.Runtime.Implementations.Local/Actors/LocalActor.cs:13-17` 与 `src/Aevatar.Foundation.Runtime.Implementations.Local/Actors/LocalActor.cs:189-228` |
