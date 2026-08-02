@@ -138,6 +138,26 @@ sequenceDiagram
 - **端点 fail-closed**：voice 实时能力未配置 provider 时，Host 映射返回 503 的 stand-in 端点，而不是映射真实 handler 让每个请求在 DI 解析处炸成 500（`src/Aevatar.Mainnet.Host.Api/Hosting/MainnetHostBuilderExtensions.cs:468`）。能力缺失应该表现为明确的协议应答，不是未处理异常。
 - **启动拓扑是组合的一部分**：hosted services 必须顺序启动。2026-06-03 生产事故中，并行启动让一批 grain-calling 启动服务抢在 Orleans silo 到达 Active 之前发出 grain 调用，全部失败并导致 CrashLoopBackOff；顺序启动按注册序保证 Kestrel 先绑探针端口、silo 先到 Active、grain 调用随后（`src/Aevatar.Mainnet.Host.Api/Hosting/MainnetHostBuilderExtensions.cs:106`）。这条不变量不住在任何业务代码里，它是纯 Host 组合知识。
 
+### Best-effort 失败不能静默
+
+`84822d19..97be0fb` 没有引入 readiness 门控：异步 readiness、取消以及释放所有权在区间起点已经存在。本次变化只收紧 Voice 边界的可观测性契约：释放 session 时等待 readiness 失败、向已关闭的客户端 transport 转发实时帧失败，以及关闭 WebSocket 失败，仍保持 best-effort 语义；前两者不能阻断底层 session 释放或 projection fanout，后者不能让清理路径反向失败，但这些异常不再被静默吞掉，而会记录带异常上下文的 Warning。
+
+```mermaid
+%%{init: {"maxTextSize": 100000, "sequence": {"actorMargin": 28, "messageMargin": 18, "diagramMarginX": 10, "diagramMarginY": 10}, "themeVariables": {"fontSize": "10px"}}}%%
+sequenceDiagram
+    participant B as Voice 边界
+    participant O as 失败操作
+    participant L as ILogger
+    participant N as 后续释放或 fanout
+
+    B->>O: readiness dispose、frame send 或 WebSocket close
+    O--xB: 抛出异常
+    B->>L: Warning + exception context
+    B->>N: 继续释放或保持 fanout 隔离
+```
+
+**为什么保留 broad catch，而不是让异常向上传播？** 这些路径承担的是清理或单客户端投递，不应把局部连接故障升级为 session 释放失败或共享 projection fanout 失败；但完全静默会让生产故障无法定位。当前边界因此同时坚持两个不变量：控制流继续隔离局部失败，观测面必须留下 Warning。对应的 CI observability baseline 同时删除这些 broad catch 的豁免，令后续回退为静默捕获能够被守卫发现；这仍是可观测性修复，不改变 readiness 的控制流设计。
+
 ## 最小示例：静态核验"某能力属于哪个 Host"
 
 > Demo status：`verified-static`
@@ -178,6 +198,7 @@ rg -n 'AddAevatarMainnetHost|EnableMakerExtensions' tools/ci/architecture_guards
 3. Mainnet Host 与 Workflow Host 共享什么、各自的差异面是什么？
 4. 一个请求穿过 Host 时，Host 在哪一步止步？业务状态在哪里、由谁推进？
 5. `actorId` 在这条链路里扮演什么角色？为什么 Host 不得解析 `actorId` 字符串做分支？
+6. Voice 的 best-effort 失败为什么不能向上传播，又为什么不能被静默吞掉？
 
 <details>
 <summary>论断—证据映射</summary>
@@ -202,6 +223,8 @@ rg -n 'AddAevatarMainnetHost|EnableMakerExtensions' tools/ci/architecture_guards
 | 一次性断言在非 dev 环境强制 Garnet 分布式实现 | E1 | `src/Aevatar.Mainnet.Host.Api/Hosting/MainnetHostBuilderExtensions.cs:229` |
 | voice 未配置时映射 fail-closed 503 | E1 | `src/Aevatar.Mainnet.Host.Api/Hosting/MainnetHostBuilderExtensions.cs:468` |
 | hosted services 顺序启动（2026-06-03 事故） | E1 | `src/Aevatar.Mainnet.Host.Api/Hosting/MainnetHostBuilderExtensions.cs:106` |
+| Voice 的 readiness 释放、实时帧转发与 WebSocket best-effort close 在隔离失败的同时记录 Warning | E1 | `src/Aevatar.Bootstrap.Extensions.AI/ReadinessGatedRealtimeVoiceProviderSession.cs:80`、`src/Aevatar.Foundation.VoicePresence/Hosting/VoiceRealtimeTransportControlBridge.cs:85`、`src/Aevatar.Foundation.VoicePresence/Transport/WebSocketVoiceTransport.cs:156` |
+| Voice broad catch 的静默豁免已从 observability baseline 删除 | E1 | `tools/ci/guards/catch_exception_observability_baseline.tsv`（`84822d19..97be0fb`） |
 | 旧统一 Host 工程禁止复活 | E1 | `tools/ci/architecture_guards.sh:66` |
 | scheduled-dispatch 端点走 capability 自映射 | E1 | `src/workflow/extensions/Aevatar.Workflow.Extensions.Hosting/AevatarPlatformHostBuilderExtensions.cs:120` |
 
