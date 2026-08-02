@@ -6,13 +6,13 @@ verified_at: 2026-07-25
 
 # Ingress 规范化与路由：先固定身份，再选择执行意图
 
-> 版本与结论：本章描述 `current`。外部 Channel payload 先在 adapter / HTTP 边界被验证并规范化成 `ChatActivity`，再由 canonical conversation identity 进入 `ConversationGAgent`。路由策略不直接改写 conversation owner，也不新增一个热路径 router actor；它用 caller-scoped policy snapshot 与无状态 resolver 生成本次请求的 `Reject` 或 `ForwardToModel`。wire contract 已把 GAgent、Team、Workflow 目标收敛为 tool hint，但冻结 relay execution 只证明 `model_name` 被消费，tool-set/hint 的执行闭环仍有缺口。
+> 版本与结论：本章描述 `current`。外部 Channel payload 先在 adapter / HTTP 边界被验证并规范化成 `ChatActivity`，再由 canonical conversation identity 进入 `ConversationGAgent`。路由策略不直接改写 conversation owner，也不新增一个热路径 router actor；它用 caller-scoped policy snapshot 与无状态 resolver 生成本次请求的 `Reject` 或 `ForwardToModel`。legacy `/ws/voice` WebSocket ingress 会在 snapshot 首次不可见时请求 read model 重物化并有界重读，仍不可见才 fail closed；这不会把 projection 升格为 authority。wire contract 已把 GAgent、Team、Workflow 目标收敛为 tool hint，但冻结 relay execution 只证明 `model_name` 被消费，tool-set/hint 的执行闭环仍有缺口。
 
 ## 设计抽象与事实源
 
 - `agents/Aevatar.GAgents.Channel.Abstractions/protos/chat_activity.proto:133`、`:325`、`:341`、`:352`、`:414`：canonical conversation、channel-neutral content、异步回复上下文、transport extras 与统一 activity envelope。
 - `agents/Aevatar.GAgents.Channel.Runtime/ConversationDispatchMiddleware.cs:25`、`:30`、`:37`、`:40`、`:48`：通用 pipeline 只按 canonical key 建立 conversation actor identity 并 direct dispatch typed envelope。
-- `src/Aevatar.ChatRouting.Core/ChatRouteResolver.cs:26`、`:35`、`:48`、`:53`、`:56`、`:97`：resolver 按已排序 snapshot 选择第一条可执行规则，否则走 default target 或 cold-start fallback。
+- `src/Aevatar.Mainnet.Host.Api/Voice/PolicyAwareVoiceEndpoints.cs:75-103`、`src/Aevatar.ChatRouting.Core/IChatRoutePolicyProjectionRecoveryPort.cs:22`：legacy `/ws/voice` 查询 miss 后请求 projection 重物化、有界重读，再交给 resolver。
 
 ## 一条 ingress 链有三个不同的“规范化”
 
@@ -163,6 +163,50 @@ resolver 自身不做 IO：
 
 为什么 resolver 不是 actor？策略事实已经由 `ChatRoutePolicyGAgent` 与 projection 拥有；给每次 ingress 再加 router actor hop 只会增加 mailbox 排队和故障面，并复制一份可漂移 cache。resolver 是 request-local library decision，但其 `resolved_at` 使用当前时钟，因此只能说 action selection 对同一有序 snapshot/input/options 是确定的，不能声称整个 serialized decision byte-for-byte 可复现。
 
+### legacy `/ws/voice` query miss 先修复副本
+
+legacy `/ws/voice` 对 snapshot miss 的处理不同于 text relay 的 configured fallback。该 WebSocket endpoint 首次查询返回 `null` 时，通过 recovery port 按 caller 的 `NyxUserId` 定位 `chat-route-policy:{scopeId}`，重新派发与 committed-state projection 相同的 durable materialization plan。它只从已提交事件重建 `ChatRoutePolicyCurrentStateDocument`，不提交新事件、不修改 grain state，也不提升 state version。这样既修复长期 idle 后丢失或滞后的查询副本，又保持 EventStore / actor committed state 的 authority 边界。
+
+为什么不直接从 grain 读策略或经 command port 重写一次？前者会让 query path 绕过 CQRS projection，后者会制造没有业务变化的新提交；两者都会混淆“恢复副本”和“改变策略”。recovery port 返回 `true` 也只表示 materialization 已派发，不表示文档已同步可见，因此 endpoint 最多重读五次，首次重读立即发生，后续重试间隔 400 ms。fresh snapshot 不进入恢复路径，真实无策略或恢复后仍不可见则继续按 voice attach 约束返回 `501`，不会借用 text default 接受 WebSocket。
+
+```mermaid
+%%{init: {"maxTextSize": 100000, "sequence": {"actorMargin": 28, "messageMargin": 18, "diagramMarginX": 10, "diagramMarginY": 10}, "themeVariables": {"fontSize": "10px"}}}%%
+sequenceDiagram
+    participant V as Legacy /ws/voice endpoint
+    participant Q as Policy query replica
+    participant P as Projection recovery port
+    participant D as Materialization dispatcher
+    participant R as ChatRouteResolver
+    V->>Q: lookup caller snapshot
+    alt snapshot visible
+        Q-->>V: current snapshot
+    else snapshot missing
+        Q-->>V: null
+        V->>P: try rematerialize caller policy
+        P->>D: dispatch committed-state activation plan
+        D-->>P: dispatch accepted or failed
+        P-->>V: dispatched true or false
+        alt dispatched
+            loop bounded visibility window
+                V->>Q: re-read snapshot
+                Q-->>V: snapshot or null
+            end
+        else not dispatched
+            Note over V: keep snapshot missing
+        end
+    end
+    V->>R: resolve visible snapshot or null
+    alt valid voice attach target
+        R-->>V: attach target
+        V->>V: accept WebSocket
+    else no usable voice target
+        R-->>V: no voice attach target
+        V-->>V: return 501 without accepting socket
+    end
+```
+
+固定证据只证明 recovery 被放在 legacy `/ws/voice` WebSocket endpoint 的初始 miss 分支中；fresh snapshot 不进入该分支，text routing 也不运行这个 handler。legacy WebSocket 的 fail-closed 决策因此发生在有限恢复窗口之后，而不是把暂时不可见直接判成永久无策略。其他 voice ingress 是否采用相同策略，需要各自入口的实现与测试证据，不能由这条局部路径外推。
+
 ### tool-first target resolution
 
 wire action 只剩：
@@ -254,7 +298,8 @@ matched_action:
 | callback auth 或 canonical scope 失败 | `401` | 使用 payload 自报 owner 降级 |
 | canonical conversation key 缺失 | relay HTTP 返回 `400`；通用 middleware 记录 warning 并短路 | 自动创建随机 conversation |
 | sender NyxID 查询失败 | user id 留空，先查 empty-user/sender tuple，再查 scope-only policy | authentication 失败或所有 policy 均失效 |
-| policy projection missing | resolver 使用 configured fallback | authority actor 不存在或规则从未配置 |
+| text relay 的 policy projection missing | resolver 使用 configured fallback | authority actor 不存在或规则从未配置 |
+| legacy `/ws/voice` WebSocket 的 policy projection 首次 missing | 按 `NyxUserId` 请求重物化并有界重读；仍无 snapshot/voice target 则 `501` | recovery dispatch 成功即代表 projection 已可见，或可以改读 grain authority |
 | route services/caller scope 不完整 | Conversation route helper 返回 empty action并继续 runner | policy 明确允许 |
 | `Reject` | actor commit typed permanent failure | HTTP ingress 已同步返回业务拒绝 |
 | `ForwardToModel` | target ref 仅随 run command 传递并在 durable copy 清除 | route decision 是审计事实或重放依据 |
@@ -280,7 +325,7 @@ matched_action:
 2. canonical conversation key 与 `OwnerScope` 分别决定哪条边界，为什么一个不能替代另一个？
 3. relay HTTP 返回 `202 accepted` 时，哪些 actor/policy/execution 事实仍未发生？
 4. Workflow target 在 wire 上为什么表达成 `ForwardToModel + aevatar_start_workflow`，冻结 relay runtime 又为什么还不能宣称执行闭环？
-5. per-user identity 或 policy projection 不可用时，冻结实现如何降级，哪些降级不能解释成授权成功？
+5. per-user identity 或 policy projection 不可用时，text 与 legacy `/ws/voice` 分别如何处理，哪些结果不能解释成授权成功？
 
 <details>
 <summary>论断—冻结证据映射</summary>
@@ -295,6 +340,8 @@ matched_action:
 | actor 先 dedup，再 route，再把 transient target ref 交给 run dispatch | `agents/Aevatar.GAgents.Channel.Runtime/Conversation/ConversationGAgent.cs:239-294`、`:329-363` |
 | caller scope 来自 platform/registration/sender，Nyx user 可为空 | `agents/Aevatar.GAgents.Channel.Runtime/Conversation/ConversationGAgent.cs:487-533` |
 | policy query 先 exact caller scope，再允许 scope-only fallback | `src/Aevatar.ChatRouting.Core/ChatRoutePolicyQueryPort.cs:20-33`、`:66-110` |
+| legacy `/ws/voice` snapshot miss 会重派 committed-state materialization plan，再做有界重读 | `src/Aevatar.Mainnet.Host.Api/Voice/PolicyAwareVoiceEndpoints.cs:75-103`；`agents/Aevatar.GAgents.ChatRouting/ChatRoutePolicyProjectionRecoveryPort.cs:37-68` |
+| recovery 不提交事件、不改 authority state，且 dispatch 不保证立即可见 | `src/Aevatar.ChatRouting.Core/IChatRoutePolicyProjectionRecoveryPort.cs:5-27`；`test/Aevatar.ChatRouting.Voice.Integration.Tests/PolicyAwareVoiceEndpointsTests.cs:158-252` |
 | resolver 选择第一条 actionable match，否则 default/fallback | `src/Aevatar.ChatRouting.Core/ChatRouteResolver.cs:26-60`、`:62-119` |
 | wire action 已删除专用 GAgent/Team/Workflow forward variants | `src/Aevatar.ChatRouting.Abstractions/chat_route_policy.proto:122-155` |
 | route decision 与 target ref 不得持久化 | `src/Aevatar.ChatRouting.Abstractions/chat_route_policy.proto:226-254`；`agents/Aevatar.GAgents.Channel.Runtime/protos/conversation_events.proto:47-78`；`agents/Aevatar.GAgents.Channel.Runtime/Conversation/ConversationGAgent.cs:337-362` |
