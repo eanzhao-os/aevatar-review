@@ -6,15 +6,15 @@ verified_at: 2026-07-25
 
 # Voice 控制面与媒体面：actor 记住语义，relay 搬运 PCM
 
-> 版本与结论：本章为 `mixed`。冻结实现已经把会话、lease、response/drain、tool call 与凭证引用收进 actor 控制面，把 raw PCM 留在 Host-local relay，并以 `lease_epoch` 拒绝旧连接的迟到信号；但 `Restarted` 只是新会话接管，不是断点续传，首次连接也仍依赖既有 chat route。`transcript_delta/completed` 有 typed wire contract，却没有当前 provider producer 或 durable transcript history。
+> 版本与结论：本章为 `mixed`。冻结实现已经把会话、lease、response/drain、tool call 与凭证引用收进 actor 控制面，把 raw PCM 留在 Host-local relay，并以 `lease_epoch` 拒绝旧连接的迟到信号；provider 建连后的 readiness 只阻塞依赖完整 session 语义的操作，不阻塞 PCM 与 cancel。控制帧发送也有超时和 fanout 故障隔离。但 `Restarted` 只是新会话接管，不是断点续传，首次连接仍依赖既有 chat route；`transcript_delta/completed` 有 typed wire contract，却没有当前 provider producer 或 durable transcript history。
 
 ## 设计抽象与事实源
 
 - `src/Aevatar.Foundation.VoicePresence.Abstractions/Protos/voice_presence.proto:150-180`、`:255-315`、`:368-505`：actor-owned runtime、provider/control frame 与 lease epoch 的稳定契约；raw audio 字段已从 actor-facing messages 移除并保留编号。
 - `src/Aevatar.Foundation.VoicePresence.Abstractions/Sessions/IVoiceVolatileMediaStreamPort.cs:3-50`、`src/Aevatar.Foundation.VoicePresence/Hosting/VoiceVolatileMediaStreamPort.cs:43-100`：live relay 按 transport lease 寻址，找不到 relay 必须暴露 delivery gap。
-- `src/Aevatar.Mainnet.Host.Api/Voice/PolicyAwareVoiceEndpoints.cs:190-250`、`:394-468`：认证 caller 先经 `ChatRoutePolicy` 得到 voice attach target，Host 签发、绑定并释放短期 tool credential reference。
+- `src/Aevatar.Foundation.VoicePresence/Hosting/VoiceRealtimeTransportControlBridge.cs:10-107`、`src/Aevatar.Foundation.VoicePresence/Transport/WebSocketVoiceTransport.cs:59-167`：控制帧发送与 transport completion 的 Host 边界；`src/Aevatar.Bootstrap.Extensions.AI/ReadinessGatedRealtimeVoiceProviderSession.cs:21-86`、`src/Aevatar.Bootstrap.Extensions.AI/VoiceRealtimeSessionReadinessBootstrapper.cs:28-118`：逐操作 readiness 栅栏、释放顺序与 session 配置补全边界。
 
-这里按协议、volatile relay、Host 准入三个设计边界分组；第二项同时列出 port 与实现，因此共有四条路径。它们只属于事实源清单，不构成正文骨架。
+这里按协议、volatile relay、Host transport/readiness 三个设计边界分组；后两项各把同一职责的抽象与实现放在一起。它们只属于事实源清单，不构成正文骨架。
 
 ## 一条边界：同一会话有三种数据，不是一份状态
 
@@ -77,6 +77,36 @@ WebSocket binary message 是 PCM16；text message 解析为 `VoiceControlFrame` 
 > Demo status：`verified-static`（核对 proto、`WebSocketVoiceTransport`、attach/session/module tests；本轮未启动 Host、未连接真实麦克风或 realtime provider）。
 
 这里要对 transcript 保持克制。proto 的 `VoiceRealtimeFrame` 定义了 `transcript_delta` 与 `transcript_completed`，projection codec 也能序列化任意此类 frame；但冻结 OpenAI/MiniCPM adapter 只生产 response/speech/function/error/disconnect 与 PCM，`VoicePresenceModule.BuildRealtimeFrame` 也没有 transcript 分支。测试还明确断言 `drain_acknowledged` 只推进 drain 状态，不能伪造 `transcript_completed`。所以当前只有**可承载 transcript 的 wire shape**，没有“provider 已输出 transcript”或“actor 已提交 transcript history”的证据。
+
+## Provider readiness：先接通媒体，再开放依赖 session 的语义
+
+provider `ConnectAsync` 返回物理 session 后，Host 会异步完成 readiness：把 route 解析出的 per-session instructions 覆盖到配置副本，合并 tool catalog 中尚未声明的工具，再调用 provider `UpdateSessionAsync`。包装 session 在 readiness 完成前阻塞 input image、tool result、主动事件注入和后续 session update；PCM 输入与 response cancel 则直接转发。dispose 会先取消并收束 readiness task，再释放底层 provider session。
+
+```mermaid
+%%{init: {"maxTextSize": 100000, "sequence": {"actorMargin": 28, "messageMargin": 18, "diagramMarginX": 10, "diagramMarginY": 10}, "themeVariables": {"fontSize": "10px"}}}%%
+sequenceDiagram
+    participant R as Host-local relay
+    participant G as Readiness-gated session
+    participant P as Realtime provider
+    participant T as Tool catalog
+    R->>P: connect provider session
+    P-->>G: physical session handle
+    par media and interruption remain live
+        R->>G: PCM or cancel
+        G->>P: forward immediately
+    and establish semantic context
+        G->>T: discover tools with lease tool context
+        T-->>G: discovered definitions
+        G->>P: update session with instructions and merged tools
+        P-->>G: readiness completed
+    end
+    R->>G: image tool result injection or session update
+    G->>P: forward only after readiness
+```
+
+为什么不让所有操作都等 readiness？PCM 与 cancel 分别承担低延迟媒体和中断旧 response 的职责，把它们绑到工具发现或 session update 会把控制面初始化延迟扩散到实时热路径。为什么 image/tool result/injection 不能抢跑？它们的解释依赖 instructions、tool definitions 与 tool context；先送达再补配置会让 provider 在不完整语义下处理同一会话。这里的栅栏不是“provider 已连上”的同义词，而是“依赖 session 语义的操作已经可以安全解释”。
+
+控制下行还有另一层故障边界：`session_accepted` 和 projection realtime frame 都通过五秒限时发送；订阅回调还会校验 session/module，关闭的客户端导致发送失败时只记录 warning，不让单个 transport 反向击穿 projection fanout。WebSocket receive loop 则把对端异常关闭、请求取消和 policy rejection 收敛为当前 transport completion；非法 image 明确 policy close，无法识别且不含 image 的 text frame保持兼容性忽略。这样做的正当性是隔离不同所有权：projection hub负责发布观察，transport负责本连接的背压与终止，任一慢连接都没有权改变其他订阅者的投影推进。
 
 ## Attach、lease 与 restart：新连接接管，不是续传旧 socket
 
@@ -210,6 +240,7 @@ open #2319 的原始描述已经**部分落地**：
 |---|---|
 | runtime持有response/drain、provider binding、lease/owner/epoch、session config、tool context与pending tool call | `src/Aevatar.Foundation.VoicePresence.Abstractions/Protos/voice_presence.proto:127-180` |
 | raw provider/transport audio从actor-facing proto移除并保留字段，PCM只走transport/relay/provider session | `src/Aevatar.Foundation.VoicePresence.Abstractions/Protos/voice_presence.proto:255-268`、`:450-488`；`src/Aevatar.Foundation.VoicePresence.Abstractions/IVoiceTransport.cs:3-34`；`src/Aevatar.Foundation.VoicePresence/Hosting/VoiceVolatileMediaStreamPort.cs:409-489` |
+| readiness前阻塞input image、tool result、事件注入与session update，PCM/cancel直接转发；dispose先取消并收束readiness再释放provider session；bootstrapper覆盖instructions、合并工具并更新session | `src/Aevatar.Bootstrap.Extensions.AI/ReadinessGatedRealtimeVoiceProviderSession.cs:21-86`；`src/Aevatar.Bootstrap.Extensions.AI/VoiceRealtimeSessionReadinessBootstrapper.cs:28-118` |
 | transcript有wire case但冻结provider/module无producer，drain ack不合成transcript | `src/Aevatar.Foundation.VoicePresence.Abstractions/Protos/voice_presence.proto:271-315`；`src/Aevatar.Foundation.VoicePresence/Modules/VoicePresenceModule.cs:1160-1199`；`test/Aevatar.Foundation.VoicePresence.Tests/VoicePresenceModuleTests.cs:41-96` |
 | capability可rematerialize/auto-enable，projection lag为retryable 503 | `src/Aevatar.Foundation.VoicePresence/Hosting/ActorOwnedVoiceRealtimeSession.cs:46-117`；`src/Aevatar.Foundation.VoicePresence/Hosting/VoiceWebSocketAttachExecutor.cs:149-193` |
 | takeover先evict旧handle，再以新GUID acquire并返回Restarted | `src/Aevatar.Foundation.VoicePresence/Hosting/ActorOwnedVoiceRealtimeSession.cs:119-223` |
