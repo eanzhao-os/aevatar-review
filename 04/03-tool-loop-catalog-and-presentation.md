@@ -12,7 +12,7 @@ verified_at: 2026-07-25
 
 - `src/Aevatar.AI.Core/Tools/ToolCallLoop.cs:20`：定义 LLM → tool call → middleware/execution → tool result → 下一轮 LLM 的受限循环。
 - `src/Aevatar.Foundation.Abstractions/Tools/tool_presentation.proto:22`：定义 tool card 的 invocation identity、kind、availability 与 typed source reference。
-- `src/Aevatar.AI.Abstractions/ToolProviders/IAgentToolSource.cs:11`：定义候选工具的异步发现口，不承诺 Host 注册或 turn 准入。
+- `src/Aevatar.AI.ToolProviders.Ornn/OrnnSearchSkillsTool.cs:39`：定义 Ornn skill 的模型侧检索 schema；`scope` 不向模型开放。
 
 ## 从 package 到一次 turn 的请求目录
 
@@ -53,6 +53,40 @@ flowchart LR
 任一 profile digest 不匹配、tool set/discovery/policy 失败都会降到 recovery 或 restricted-empty，而不是扩大目录。不同实例发生同名 collision 时，该名字从 exact map 移除；catalog materialization 还拒绝任何超出 reconcile proposal ceiling 的名字。
 
 没有 profile catalog 不等于“任意工具可用”：基础 request 的 tools 与 typed `ToolVisibility` 仍是边界。catalog 只是更具体的 turn-local ceiling，不是唯一安全层。
+
+## Ornn skill 搜索：固定客户端查询，不让模型选择 scope
+
+`ornn_search_skills` 的模型侧 schema 只暴露可选的 `query`，不再暴露 `public`、`private`、`mixed` 等 `scope`。执行端即使收到旧模型或手写请求夹带的 `scope`，也不会读取它；客户端固定向 Ornn API 发送 `scope=mixed` 与 `pageSize=100`。
+
+```mermaid
+%%{init: {"maxTextSize": 100000, "flowchart": {"useMaxWidth": false, "nodeSpacing": 12, "rankSpacing": 48}, "themeVariables": {"fontSize": "10px"}}}%%
+flowchart LR
+    U["user asks for a capability or named skill"]
+    M["model supplies optional query<br/>no scope contract"]
+    T["ornn_search_skills<br/>ignore injected scope"]
+    A["Ornn API<br/>scope=mixed + pageSize=100"]
+    R["API response matches<br/>name + description"]
+    N["use_skill loads the selected package"]
+    U --> M
+    M --> T
+    T --> A
+    A --> R
+    R --> N
+```
+
+这里能由客户端实现确认的边界只有两层：模型不能通过 tool arguments 选择 `scope`，而发往 Ornn API 的请求固定携带 `scope=mixed`。`mixed` 在服务端对应哪些集合、怎样实施授权过滤，不在本章固定证据覆盖范围内，不能由客户端的 description、注释或参数名反推。
+
+搜索还显式请求 `pageSize=100`，替代 client 方法的默认值 `20`。这只证明客户端请求了更大的单页结果，不证明响应覆盖服务端全集；结果头会区分 matched 与 shown，响应错误也会如实返回。
+
+最小模型参数只有查询词；空字符串或省略 `query` 表示浏览可用 skill：
+
+```json
+{
+  "query": "office"
+}
+```
+
+**为什么不保留 `scope` 作为“灵活选项”？** 当前 discovery contract 只需要接收检索词；固定客户端查询使同一 `query` 不会因模型额外生成不同 `scope` 而改变请求形态。若将来需要分类或所有权筛选，应先补齐稳定的服务端契约证据，再设计独立的模型侧语义。
 
 ## authorization fence 为什么必须在 middleware 两侧
 
@@ -171,6 +205,8 @@ flowchart TD
 
 **为什么 receipt 不是所有成功调用都强制生成？** 审批、破坏性和声明副作用需要可审计 outcome；普通纯读工具已有 call/result lifecycle。把每个读取结果复制进重型 receipt 只会制造重复事实。
 
+**为什么 Ornn 搜索固定发送 `mixed`？** 这是当前客户端把模型侧 schema 收窄到 `query` 后采用的确定性请求策略：夹带的 `scope` 不参与执行。至于 `mixed` 的服务端集合和授权语义，本章保持未知，不把客户端策略解释成服务端保证。
+
 ## 边界与演进
 
 - package 清单是实现库存；实际 Host enablement 以 DI/feature/tool-set composition 为准。新增 package 不等于进入 `workspace.default` 或任一 profile。
@@ -186,6 +222,7 @@ flowchart TD
 3. Responses 怎样区分 forwarded、substitute 与 additive，撞名时谁拥有执行权？
 4. 同一 round 同时有 forwarded/local calls 时，为什么先返回 forwarded 而不执行 local？
 5. presentation descriptor 与 receipt 分别证明什么，又分别不能证明什么？
+6. `ornn_search_skills` 对 `scope` 能证明哪些客户端行为，又不能证明哪些服务端语义？
 
 <details>
 <summary>论断—证据映射</summary>
@@ -201,5 +238,7 @@ flowchart TD
 | actor forwarded record 保存 schema hash；client boundary 丢弃 raw tool deltas，只从 completion forwarded calls 重建 call id/name/arguments | E1 | `src/platform/Aevatar.GAgentService.Application/Responses/LlmRunCore.cs:621`、`src/platform/Aevatar.GAgentService.Application/Responses/LlmSessionRunObservationAccumulator.cs:18`、`:42` |
 | presentation snapshot 与 completion receipt 分别进入 typed tool lifecycle | E1 | `src/Aevatar.AI.Core/Chat/ChatRuntime.cs:906`、`:938`、`src/Aevatar.Foundation.Abstractions/Tools/tool_presentation.proto:22` |
 | receipt 区分 success/approval/denial/error/authorization，并只为自定义或 receipt-worthy 调用生成 | E1 | `src/Aevatar.AI.Abstractions/ai_messages.proto:277`、`:302`、`src/Aevatar.AI.Core/Tools/AgentToolReceiptFactory.cs:8` |
+| Ornn discovery schema 不暴露 `scope`，执行端不读取夹带值，并固定发送 `scope=mixed`、`pageSize=100` | E1 | `src/Aevatar.AI.ToolProviders.Ornn/OrnnSearchSkillsTool.cs:39`、`:67`、`:77`；`test/Aevatar.AI.ToolProviders.Ornn.Tests/OrnnSearchSkillsToolTests.cs:11`、`:50`、`:145` |
+| Ornn client 的搜索接口保留 `scope` 参数，默认值为 `mixed`，并将归一化后的值写入请求 URL | E1 | `src/Aevatar.AI.ToolProviders.Ornn/OrnnSkillClient.cs:68`、`:77`、`:95` |
 
 </details>
