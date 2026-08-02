@@ -11,7 +11,7 @@ verified_at: 2026-07-25
 ## 设计抽象与事实源
 
 - `src/Aevatar.CQRS.Projection.Stores.Abstractions/Abstractions/ReadModels/ProjectionWriteResult.cs:3`、`:12`、`:16`：定义 applied、duplicate、stale、gap、conflict 的 store 写入结果协议。
-- `src/Aevatar.CQRS.Projection.Providers.Elasticsearch/Stores/ElasticsearchIndexLifecycleManager.cs:87`、`:151`、`:206`、`:524`：alias consistency、请求路径 fail-closed、启动期 reindex 与完整性检查的 current 实现。
+- `src/Aevatar.CQRS.Projection.Providers.Elasticsearch/Stores/ElasticsearchProjectionDescriptorMappingSupport.cs:17`、`:46`、`:88`、`:120`：protobuf descriptor 补齐 mapping、map 禁用索引、嵌套 object 递归与显式 mapping 优先级；`ElasticsearchIndexLifecycleManager.cs:87`、`:206`、`:524`：alias consistency、启动期 reindex 与完整性检查。
 - `docs/adr/0040-current-state-readmodel-dr-rebuild.md:9`、`:36`、`:56`：current-state 副本丢失场景、accepted re-publication 决策及其 audit consumer 限制。
 
 ## 所有权图：store 保存副本，不接管事实
@@ -28,7 +28,7 @@ flowchart LR
     X["Elasticsearch stable alias<br/>external durable read store"]
     P["physical index<br/>alias-v{mapping fingerprint}"]
     Q["typed query port<br/>read-model-only consumer"]
-    S["declared metadata + protobuf descriptor<br/>schema lifecycle input"]
+    S["declared metadata + protobuf descriptor<br/>map fields disabled、nested messages expanded"]
     A -->|"commit 后发布"| E --> M --> D --> V
     V --> I --> Q
     V --> X --> P --> Q
@@ -93,6 +93,25 @@ expected physical: aevatar-workflow-execution-v<8-hex-mapping-fingerprint>
 ```
 
 fingerprint 的 authority 是代码声明的 augmented mapping，不是运行中 Elasticsearch 返回的 live mapping。query/probe 不通过“读 mapping后猜兼容”来修复漂移，这让多个 pod 能从相同代码得到相同 expected physical。代价也要说清：当前 fingerprint 只覆盖 `Mappings`，不覆盖 `Settings` 或 `Aliases`；它不是所有 index metadata 的完整版本号。
+
+descriptor augmentation 不是把 protobuf 全量翻译成 Elasticsearch schema。当前规则只补齐安全且稳定的形状：时间戳标为 `date`，稳定标识字符串标为 `keyword`；任意 protobuf `map` 标为 `type: object, enabled: false`，避免动态 key 造成 mapping explosion；普通 message 只有在自身或后代含 map 时才递归展开为 `object`，使深层 map 也能在精确路径被禁用。repeated message 沿用 `object` 而不是 `nested`，因此它不承诺数组元素级的独立匹配语义。`Any`、`Struct` 等开放 message 与 repeated primitive 仍不由 descriptor 自动声明。
+
+```yaml
+  # descriptor-derived augmented mapping（示意）
+properties:
+  primary_entry:
+    type: object
+    properties:
+      entry_id: { type: keyword }
+      attributes: { type: object, enabled: false }
+      leaf:
+        type: object
+        properties:
+          leaf_id: { type: keyword }
+          annotations: { type: object, enabled: false }
+```
+
+声明式 metadata 始终优先：若 provider 已在同一路径声明 mapping，augmentation 保留该决定；对于已有 object，只补齐缺失的后代字段，显式 `enabled: true`、`enabled: false` 或非 object 类型都不会被暗中改写。这样 provider 可以有意识地开放某个 map 的索引能力，同时默认策略保持低风险。反过来，protobuf schema 新增 map 或含 map 的 message 会改变 augmented `Mappings`，继而改变 fingerprint；这不是普通 document 写入能吸收的变化，必须经过前述 startup schema reconcile，或在 operator-owned lifecycle 中显式迁移。
 
 ### 请求路径与启动路径不是同一种 reconcile
 
@@ -238,6 +257,7 @@ cases:
 | dispatcher只允许一个 enabled sink；mapped current-state helper不读取 write result | E1 | `src/Aevatar.CQRS.Projection.Runtime/Runtime/ProjectionStoreDispatcher.cs:20`、`:37`、`:43`、`:58`；`src/Aevatar.CQRS.Projection.Core/Orchestration/MappedCurrentStateProjectionMaterializer.cs:68`、`:72` |
 | ES writer用 evaluator决定业务顺序，以 seq_no/primary_term条件写并在 physical conflict后重评估 | E1 | `src/Aevatar.CQRS.Projection.Providers.Elasticsearch/Stores/ElasticsearchOptimisticWriter.cs:42`、`:56`、`:66`、`:74`、`:86`、`:94` |
 | fingerprint只对 canonicalized mappings取 SHA-256前 4 bytes，不读 live mapping修复 | E1 | `src/Aevatar.CQRS.Projection.Providers.Elasticsearch/Stores/ElasticsearchProjectionSchemaFingerprint.cs:7`、`:20`、`:23`、`:26` |
+| descriptor 将 map 默认声明为禁用索引的 object，并递归展开含 map 的 message；open message不自动展开，显式同路径 mapping优先 | E1 | `src/Aevatar.CQRS.Projection.Providers.Elasticsearch/Stores/ElasticsearchProjectionDescriptorMappingSupport.cs:17`、`:46`、`:88`、`:120`、`:142`、`:189`；`test/Aevatar.CQRS.Projection.Core.Tests/ElasticsearchProjectionDocumentStoreBehaviorTests.cs:246`、`:284`、`:352` |
 | read path在 auto-create模式检测 drift后于查询前失败；static reconcile与 dynamic/disabled边界明确 | E1 | `src/Aevatar.CQRS.Projection.Providers.Elasticsearch/Stores/ElasticsearchProjectionDocumentStore.cs:276`、`:287`、`:291`、`:297`、`:302` |
 | startup单旧 physical可 reindex后原子换 alias，multi-backing失败；reindex failure/timeout阻止 swap | E1 | `src/Aevatar.CQRS.Projection.Providers.Elasticsearch/Stores/ElasticsearchIndexLifecycleManager.cs:206`、`:214`、`:224`、`:231`、`:246`、`:524`、`:552`、`:559` |
 | Mainnet startup逐 target reconcile但单项失败只记录并继续 | E1 | `src/Aevatar.Mainnet.Host.Api/Hosting/ElasticsearchProjectionIndexReconcileHostedService.cs:30`、`:38`、`:45`、`:58` |
