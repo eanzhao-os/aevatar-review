@@ -11,7 +11,7 @@ verified_at: 2026-07-25
 ## 设计抽象与事实源
 
 - `agents/Aevatar.GAgents.Channel.Abstractions/protos/channel_contracts.proto:34`、`:47`、`:96`、`:108`、`:156`、`:172`：adapter capability、bot descriptor、bootstrap binding、external subject 与 outbound auth choice 的 channel-neutral contract。
-- `agents/Aevatar.GAgents.Channel.Runtime/Conversation/ConversationGAgent.cs:118`、`:126`、`:337`、`:351`、`:2611`、`:2646`：Conversation actor 的入站 authority、raw credential strip、runtime reference 挂接与恢复边界。
+- `agents/Aevatar.GAgents.Channel.Runtime/Conversation/ConversationGAgent.cs:118`、`:126`、`:337`、`:351`、`:2611`、`:2646`：Conversation actor 的入站 authority、raw credential strip、runtime reference 挂接与恢复边界；`agents/Aevatar.GAgents.NyxidChat/ChannelConversationTurnRunner.cs:2060-2074` 与 `ChannelContextMiddleware.cs:78-141`：mention 候选值的过滤、格式化与 prompt 注入边界。
 - `docs/adr/0012-channel-runtime-credential-boundary.md:31`、`:35`、`:43`、`:62`：Channel Runtime 不是 channel credential authority，支持面收敛到 Nyx-backed ingress/reply，并要求 registration 只保留非 secret facts/handles。
 
 ## 两个 durable owner，不是一个“channel service”大对象
@@ -156,6 +156,34 @@ flowchart TB
 
 冻结 sentinel tests 扫描每个 persisted event 的 bytes，确认 reply token 与 user token 不出现；另一个 activation test 证明 state 中 token 为空、refs 非空，重建 actor 后又能从 runtime secret store 恢复并 dispatch。这比“代码里看起来调用了 Clear”更强，因为它检查了实际序列化结果。
 
+### mention 是本 turn 的不可信寻址候选，不是新的 credential authority
+
+Lark 消息正文中的 `@_user_N` 只是展示占位符，不能作为 member id。当前 turn runner 只遍历入站 `ChatActivity.Mentions` 的现有枚举顺序，过滤 `CanonicalId` 为空的项，再格式化为 `name <canonical_id>`；这段边界既不解析正文占位符，也不校验枚举顺序是否与占位符顺序一致。它同样不验证 `CanonicalId` 是否真是 Lark `open_id`，也不验证 display name 与 id 的对应关系。`ChannelContextMiddleware` 仅在结果非空时把整段字符串原样注入 `<channel-context>`，没有在该边界做转义或身份校验。
+
+这次变化只为涉及 @某人的后续操作多提供了一组 turn-local 候选，并未把文本意图直接变成可信目标。固定证据也没有在此处证明 `sender_id` 已验证。因此，无论候选来自 `sender_id` 还是 `mentions`，消费者都必须结合受信 channel adapter / identity binding 校验平台、目标类型与真实 id，再由具体工具或服务的授权检查决定能否操作；绝不能把 `@_user_N` 或未经校验的 `CanonicalId` 直接提升为 permission grant 目标。当前固定基线的 system prompt 只说明如何消费这些字段及 placeholder safety，不构成身份验证、授权策略或 grant 执行能力的证据。
+
+为什么不让 LLM 从正文猜 placeholder 与 id？正文只有序号，没有可信 identity 映射，猜测会把无效或错误字符串送进 permission API。为什么也不能直接相信注入的 `mentions`？该字符串来自未在此边界验证或转义的 activity 字段，最多缩小候选范围，不能证明 placeholder 对应关系、身份真实性或授权。把 mention 变成长久 binding 还会混淆一次消息里的指向与持续委托；因此它只能作为 turn-local 输入，目标校验与授权成败必须留给受信 adapter、identity binding 和下游平台。
+
+```mermaid
+%%{init: {"maxTextSize": 100000, "flowchart": {"useMaxWidth": false, "nodeSpacing": 14, "rankSpacing": 48}, "themeVariables": {"fontSize": "10px"}}}%%
+flowchart LR
+    A["Inbound text\n@_user_1 and @_user_2 placeholders"]
+    M["ChatActivity.Mentions\ninput enumeration order"]
+    F["Filter empty CanonicalId\nformat raw name plus id"]
+    T["Turn metadata\nchannel.mentions"]
+    C["channel-context\nmentions only when non-empty"]
+    I{"requested target"}
+    S["sender_id\nrequester"]
+    P["untrusted sender or mention candidate"]
+    V["Trusted adapter or identity binding\nvalidate platform target type and id"]
+    Q["ask for a real id\nno guessing"]
+    G["Authorized downstream operation\nthrough a concrete tool or service"]
+    A -. "no mapping guarantee" .-> M --> F --> T --> C --> I
+    I -->|"self candidate"| S --> V
+    I -->|"mention candidate"| P --> V --> G
+    I -->|"unresolved person"| Q
+```
+
 ## Outbound native target：platform-neutral 不等于 credential-free
 
 ### durable address 与 runtime capability 是两层
@@ -225,7 +253,21 @@ same activation:
 
 after reactivation:
   valid unexpired reference -> resolve and retry dispatch
-  missing/expired reply-token reference -> missing_runtime_reply_token, NotRetryable
+missing/expired reply-token reference -> missing_runtime_reply_token, NotRetryable
+```
+
+第三方授权的静态判定：
+
+```text
+text: "@_user_1 给 @_user_2 加一下权限"
+mentions: Aevatar <ou_bot_1>; 张三 <ou_zhangsan>
+candidate: 张三 <ou_zhangsan>
+required: trusted adapter/binding validates member_type and member_id before grant
+
+forbidden:
+  member_id=@_user_2
+  treat CanonicalId or sender_id as already verified
+  treat mention presence as authorization success
 ```
 
 ## 边界与演进
@@ -237,6 +279,7 @@ after reactivation:
 | raw Nyx full key | 有 full key 且 Vault put成功时 mirror只存 typed ref；否则 reference为空并关闭 workflow result delivery | provisioning 已幂等、旧 key 已回收或 background delivery 可用 |
 | registration read model | 含 identity/status、repair state 与 typed ref | 可匿名公开或可解析 secret |
 | relay reply/user token | run command/runtime store 可持有，persisted bytes 清除 | actor 从未接触 secret |
+| mention candidate | 过滤空 `CanonicalId` 后按 `ChatActivity.Mentions` 输入枚举顺序格式化，非空时原样进入 turn-local `channel-context` | 顺序对应正文 placeholder、字段已经验证/转义、Lark canonical id 必为 `open_id`，或平台已经授权 |
 | runtime secret-store write失败 | same-turn raw command继续，recovery capability降级 | crash后仍必然可恢复 |
 | native delivery target | narrow runtime DTO 可含 raw key，Lark fields 只在 adapter派生类型；reader仍可读 deprecated legacy raw-key document | current writer可重新持久化 raw key，或 durable generic target可含Lark schema |
 | sender binding exists | broker可按 binding mint短命 capability | tool authorization与数据源访问必然成功 |
@@ -260,6 +303,7 @@ scheduled credential document 的 deprecated `nyx_api_key` 与 reader fallback�
 3. `ChannelNativeDeliveryTarget` 为什么可以在运行期含 raw key，却仍不违反 actor/read-model credential boundary？
 4. platform-neutral delivery address 如何避免 Lark receive-id 污染 generic contract？
 5. 为什么 Vault store 成功和 HTTP `accepted` 都不能证明 provisioning 幂等、read model visible或 sender authorization 已闭合？
+6. `@_user_N`、`mentions` 中的 canonical id 与 permission grant 分别证明什么，为什么不能互相替代？
 
 <details>
 <summary>论断—冻结证据映射</summary>
@@ -274,6 +318,8 @@ scheduled credential document 的 deprecated `nyx_api_key` 与 reader fallback�
 | local mirror前失败执行 best-effort remote/Vault compensation | `agents/channels/Aevatar.GAgents.Channel.NyxIdRelay/NyxLarkProvisioningService.cs:237-263` |
 | Conversation durable clone清除 raw user token，run/persist copies分离 | `agents/Aevatar.GAgents.Channel.Runtime/Conversation/ConversationGAgent.cs:337-363`、`:2611-2631` |
 | runtime refs 写入/恢复有 purpose、run、correlation、TTL fence | `agents/Aevatar.GAgents.Channel.Runtime/Conversation/ConversationGAgent.cs:2646-2751` |
+| mention 过滤空 canonical id、保留 activity 输入枚举顺序，并在非空时原样注入 channel context；这些代码不建立 placeholder 映射或身份验证保证 | `agents/Aevatar.GAgents.Channel.Runtime/ChannelMetadataKeys.cs:38-44`；`agents/Aevatar.GAgents.NyxidChat/ChannelConversationTurnRunner.cs:2060-2074`；`agents/Aevatar.GAgents.NyxidChat/ChannelContextMiddleware.cs:78-141` |
+| 当前 prompt 把 sender_id、identity_hints、mentions 描述为寻址输入并禁止把 placeholder 当 id；这是模型消费指令，不是字段已验证或具备 grant 执行能力的证据 | `agents/Aevatar.GAgents.NyxidChat/Skills/system-prompt.md:53-69` |
 | persisted events不含 reply/user sentinel，reactivation可用 refs恢复 | `test/Aevatar.GAgents.Channel.Protocol.Tests/ConversationGAgentDedupTests.cs:1290-1348`、`:1685-1755` |
 | generic native target含五个 channel-neutral字段，Lark address只由 platform adapter补齐 | `agents/Aevatar.GAgents.Channel.Abstractions/Composition/ChannelNativeDeliveryTarget.cs:1-15`；`agents/platforms/Aevatar.GAgents.Platform.Lark/LarkChannelNativeDeliveryTargetAdapter.cs:5-55` |
 | internal delivery reader从 routing document + credential projection + Vault构造 runtime target；current projector清空 raw key但reader仍有deprecated fallback | `agents/Aevatar.GAgents.Scheduled/IUserAgentDeliveryTargetReader.cs:6-45`；`agents/Aevatar.GAgents.Scheduled/UserAgentDeliveryTargetReader.cs:26-105`；`agents/Aevatar.GAgents.Scheduled/UserAgentCatalogNyxCredentialProjector.cs:29-43` |
