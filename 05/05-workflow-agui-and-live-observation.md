@@ -6,13 +6,13 @@ verified_at: 2026-07-25
 
 # Workflow AGUI 与 live observation：同源映射，不同持久性
 
-> 版本与结论：本章描述 `current`。Workflow 的 committed observation 同时供 current-state replica、durable artifact 与 session event projector消费；三者共享同一输入 provenance，不共享产物形状与生命周期。当前 session projector先产出 `WorkflowRunEventEnvelope`，chat SSE/WS直接传这种方言，scoped workflow入口可再映射成标准 `AGUIEvent`。live frame只属于当前 `RootActorId + commandId` 观察窗口，不是可续传历史，也不能替代断线后的 current-state/artifact查询。
+> 版本与结论：本章描述 `current`。Workflow 的 committed observation 同时供 current-state replica、durable artifact 与 session event projector消费；三者共享同一输入 provenance，不共享产物形状与生命周期。当前 session projector先产出 `WorkflowRunEventEnvelope`，chat SSE/WS直接传这种方言，scoped workflow入口可再映射成标准 `AGUIEvent`。新增 Workflow Run Observatory 只组合 scope-gated current-state 与 artifact query，不接管事实、发 command 或回放 live frame。
 
 ## 设计抽象与事实源
 
-- `src/workflow/Aevatar.Workflow.Projection/README.md:3`、`:24`、`:52`：冻结设计把 actor current-state、report/graph artifact与 AGUI session observation分成三条输出。
-- `src/workflow/Aevatar.Workflow.Presentation.AGUIAdapter/EventEnvelopeToWorkflowRunEventMapper.cs:31`、`:56`、`:67`：ordered handlers解开 committed payload，known event typed映射，unknown event降级为 `aevatar.raw.observed`。
-- `src/Aevatar.AGUI.Contracts/agui_events.proto:11`、`:15`、`:39`：标准 `AGUIEvent` oneof、sequence字段与 run completion枚举的 wire contract。
+- `src/workflow/Aevatar.Workflow.Application/Observatory/WorkflowRunObservatoryQueryService.cs:14`、`:30`、`:61`、`:96`、`:131`：`bd9975c8` 初版读服务只承载caller-scope ownership查询，并只组合current-state与artifact query ports。
+- `src/workflow/Aevatar.Workflow.Infrastructure/CapabilityApi/WorkflowRunObservatoryEndpoints.cs:23`、`:41`、`:46`、`:51`：`bd9975c8` 初版页面壳与三个caller-scope GET数据入口的认证边界。
+- `src/workflow/Aevatar.Workflow.Application/Observatory/WorkflowRunObservatoryTimelineMapper.cs:17`、`:44`、`:62`：committed timeline stage 到 AGUI-shaped view event、tool detail与usage展示模型的映射。
 
 ## 三种输出：事实同源，owner不同
 
@@ -48,9 +48,44 @@ flowchart LR
 | `WorkflowExecutionBoardDocument` | root workflow run的 committed observation，materializer拒绝非 root publisher | root actor的 `StateEvent.Version + LastEventId` | Mission Wall / workflow-board snapshot，经 `IWorkflowBoardExecutionQueryPort` |
 | `WorkflowRunEventEnvelope` | session projector对 committed observation的表示层映射 | `RootActorId + commandId` 路由；frame本身没有 durable cursor | 当前 interaction sink、chat SSE/WS、scoped AGUI adapter |
 
+Observatory不是第四种事实产物，而是前三种输出之上的授权读模型组合器。列表和summary来自带`ScopeId`、`StateVersion`的current-state；timeline与usage来自run report artifact；graph来自graph-export subgraph。由此页面可以轮询同一套committed读侧展示运行中与历史run，但eventual consistency仍然可见：report尚未物化时，detail保留summary并返回空timeline与零usage，而不是把“暂未投影”误报成“从未发生”。
+
 这张表也解释了 Mission Wall为什么读取 durable board artifact，而不是保存浏览器收到的 SSE。board materializer只接受 root publisher，按 committed version更新 document；query port还把 `StateVersion + LastEventId` 暴露成 revision。首次出现的新 run可由前端选择并聚焦，但刷新、换浏览器或断线后的视图仍来自 snapshot query，不依赖某条连接是否从开头在线。
 
 成员发布服务的 run history也是 durable view：`GET /api/scopes/{scopeId}/members/{memberId}/runs` 先解析成员绑定的 published service，再从 service-run projection列出记录；不传 `scheduleId` 时返回该成员的运行窗口，传入时由读侧做等值过滤。Mission Wall则每 5 秒读取 workflow-board snapshot；前端窗口尊重手工选择，否则按 route/preferred、仍在运行的选择、新增 run等候选决定焦点，新增 run可在无需刷新时自动显示拓扑。两种产品交互都只是在 committed read model上筛选、排序或选择，不消费、缓存或回放 session frame。
+
+## Workflow Run Observatory：授权查询，不是控制面
+
+```mermaid
+%%{init: {"maxTextSize": 100000, "flowchart": {"useMaxWidth": false, "nodeSpacing": 14, "rankSpacing": 42}, "themeVariables": {"fontSize": "10px"}}}%%
+flowchart LR
+    B["Browser<br/>live or history view"]
+    E["GET-only Observatory API<br/>bearer required"]
+    C["caller scope_id<br/>implicit target scope"]
+    O["Workflow observatory query service<br/>caller-scope contract only"]
+    S["Current-state query<br/>list + ownership + summary"]
+    R["Run report artifact<br/>timeline + usage"]
+    G["Graph export artifact<br/>nodes + edges"]
+    Y["run missing or scope mismatch<br/>404 without disclosure"]
+    V["AGUI-shaped view DTO<br/>not AGUI live wire event"]
+    B --> E --> C --> O
+    O --> S
+    S -->|"scope matches"| R --> V
+    S -->|"scope matches"| G --> V
+    S -->|"missing or scope mismatch"| Y
+    V --> B
+```
+
+本节按引入 Observatory 的固定提交 `bd9975c8` 描述初版边界。数据面只有三个 bearer 保护的 GET：`/runs`、`/runs/{runId}`、`/runs/{runId}/graph`。scope只来自caller bearer中的`scope_id`，接口不接受目标scope；列表在source query中带scope过滤，detail与graph先读取带scope stamp的current-state并核对ownership。未知run与scope不匹配都返回404，避免用响应差异披露跨scope run是否存在。
+
+该固定提交没有`/me`、`scope=<id>`、`scope=__all__`、`/admin/runs/*`或`/resolve-scope`，也没有平台管理员authorizer与跨scope query contract。这些属于后续演进，不能作为 `bd9975c8` 的current能力使用。初版因此是严格的单caller-scope读面，不提供管理员诊断通道。
+
+timeline mapper把committed report stage转换成`RunStarted`、`StepStarted`、`Message`、`ToolCall`、`RunError`、`HumanInputRequest`、`RunFinished`等view kind。这里的“AGUI-shaped”只描述浏览器DTO的语义形状：role reply是已提交的整块内容，不是token delta，也不具备`AGUIEvent.sequence`或session replay语义。usage从report aggregate读取，不从timeline拼算；tool arguments/result/error进入artifact前仅做最长2000字符的长度截断，短值原样保留，viewer也原样消费已物化字段。
+
+!!! warning "长度截断不是秘密清除"
+    `Redact`这个实现名称不能当作安全保证：它不识别key、Bearer、token、Vault引用或其他secret。敏感值若进入tool detail，即使长度未超限也可能出现在Observatory；producer必须在写入artifact前另行控制敏感数据，viewer不能把截断函数视为脱敏边界。
+
+为什么要让live与history共用这条读路径，而不是让页面直接查三个store？scope ownership属于current-state，timeline/usage与graph属于各自artifact；初版caller-scope路径统一先以current-state做ownership gate，再组合consumer-shaped输出，不会先把run-id-only artifact暴露给未授权caller。反过来，这个服务不能依赖actor dispatch，因为观测页面一旦能发command，“查看”就会变成隐式控制面。
 
 ## 从 committed payload 到 typed live frame
 
@@ -144,7 +179,7 @@ chat SSE writer把 Workflow frame序列化为 protobuf JSON并写成 `data: ...\
 
 1. 关闭当前live sink并release session scope；
 2. 不撤销已经accepted的 actor command，不停止durable materialization；
-3. 用 `/api/workflow-actors/{actorId}/current-state` 或 scope-filtered artifact/board query确认现状；
+3. 用 `/api/workflow-actors/{actorId}/current-state`、scope-filtered artifact/board query或 Observatory的ownership-checked detail确认现状；
 4. 不声称补回断线期间每个 token、reasoning chunk或tool frame。
 
 open issue `#2661` 提出的 run-event resume stream、`Last-Event-ID` / `afterEventId` contract在冻结代码中不存在。Step IO面板与从历史run创建draft debug会话（`#2105`、`#2106`、`#2654`）也不是 current AGUI能力；它们需要durable、可授权、可脱敏的artifact contract，不能靠缓存live frames补出来。Mission Wall已有durable board snapshot slice，但不证明更广泛的低交互展示板（`#2333`）或运行一段时间后拓扑消失（`#2639`）已经解决。
@@ -178,6 +213,14 @@ response_tail:
 reconnect:
   resume_from_frame: unsupported
   authoritative_read: GET /api/workflow-actors/workflow-run-42/current-state
+observatory_read:
+  list: GET /api/workflow/observatory/runs?status=completed&take=100
+  detail: GET /api/workflow/observatory/runs/workflow-run-42
+  graph: GET /api/workflow/observatory/runs/workflow-run-42/graph
+  scope_source: bearer scope_id claim
+  cross_scope_run_result: 404 after ownership mismatch
+  target_scope_parameter: unsupported
+  admin_cross_scope_surface: unavailable_at_bd9975c8
 ```
 
 静态预期：两个 LLM delta可由同一 observed payload映射并保持handler顺序；保留标准publisher identity时只有root terminal结束本次interaction，publisher缺失则当前实现仍会放行；final snapshot来自read model而不是重新读actor/EventStore。若连接在terminal前断开，客户端不能要求从第二个frame续传，只能查询committed视图，并接受token级细节可能不可恢复。
@@ -194,6 +237,8 @@ reconnect:
 
 **为什么断线后query，而不是自动replay？** hub没有durable cursor contract，session frame也未被定义为可重放日志；即使它的源observation已committed，hub仍不保留已映射frame。伪造resume会制造重复、漏帧与错误终态；current-state和artifact已经提供按committed version校验的恢复面，直到显式run-event log与授权协议落地前，这是唯一诚实语义。
 
+**为什么 Observatory 初版统一先做scope ownership gate？** report与graph查询以run id为键，本身不承担caller ownership。固定提交只支持caller自己的scope，因此先用带scope stamp的current-state判定归属，再允许读取artifact；否则run-id命中本身就会成为存在性侧信道。管理员跨scope读取在该提交尚不存在，不能从这个普通查询契约推导出来。
+
 ## 当前边界与演进
 
 - session id为空时 projector fail closed；冻结 adapter README的correlation fallback描述已过时，应在 `12/05-open-gaps-and-canon-drift.md` 登记并修正上游文档。
@@ -204,6 +249,7 @@ reconnect:
 - finalize `state_snapshot` 是response尾帧，不是新的durable snapshot owner；其`projection_completed`与`snapshot_available`必须分别解释。
 - SSE/WS断线不回滚actor commit；session release也不停止durable materialization。具体detach/release顺序见 [Projection lifecycle与lease](03-projection-lifecycle-and-leases.md)。
 - run-event resume、Step IO、historical draft debug与更广展示板仍是open gap；必须建在authorized durable artifact上，而不是扩张session hub职责。
+- Observatory的“live”是对eventually-consistent committed read model轮询，不是SSE token流；summary带`StateVersion`与更新时间，timeline/graph没有被提升为新的authoritative owner。
 - board artifact与report artifact不是actor current-state replica，即使它们实现同一个store envelope；其consumer边界见 [command、event、projection与read model](01-command-event-projection-readmodel.md)。
 
 ## 读完应能回答
@@ -213,6 +259,7 @@ reconnect:
 3. 文本delta、reasoning、terminal与unknown payload分别怎样映射，为什么child terminal不能结束root session？
 4. accepted context frame、live terminal与final state snapshot各证明到哪个阶段？
 5. 当前为何不能用`Last-Event-ID`续传，哪些产品需求必须先有durable artifact contract？
+6. Observatory初版如何用caller scope ownership gate保护三个只读接口，且为何它的AGUI-shaped timeline不等于AGUI live stream？
 
 <details>
 <summary>论断—证据映射</summary>
@@ -234,5 +281,10 @@ reconnect:
 | board artifact只接受root committed observation并用root version写入，Mission Wall query从document构造revision | E1 | `src/Aevatar.Studio.Projection/Projectors/WorkflowExecutionBoardMaterializer.cs:62`、`:71`、`:81`、`:135`；`src/Aevatar.Studio.Hosting/WorkflowBoards/WorkflowProjectionBoardExecutionQueryPort.cs:22`、`:48`、`:136` |
 | 成员发布运行目录读取service-run projection，`scheduleId`是可选等值过滤，不是session stream筛选 | E1 | `src/platform/Aevatar.GAgentService.Hosting/Endpoints/ScopeServiceEndpoints.cs:83`、`:85`、`:1218`、`:1254`、`:1268`；`src/platform/Aevatar.GAgentService.Projection/Queries/ServiceRunQueryReader.cs:23`、`:51`、`:88` |
 | Mission Wall从workflow-board snapshot构造视图；前端窗口保留手工选择，并让符合候选顺序的新增runtime run可自动获得焦点 | E1 | `apps/aevatar-console-web/src/pages/MissionWall/hooks/useMissionWallData.ts:218`、`:221`、`:334`；`apps/aevatar-console-web/src/pages/MissionWall/hooks/usePublishedRunWindow.ts:65`、`:75`、`:88`、`:100` |
+| `bd9975c8` Observatory数据面只有三个需认证的GET；scope隐式来自caller claim，不接受目标scope | E1 | `src/workflow/Aevatar.Workflow.Infrastructure/CapabilityApi/WorkflowRunObservatoryEndpoints.cs:39`、`:41`、`:46`、`:51`、`:72`、`:92`、`:105` |
+| 列表按caller scope从source过滤并复核；detail与graph统一先以current-state scope stamp做ownership gate，缺失或不匹配返回null | E1 | `src/workflow/Aevatar.Workflow.Application/Observatory/WorkflowRunObservatoryQueryService.cs:30`、`:41`、`:50`、`:61`、`:96`、`:131`、`:143`、`:147` |
+| tool detail所谓`Redact`仅截断超过2000字符的值，不识别或清除secret | E1 | `src/workflow/Aevatar.Workflow.Core/WorkflowArtifactFactBuilder.cs:194`、`:205`、`:215`、`:220` |
+| report未物化时detail保留summary并返回空timeline/usage；已物化timeline按时间排序，usage读取report aggregate | E1 | `src/workflow/Aevatar.Workflow.Application/Observatory/WorkflowRunObservatoryQueryService.cs:70`、`:73`、`:83`、`:88` |
+| Observatory把committed stage映射为AGUI-shaped view kind，tool detail读取已物化data，role reply不是token delta | E1 | `src/workflow/Aevatar.Workflow.Application/Observatory/WorkflowRunObservatoryTimelineMapper.cs:6`、`:17`、`:44`、`:62` |
 
 </details>
