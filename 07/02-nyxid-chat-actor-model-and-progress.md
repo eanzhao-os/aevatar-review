@@ -6,7 +6,7 @@ verified_at: 2026-07-25
 
 # NyxIdChat Actor 模型与已提交进度
 
-> 版本与结论：本章描述 `current`（Mainnet NyxID Assistant Chat v1，上游 HEAD `d9db826eb`）。权威运行时是 durable conversation controller actor（`NyxIdChatConversationGAgent`）加每 turn 一个 run-scoped turn actor（`NyxIdChatTurnGAgent`）：controller 拥有 turns/task/step/operation、control fence、continuation admission 与 action requests，turn actor 只执行被授权的一个 operation 并回报水线。`conversationId` 就是 controller 的 `actorId`，`turnId` 是一次被观察到的 run，`taskId/stepId/operationId/operationGeneration` 组成完整操作键。`NyxIdChatGAgent` 已降级为 `nyxid.chat.legacy` 兼容 actor；`/api/scopes/{scopeId}/nyxid-chat/**` 是 deprecated compatibility adapter。可对客户端承诺的进度来自 controller committed events 经 projection 转成 AG-UI，而不是 Host 旁路转发 provider callback。
+> 版本与结论：本章描述 `current`（Mainnet NyxID Assistant Chat v1；正文同步目标为上游 HEAD `d9db826eb`，frontmatter 审查基线仍为冻结 `f02aa690`）。权威运行时是 durable conversation controller actor（`NyxIdChatConversationGAgent`）加每 turn 一个 run-scoped turn actor（`NyxIdChatTurnGAgent`）：controller 拥有 turns/task/step/operation、control fence、continuation admission 与 action requests，turn actor 只执行被授权的一个 operation 并回报水线。`conversationId` 就是 controller 的 `actorId`，`turnId` 是一次被观察到的 run，`taskId/stepId/operationId/operationGeneration` 组成完整操作键。`NyxIdChatGAgent` 已降级为 `nyxid.chat.legacy` 兼容 actor；`/api/scopes/{scopeId}/nyxid-chat/**` 是 deprecated compatibility adapter。可对客户端承诺的进度来自 controller committed events 经 projection 转成 AG-UI，而不是 Host 旁路转发 provider callback。
 
 本章只讲 direct HTTP NyxIdChat（Mainnet `POST /api/chat` 与 `/api/chat/conversations/**`，以及复用同一 actor 权威的 scoped 兼容适配器）。Channel webhook 的延迟回复使用 `ConversationGAgent + AgentRunGAgent` 另一条链路；两者共享部分 AI 能力代码，不共享 actor、run 或重连语义。
 
@@ -176,11 +176,14 @@ Content-Type: application/json
 Idempotency-Key: client-request-42
 
 {
+  "type": "text",
   "conversationId": "nyx-chat-1",
   "prompt": "总结已连接仓库",
   "clientRequestId": "client-request-42"
 }
 ```
+
+`type` 是 Mainnet facade 的判别字段：带 `type`（`text`/`action.continue`/`approval.resolve`/`task.stop`/`task.steer`/`step.retry`/`step.skip`）的 JSON 路由到 NyxID Chat v1（`MainnetChatEndpoints.cs:22-32`、`:50-96`）；form 或无 `type` 的 JSON 走 Workflow Chat 分支。
 
 静态预期：
 
