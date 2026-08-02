@@ -11,7 +11,7 @@ verified_at: 2026-07-25
 ## 设计抽象与事实源
 
 - `docs/canon/observability.md:9-45`、`:253-356`：`Aevatar.Agents` / `Aevatar.GenAI` 信号面、sampling与infallible emission边界。
-- `src/Aevatar.Mainnet.Host.Api/Status/StatusEndpoints.cs:31-126`、`:153-248`：Status只读已投影probe targets，执行severity roll-up、history与availability计算。
+- `docs/canon/status-dashboard.md:103-143`、`:175-233`：Status的executor、鉴权模式、真实成功判定、凭证门控target与查询面边界。
 - `src/workflow/Aevatar.Workflow.Infrastructure/CapabilityApi/WorkflowRunObservatoryEndpoints.cs:15-137`、`:149-388`：GET-only查询面、own-scope默认路径、platform-admin跨scope支路与审计边界。
 
 ## 四个问题，四个不同答案
@@ -84,6 +84,65 @@ sequenceDiagram
 roll-up只统计enabled且known的target。critical target为`down`才把overall置为`down`；非critical down或任何degraded把overall置为`degraded`；unknown不把未配置canary强行染红。availability只在最近最多120个样本中的known outcome上计算，当前snapshot没有history时才用last outcome补一个样本。
 
 这个模型避免慢依赖拖住status request，也保留连续失败与历史。但“probe ok”只表示该探针在某个时间按某个检查通过，不证明一次业务交易完成；“unknown”也不是healthy。operator必须同时看`last_check_at`、probe kind、target severity与projection freshness。
+
+### 真实健康不是“认证墙还在”
+
+对需要身份的业务入口，`401 Unauthorized`只能证明匿名访问被拒绝，不能证明带合法身份的请求能够完成。因此默认manifest退役了把预期`401`判为`ok`的auth-gate targets；核心编排与Observatory改为携带scope service token并断言`200`，LLM catalog与completion canary则只在配置专用bearer时生成。这样`ok`才表示探针跨过认证并到达目标能力，而不只是认证中间件仍在线。
+
+```mermaid
+%%{init: {"maxTextSize": 100000, "flowchart": {"useMaxWidth": false, "nodeSpacing": 17, "rankSpacing": 42}, "themeVariables": {"fontSize": "10px"}}}%%
+flowchart TD
+    T["Credentialed target is present"]
+    M{"Authentication mode"}
+    S["Read dedicated static bearer"]
+    I["Resolve short-lived scope service token"]
+    C["Request OAuth client-credentials token"]
+    A{"Scope token resolution"}
+    B{"Static bearer resolved"}
+    E{"OAuth token acquired"}
+    R["Send authenticated probe"]
+    P{"Expected success status and body"}
+    O["ok: target capability answered"]
+    U["unknown: credential_unavailable\nscope_service_token only"]
+    F["down: oauth_token_failed"]
+    D["down or degraded\nby response policy"]
+    T --> M
+    M -->|"static_bearer"| S --> B
+    M -->|"scope_service_token"| I --> A
+    M -->|"client_credentials"| C --> E
+    A -->|"scope empty, provider missing, or empty token"| U
+    A -->|"token returned"| R --> P
+    A -->|"mint exception"| F
+    B -->|"no"| F
+    B -->|"yes"| R
+    E -->|"no"| F
+    E -->|"yes"| R
+    P -->|"yes"| O
+    P -->|"no"| D
+```
+
+`scope_service_token`由Host侧provider按`scope_id`签发短生命周期token并在临近过期前刷新，executor自动附加Bearer。只有scope为空、provider未注册或provider返回空token时，resolver才抛出专用的凭证不可用异常；executor不发送匿名请求，而是记录`unknown`与`credential_unavailable`。provider调用issuer时发生的签发异常不会被转换为该专用异常，当前会由executor的普通异常分支记录为`down: oauth_token_failed`。显式`static_bearer`缺少配置或token为空，以及`client_credentials`缺少配置、secret为空或取token失败，同样不会落入`unknown`。
+
+为什么区别处理？scope service token是Host为自探测临时签发的资格；scope为空、provider缺席或provider明确返回空token表示探针没有可用凭证，属于观测缺口。issuer已经参与但签发抛出异常，则是凭证链路执行失败，应暴露为探针失败。显式选择`static_bearer`或`client_credentials`也声明了一个必须工作的认证依赖，配置不完整或换取token失败同样应暴露。与此同时，内置可选targets先由manifest门控：没有`CanaryBearer`就不生成LLM canary，没有`ScopeId`就不生成编排与Observatory targets，因此“未启用可选能力”仍不会被误报为`down`。
+
+最小YAML只声明探针身份与低成本预算，不写入secret：
+
+```yaml
+Aevatar:
+  Authentication:
+    ScopeServiceTokens:
+      Enabled: true
+  Status:
+    Probe:
+      ScopeId: operations
+      CanaryModel: deepseek/deepseek-v4-flash
+      CanaryIntervalSeconds: 900
+      CanaryMaxTokens: 8
+```
+
+若要启用LLM canary，由部署环境通过.NET配置键`Aevatar__Status__Probe__CanaryBearer`注入真实凭证；YAML中的`${...}`不会在这一绑定链路中自动展开，写入这种占位字符串反而会生成LLM targets并把字面量当作bearer发送。scope探针要实际取得token，除上述`Enabled: true`外，部署侧还必须配置scope service token签名密钥。若provider缺失或返回空token，已生成的编排与Observatory targets得到`unknown: credential_unavailable`；若issuer在签发时抛出异常，当前executor将其记录为`down: oauth_token_failed`，而部署也可能更早被配置验证阻止启动。因此这个最小片段只说明探针选择，不构成可成功签发token的完整生产配置。
+
+`ScopeId`为空时不生成编排与Observatory targets；`CanaryBearer`为空时不生成付费LLM targets。选择“省略target”而不是持续显示`down`，是因为未启用的可选能力没有失败；对已生成target，只有明确的凭证不可用路径显示`unknown`，签发异常仍显示`down`，从而区分观测缺口与执行失败。生产bearer应是专用、低权限凭证，不能固定人工登录产生的短期access token。
 
 ## Observatory：授权之后才组合 Read Models
 
@@ -161,6 +220,7 @@ printf 'observation-boundaries: verified-static\n'
 
 - OTel tag多数仍是experimental；consumer不能把名称当永久schema，稳定项也必须走deprecation周期。
 - `/api/status` 与页面当前匿名可读，内容必须保持operational summary，不能把credential、raw upstream response或跨scope业务数据塞进detail。
+- 默认Status target必须断言真实成功；预期`401`的auth-gate只能检查认证边界，不能代表API健康。manifest应省略未配置凭证的可选target；已生成target中只有`scope_service_token`资格不可用呈现`unknown`，显式static/client认证失败则呈现`down`，两者都不能伪装成`ok`。
 - Observatory跨scope依赖 [10/05](05-authentication-scope-and-admin-authorization.md) 的platform-admin authorizer；`scope=__all__` 本身从不授予权限。
 - Issue #2611 已把backend console页面拆成checked-in embedded assets并由Host注入必要配置；页面组织落地不提升其中数据的证据等级。
 - 旧Observatory/read-side事故、索引漂移和repair教训统一迁入 [12/04](../12/04-incident-case-studies.md)，不能在本章把“有repair”写成“不会漂移”。
@@ -169,9 +229,10 @@ printf 'observation-boundaries: verified-static\n'
 
 1. OTel、Status、canonical read model与Observatory各自回答什么问题？
 2. 为什么Status endpoint不应在请求内同步探测所有依赖？
-3. 普通调用者查询别的scope run时为什么统一得到404，而不是暴露存在性？
-4. `scope=__all__` 与platform-admin grant是什么关系？
-5. 为什么观测面能辅助repair，却不能直接成为业务事实所有者？
+3. 为什么一个预期`401`的探针不能证明API健康，scope token不可用又为什么是`unknown`？
+4. 普通调用者查询别的scope run时为什么统一得到404，而不是暴露存在性？
+5. `scope=__all__` 与platform-admin grant是什么关系？
+6. 为什么观测面能辅助repair，却不能直接成为业务事实所有者？
 
 <details>
 <summary>论断—冻结证据映射</summary>
@@ -183,6 +244,9 @@ printf 'observation-boundaries: verified-static\n'
 | HealthProbe actor提交outcome、连续失败和bounded history | `agents/Aevatar.GAgents.StatusDashboard/HealthProbeTargetGAgent.cs:26-139`、`:348-426` |
 | projector只从committed state event生成HealthProbeTargetDocument | `agents/Aevatar.GAgents.StatusDashboard/HealthProbeTargetProjector.cs:11-77` |
 | Status只读query port，unknown不参与overall且critical down才整体down | `src/Aevatar.Mainnet.Host.Api/Status/StatusEndpoints.cs:31-126` |
+| scope service token按scope短期签发并缓存；scope为空、provider缺失或返回空token时不发送匿名探针 | `src/Aevatar.Mainnet.Host.Api/Status/ScopeServiceProbeTokenProvider.cs:7-46`；`agents/Aevatar.GAgents.StatusDashboard/Executors/StatusProbeAuthorizationResolver.cs:38-80` |
+| 默认编排与Observatory探针携带scope token断言200，LLM canary由专用bearer门控 | `agents/Aevatar.GAgents.StatusDashboard/Configuration/StatusDashboardManifest.cs:177-258` |
+| executor仅把scope service token的专用凭证不可用异常映射为unknown；其他认证异常为oauth_token_failed，真实HTTP响应再按成功状态与body assertion判定 | `agents/Aevatar.GAgents.StatusDashboard/Executors/StatusProbeAuthorizationResolver.cs:35-153`；`agents/Aevatar.GAgents.StatusDashboard/Executors/HttpStatusProbeExecutor.cs:65-168` |
 | Observatory数据端点GET-only且要求authorization，跨scope先走admin gate | `src/workflow/Aevatar.Workflow.Infrastructure/CapabilityApi/WorkflowRunObservatoryEndpoints.cs:15-137`、`:171-388` |
 | list filter在bounded take前下推，own-scope mismatch统一返回null | `src/workflow/Aevatar.Workflow.Application/Observatory/WorkflowRunObservatoryQueryService.cs:33-84`、`:109-137`、`:255-284` |
 | detail与graph只组合current-state/artifact query ports，无dispatch/runtime | `src/workflow/Aevatar.Workflow.Application/Observatory/WorkflowRunObservatoryQueryService.cs:9-31`、`:139-253` |
