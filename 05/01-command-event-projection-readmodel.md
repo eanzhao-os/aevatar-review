@@ -14,6 +14,8 @@ verified_at: 2026-07-25
 - `src/Aevatar.CQRS.Projection.Core/README.md:3`、`:48`：区分 durable materialization 与 session observation，并把 durable 输入限定为 committed observation。
 - `src/Aevatar.CQRS.Projection.Core.Abstractions/Abstractions/Orchestration/CommittedStateEventEnvelope.cs:7`、`:23`、`:48`：从包络中验证并解出 `state_event`、`state_root`、event id 与 authoritative state version。
 
+本章另以 `IProjectionScopeStatusListQueryPort`、`ProjectionScopeStatusListQueryPort` 与 Mainnet 的 `CqrsObservatoryApiEndpoints` 核对跨 scope 运维读视图；这些锚点列在文末证据映射中，不把 Host 路由细节当作 CQRS 主链骨架。
+
 ## 四种对象，只有一个写侧事实拥有者
 
 ```mermaid
@@ -115,6 +117,33 @@ sequenceDiagram
 
 因此以下“补救”都属于阻断性缺陷：query-time `IEventStore` replay、临时 rebuild actor state、ensure/activate projection、创建 observation session、repair/reindex store，以及从旧 read model 反推并提交业务状态。恢复或 DR rebuild 是显式运维写流程，不是普通 query 的 fallback。
 
+## Projection 状态也是 read model，不是控制面
+
+```mermaid
+%%{init: {"maxTextSize": 100000, "flowchart": {"useMaxWidth": false, "nodeSpacing": 12, "rankSpacing": 48}, "themeVariables": {"fontSize": "10px"}}}%%
+flowchart LR
+    M["Durable materialization scopes"]
+    S["ProjectionScopeStatusDocument<br/>active + observed + successful + failures"]
+    P["IProjectionScopeStatusListQueryPort<br/>bounded read-only list"]
+    G["Bearer + caller scope guard"]
+    A["NyxID platform-admin authorization"]
+    O["GET /api/cqrs/scopes<br/>CQRS Observatory"]
+    M -->|"materialize status"| S
+    S -->|"QueryAsync、newest first、take <= 200"| P
+    G --> A
+    A -->|"allowed"| O
+    P --> O
+    A -.->|"denied before query"| X["401 / 403"]
+```
+
+`ProjectionScopeStatusDocument` 把每个 projection scope 的 `Active`、最后观察版本、最后成功版本、失败次数与更新时间物化为运维读副本。新增 list port 只通过 document reader 查询这批副本，按更新时间倒序并以 document id 稳定消歧；`Take` 被限制在 1 到 200，结果超过窗口时只记录截断告警。`Lag = max(LastObservedVersion - LastSuccessfulVersion, 0)` 是读侧派生的积压信号，不是 actor 业务状态，也不是全局提交水位。
+
+为什么不让 Observatory 逐个访问 actor 或 replay event store？运维列表天然需要跨 scope 扫描、排序与比较。若逐 actor ask，会把页面刷新放大成 actor activation 和 mailbox 压力；若 replay，则一次 GET 会变成隐式恢复操作。物化状态文档让控制台的成本有界，也保持“查询缺失只表示读侧不可见”的语义。
+
+这个列表还是 platform-wide 视图：scope key 表示 projection scope / actor，而不是调用者自己的 tenant scope。Mainnet 因而先验证 authenticated caller scope 与 bearer，再由 NyxID-backed platform-admin authorizer 提权；未提权请求在调用 list port 之前返回 `401` 或 `403`。页面 shell 可以匿名提供，但数据 endpoint 仍是 `GET` + authorization，且没有 start、stop、repair 或 edit 控件。
+
+为什么采用管理员门控，而不是按 caller scope 自动过滤？当前 status schema 没有可证明的 caller-tenant ownership 映射；把字符串 scope key 猜成租户边界会造成越权或漏报。显式 platform-admin 边界承认这是跨 scope 运维数据，同时保留结构化审计；若未来要开放租户视图，应先引入权威 ownership 字段与查询过滤协议，而不是在 UI 中做字符串裁剪。
+
 ## Durable materialization 不等于所有实时观察
 
 Projection Core 明确保留两条主链：durable materialization 与 session observation。本章只定义前者的 CQRS 读副本。后者可以把已观察到的事件映射为一次 session 的 SSE/AGUI 输出，但 session stream 不拥有业务事实，也不保证长期保存。
@@ -158,6 +187,24 @@ Projection Core 明确保留两条主链：durable materialization 与 session o
 
 这个样例故意只含一个 origin actor。静态预期只有两条：receipt 出现时，后面三个对象可以都还不存在；两个读模型出现时，它们的业务字段必须来自 `WorkflowRunState` 或 committed event payload，version/event id 来自同一个 `StateEvent`。即使 read model 暂缺，query port 也只返回 missing/empty，或由 enablement gate 表达 disabled，不会在请求内补跑 projection。
 
+Projection Observatory 的最小静态响应同样只表达读侧观察，不承诺修复动作：
+
+```json
+{
+  "scopes": [
+    {
+      "id": "workflow:execution:org-123",
+      "active": true,
+      "observed": 18,
+      "successful": 17,
+      "failures": 1
+    }
+  ]
+}
+```
+
+这里的版本差 `1` 可用于提示 lag，但不能证明 event store 丢失、actor 失败或何时追平；诊断需要结合投影日志与显式运维流程，普通 GET 不会因此启动或重建 scope。
+
 ## 为什么是它，不是别的
 
 **为什么由 actor 拥有写侧事实，而不是 projection？** actor mailbox 给同一 identity 串行决策边界，commit 给出可恢复的 versioned fact。projection 面向多个消费者且允许重放；若它能发明业务状态，重放顺序或 provider 差异就会产生多个事实源。
@@ -176,6 +223,7 @@ Projection Core 明确保留两条主链：durable materialization 与 session o
 - actor-scoped `StateVersion` 说明已物化到该 actor 的哪个 commit，不保证两个不同 read model 在同一瞬间版本相等；聚合 artifact 更不能把不同 actor 的 local version 当成全局序号。需要跨视图或跨 actor 一致性的用例必须显式定义 per-origin 水位与缺口策略，不能由 query 暗中 replay。
 - session observation 是短期交互输出，不是 durable truth；其事件丢失、重连和 terminal mapping 不改变本章的 committed-only durable 边界。
 - split / merge / re-key 的 bootstrap 只能从 committed durable feed 进入显式迁移流程；新 owner 仍要提交自己的事实。普通查询不能借 bootstrap 名义激活或改写 actor。
+- projection-scope status list 是最多 200 条的运维窗口，不是完整 inventory API；排序与截断都不能被解释为全平台 scope 的完备快照。
 
 ## 读完应能回答
 
@@ -184,6 +232,7 @@ Projection Core 明确保留两条主链：durable materialization 与 session o
 3. 一个 `WorkflowRunGAgent` 的 committed state 为什么可以生成 current-state 与 report 两种视图，却仍只有一个事实源？
 4. read model missing 或落后时，query port 为什么不能 replay event store 或 activate projection？
 5. durable materialization 与 session observation 的输入约束和事实权威有何不同？
+6. Projection Observatory 为什么读取 status read model，并要求 platform-admin，而不能逐 actor 查询或按 caller scope 猜测过滤？
 
 <details>
 <summary>论断—证据映射</summary>
@@ -200,5 +249,7 @@ Projection Core 明确保留两条主链：durable materialization 与 session o
 | current-state query port 只读 document reader，artifact query port 只读 document/graph stores | E1 | `src/workflow/Aevatar.Workflow.Projection/Orchestration/WorkflowExecutionCurrentStateQueryPort.cs:34`、`:58`、`:84`；`src/workflow/Aevatar.Workflow.Projection/Orchestration/WorkflowExecutionArtifactQueryPort.cs:32`、`:43`、`:63` |
 | durable 与 session 是两条链，durable 只消费 committed observation，host 不持有长期 runtime registry | E1 | `src/Aevatar.CQRS.Projection.Core/README.md:3`、`:48` |
 | canon 明令禁止 query-time replay、temporary rebuild、projection priming 与 readmodel 反向定义业务事实 | E2 | `docs/canon/cqrs-projection.md:118`、`:131` |
+| projection status list 只查物化文档，限制 `Take <= 200`，按更新时间与 id 稳定排序，并从 observed/successful 计算非负 lag | E1 | `src/Aevatar.CQRS.Projection.Core.Abstractions/Abstractions/Ports/IProjectionScopeStatusListQueryPort.cs:7`、`:16`、`:22`；`src/Aevatar.CQRS.Projection.Core/Orchestration/ProjectionScopeStatusListQueryPort.cs:15`、`:36`、`:40`、`:73` |
+| Mainnet status endpoint 是 platform-wide 管理员读面；未授权请求在查询前失败，成功响应只暴露 status read model 字段 | E1 | `src/Aevatar.Mainnet.Host.Api/Cqrs/CqrsObservatoryApiEndpoints.cs:12`、`:33`、`:49`、`:62`、`:73` |
 
 </details>
