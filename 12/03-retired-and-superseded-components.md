@@ -147,9 +147,18 @@ sequenceDiagram
 ## 最小 demo：核对零命中、现役替代与残留
 
 ```bash
+AEVATAR_SRC=${AEVATAR_SRC:-"$HOME/Code/aevatar"}
 AEVATAR_FROZEN=$(bash scripts/materialize-frozen-upstream.sh \
-  --repo /Users/eanzhao/Code/aevatar \
+  --repo "$AEVATAR_SRC" \
   --sha f02aa690bbebb9cabeac30a553d737486b0eb661)
+
+: "拼接 pattern，避免门禁把自身当成个人 owner 路径。"
+personal_home_prefix='/Users/'
+if rg -n "${personal_home_prefix}[^/[:space:]]+/" \
+  12/03-retired-and-superseded-components.md
+then
+  exit 1
+fi
 
 for removed in \
   src/Aevatar.Interop.A2A.Abstractions \
