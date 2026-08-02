@@ -99,6 +99,13 @@
 - 现有 aevatar 文档(`docs/canon/*`、`docs/adr/*`)内容可引用、可转述并加导读,但不得
   整篇复制(版权与可维护性)。
 
+## Agent 协作约束
+
+- 所有 agent 必须直接在 `main` 分支工作;不得创建或切换其他分支。
+- 禁止创建或使用 Git worktree。
+- 允许多个 agent 并行工作,但同一文档同时只能由一个 agent 修改;并行派发前必须按文档
+  划分互不重叠的 `scope_paths`。
+
 ## consensus-loop 工作单元边界
 
 - 每个 chapter issue 是一个独立工作单元,产物为单个 Markdown 文件(或一组同目录文件)。
