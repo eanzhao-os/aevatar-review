@@ -6,7 +6,7 @@ verified_at: 2026-07-25
 
 # 快速上手:本地启动 Host 并完成第一次请求
 
-> 版本与结论:本章描述 `current`;当前行为以 `f02aa690` 为准。核心结论:框架学习面的本地入口是 `Aevatar.Workflow.Host.Api` 的 `POST /api/chat`(SSE);Mainnet Host 是 `aevatar app` 的产品后端,其正式契约是 scope-first,`POST /api/chat` 由 `MainnetChatEndpoints` facade 提供——workflow 类请求仍转发给 Workflow capability 实现,带 assistant `type` 的请求转发给 NyxID Chat v1,契约地位已退役。
+> 版本与结论:本章描述 `current`（正文同步目标为上游 HEAD `d9db826eb`，frontmatter 审查基线仍为冻结 `f02aa690`）。核心结论:框架学习面的本地入口是 `Aevatar.Workflow.Host.Api` 的 `POST /api/chat`(SSE);Mainnet Host 是 `aevatar app` 的产品后端,其正式契约是 scope-first,`POST /api/chat` 由 `MainnetChatEndpoints` facade 提供——workflow 类请求仍转发给 Workflow capability 实现,带 assistant `type` 的请求转发给 NyxID Chat v1,契约地位已退役。
 
 ## 设计抽象与事实源
 
