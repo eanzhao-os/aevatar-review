@@ -50,7 +50,7 @@
 
 - `SKILL.md`：规定触发条件、主流程、证据要求、新章节扩展、独立复核、失败边界和完成条件。
 - `agents/openai.yaml`：提供仓库内 skill 的展示名、简述和默认调用提示。
-- `prepare-update.py`：执行安全 fetch、固定目标 SHA、生成冻结快照、输出增量事实包、列出架构候选、选择旧正文复核样本，并在成功后更新状态。
+- `prepare-update.py`：执行安全 fetch、固定目标 SHA、生成冻结快照、输出增量事实包、在本轮修改范围确定后选择旧正文复核样本，并在成功后更新状态。
 - `.config/aevatar-doc-update/state.json`：仓库级、可提交的跨 turn 权威记录。skill 私有目录不保存文档基线或覆盖台账。
 
 复用现有组件：
@@ -59,6 +59,8 @@
 - `.config/upstream-sync/chapter-source-map.json` 提供章节到源码路径的导航映射；
 - `scripts/check-md.sh`、`scripts/check-links.py`、`scripts/check-drift.sh`、`scripts/check-mermaid.py` 和 `mkdocs build --strict` 承担现有质量门禁；
 - `scripts/upstream-sync.sh` 继续服务定时 issue watch loop，其未提交的运行状态不作为“文档已经同步”的证据。
+
+活跃书目以 `PLAN.md` 为准。`docs/migration/2026-07-25-target-chapters.md` 保持为 2026-07-25 重构的冻结迁移证据；未来自动扩章不得改写它，也不得继续让验证器把它当作当前章节清单。
 
 ## 4. 上游同步与事实快照
 
@@ -113,9 +115,9 @@
 1. 确认当前目录和仓库身份，读取 `AGENTS.md`、`PLAN.md`、`mkdocs.yml`、章节映射、状态及当前工作树 diff。
 2. 运行辅助脚本的 prepare 阶段，固定目标 SHA、生成冻结快照和事实包。
 3. 逐项检查全部 commit、changed files、映射结果、未覆盖路径和架构候选。
-4. 对已有能力，修改最少数量的现有章节，并同步事实源入口、设计图、示例、状态标记和相关索引。
+4. 目标 SHA 变化时，先把所有普通章节 frontmatter 和公共版本入口机械迁移到同一基线；逐项判断正文中的旧 SHA、旧计数和旧结论是否仍是历史证据。block index 没有 SHA/date frontmatter 契约，但其中的事实与计数仍须同步。对真正受证据影响的能力，修改最少数量的现有章节，并同步事实源入口、设计图、示例、状态标记和相关索引。
 5. 对新职责边界或独立读者问题，按第 7 节扩展新章节。
-6. 调度一个全新上下文、只读的独立 reviewer，审查本轮全部变更章节和抽中的 6 篇旧正文。
+6. 以本轮最终语义修订章节为排除集重选旧正文样本，再调度一个全新上下文、只读的独立 reviewer，审查全部语义修订章节和抽中的 6 篇旧正文。只改公共 SHA/date frontmatter 的机械迁移由全量门禁验证，不把 72 篇全部伪装成语义修订。
 7. 修复 findings；存在 blocking finding 时，由同一 reviewer 复核修订。
 8. 执行全量文档门禁。
 9. 全部通过后调用辅助脚本的 commit-state 阶段，原子推进文档基线和覆盖台账。
@@ -144,16 +146,17 @@ Issue 创建是一次有外部副作用的操作。调用失败或返回不明�
 
 Reviewer 范围包括：
 
-- 本轮全部新增或修改的章节；
+- 本轮全部新增或发生正文、图、事实源、示例或状态结论变化的语义修订章节；
 - 由脚本选出的 6 篇旧正文。
 
 Reviewer 按章节返回 `blocking` 和 `non-blocking` findings。事实错误、遗漏关键架构边界、把目标态写成当前实现、无证据论断、损坏的图或导航属于 blocking。存在 blocking finding 时不能推进状态。
+辅助脚本在语义修订范围确定后写入 `semantic_changed_chapters` 和最终 `review_sample`；它同时对比旧状态与新 `PLAN.md`，要求每个新增章节都记录唯一且与 PLAN 行一致的 GitHub issue URL。状态提交要求 reviewer 已覆盖二者的并集，并且新增章节 issue 记录完整。
 
 ### 8.1 抽样算法
 
 旧正文选择顺序为：
 
-1. 排除本轮已经新增或修改的章节；
+1. 排除本轮语义修订章节；
 2. 按 `review_count` 升序，优先覆盖审查次数最低的章节；
 3. 同计数按 `last_reviewed_at` 升序，未审查视为最早；
 4. 仍相同时，以目标 SHA 为种子做稳定打散；
@@ -169,6 +172,7 @@ Reviewer 按章节返回 `blocking` 和 `non-blocking` findings。事实错误�
 {
   "schema_version": 1,
   "documented_upstream_sha": "f02aa690bbebb9cabeac30a553d737486b0eb661",
+  "documented_verified_at": "2026-07-25",
   "last_successful_update_at": "2026-08-02T00:00:00Z",
   "chapters": {
     "02/01-agent-actor-runtime.md": {
@@ -181,7 +185,7 @@ Reviewer 按章节返回 `blocking` 和 `non-blocking` findings。事实错误�
 }
 ```
 
-初次启用时，以当前文档明确声明的冻结上游 SHA 初始化 `documented_upstream_sha`；若无法唯一解析，停止并报告，不能直接把最新远端 SHA 当作“已经记录”。所有现有普通章节以 `review_count: 0` 初始化。
+初次启用时，以当前文档明确声明的冻结上游 SHA 和核验日期初始化 `documented_upstream_sha` 与 `documented_verified_at`；若无法唯一解析，停止并报告，不能直接把最新远端 SHA 当作“已经记录”。所有现有普通章节以 `review_count: 0` 初始化。`last_successful_update_at` 记录最近一次完整更新或抽样复核完成的时间，不能冒充正文绑定的核验日期。
 
 Prepare 阶段不改状态。只有以下条件全部满足后才原子替换状态文件：
 
@@ -191,6 +195,7 @@ Prepare 阶段不改状态。只有以下条件全部满足后才原子替换状
 - 新章节 issue 均有可核验编号。
 
 任一阶段失败都保留旧状态，使下一次调用能够从同一基线完整重试。
+目标 SHA 没有变化时，成功的抽样复核只更新运行时间和章节覆盖记录，保留 `documented_verified_at`，避免把未重新判定的正文统一标成新的核验日期。
 
 ## 10. 工作树与权限边界
 
