@@ -10,8 +10,8 @@ verified_at: 2026-07-25
 
 ## 设计抽象与事实源
 
-- `tools/ci/architecture_guards.sh:39-68`、`:932-961`、`:2140-2176`：full/range扫描入口、子guard编排与最终阻断式汇总。
-- `tools/ci/README.md:1-59`：quality guards、build/test、provider/runtime smoke与CI job之间的责任映射。
+- `tools/ci/architecture_guards.sh:39-68`、`:932-962`、`:2140-2176`：full/range扫描入口、子guard编排与最终阻断式汇总。
+- `tools/ci/workflow_observatory_readonly_guard.sh:1-115`：Observatory 的GET-only、query-port-only与zero-build embedded asset边界。
 - `tools/ci/audit_trail_guards.sh:1-76`：raw payload/tool result、伪redaction、弱HMAC默认值与sanitizer入口的窄安全门。
 
 ## Guard 的位置：Policy 到 Evidence 之间
@@ -55,6 +55,37 @@ flowchart LR
 runtime callback、run ID、closed-world primitive、binding、caller context、Saga compensation和script runtime snapshot等guard，保护generation/lease/idempotency、typed capability ref与可重放恢复。它们拒绝process-local registry冒充跨turn事实、callback直接承担业务状态、或workflow core渗入channel-specific payload。
 
 这组的价值不是证明所有并发交错正确，而是让已知事故根因对应的坏token/坏调用图无法悄悄回来。真正的race、crash recovery与distributed behavior仍需定向测试和smoke。
+
+#### Observatory：只读不是 UI 文案，而是三道边界
+
+Workflow Run Observatory 的专用guard同时约束三种容易被“顺手加功能”侵蚀的边界：endpoint只能注册`GET`，application service只能依赖current-state/artifact query ports，页面必须是项目内声明的zero-build embedded HTML asset。前两项共同阻止viewer演变成隐蔽的run/stop控制面；第三项要求`workflow-observatory.html`存在并注册为`EmbeddedResource`，同时拒绝旧的C# raw-string carrier、`wwwroot`和frontend build step。它固定的是页面交付边界，不等同于授权保证。
+
+```mermaid
+%%{init: {"maxTextSize": 100000, "flowchart": {"useMaxWidth": false, "nodeSpacing": 16, "rankSpacing": 44}, "themeVariables": {"fontSize": "10px"}}}%%
+flowchart LR
+    C["Authenticated caller\nown scope claim"]
+    E["GET-only Observatory endpoints"]
+    A{"Request path?"}
+    O["Own-scope query\nclaim supplies scope"]
+    Z["Admin authorization\nbefore cross-scope query"]
+    S["Explicit scope or __all__\nscoped or all-runs query"]
+    R["Admin run path\nresolve owner by runId"]
+    G["Scope-specific ownership gate\nsnapshot scope must match"]
+    N["Missing or mismatch\nuniform 404"]
+    Q["Current-state and artifact\nquery ports only"]
+    C --> E --> A
+    A -->|"own scope"| O --> G
+    A -->|"scope or __all__"| Z --> S
+    A -->|"admin runId"| Z --> R
+    G -->|"match"| Q
+    G -->|"missing or mismatch"| N
+    S --> Q
+    R --> Q
+```
+
+当前授权模型有两条明确路径。普通调用者不传cross-scope intent时走own-scope快路径，由自己的scope claim确定查询范围；按`runId`读取仍先校验带scope的current-state snapshot，缺失或scope不匹配统一返回`404`。管理员则可在通用读端点传`scope=<id>`或`scope=__all__`，但必须先通过平台管理员授权，随后才执行指定scope或all-scopes查询；另有`/admin/runs/{runId}`、对应graph端点，可在只知道run ID时从read model解析所属scope，`/resolve-scope`用于管理员按email寻找候选scope。
+
+为什么保留own-scope快路径而不是所有请求都走管理员解析？普通读取无需外部管理员判定，权限面和依赖都更窄；为什么管理员能力仍留在GET/query ports？跨scope扩大的是可见范围，不应顺带获得run/stop等写能力。静态guard只能守住HTTP verb、依赖形状和页面交付形态，claim解析、管理员fail-closed、ownership比较与`404`语义仍由实现和测试承担。
 
 ### 4. Channel、Tool 与 Profile 治理
 
@@ -160,13 +191,16 @@ rg -Fq 'bash "${SCRIPT_DIR}/query_projection_priming_guard.sh"' \
   "$AEVATAR_SRC/tools/ci/architecture_guards.sh"
 rg -Fq 'bash tools/ci/audit_trail_guards.sh' \
   "$AEVATAR_SRC/tools/ci/architecture_guards.sh"
+rg -Fq 'bash "${SCRIPT_DIR}/workflow_observatory_readonly_guard.sh"' \
+  "$AEVATAR_SRC/tools/ci/architecture_guards.sh"
+bash "$AEVATAR_SRC/tools/ci/workflow_observatory_readonly_guard.sh"
 rg -Fq 'run: bash tools/ci/architecture_guards.sh' \
   "$AEVATAR_SRC/.github/workflows/ci.yml"
 
 printf 'top-level-guards=%s verified-static\n' "${#guards[@]}"
 ```
 
-> Demo status：`verified-static`（本轮在冻结SHA执行了精确glob与聚合/CI接线断言，得到56个顶层guard；未运行上游全套guard/build/test/smoke，因此不把inventory核对写成release pass）。
+> Demo status：`verified-static`（既有冻结基线曾执行精确glob与聚合/CI接线断言，得到56个顶层guard；本次仅依据controller冻结证据复核Observatory接线，未执行新增guard或上游全套guard/build/test/smoke，因此不把inventory核对写成release pass）。
 
 ## 边界与演进
 
@@ -184,15 +218,20 @@ printf 'top-level-guards=%s verified-static\n' "${#guards[@]}"
 1. 为什么架构原则需要guard，而编译与review仍不可省？
 2. 56个顶层guard可按哪六组不变量理解？
 3. blocking guard、advisory PR size与integration smoke的证据强度有何不同？
-4. 为什么guard通过不能证明#375/#2580已经解决？
-5. 一个新的跨层事故应怎样沉淀成可执行、可自测的治理规则？
+4. Observatory的own-scope、管理员显式scope/all-scopes与admin run三条读路径如何分权？
+5. 为什么guard通过不能证明#375/#2580已经解决？
+6. 一个新的跨层事故应怎样沉淀成可执行、可自测的治理规则？
 
 <details>
 <summary>论断—冻结证据映射</summary>
 
 | 论断 | 冻结证据 |
 |---|---|
-| architecture聚合器支持range/worktree模式并调用domain subguards | `tools/ci/architecture_guards.sh:39-68`、`:932-961`、`:2140-2176` |
+| architecture聚合器支持range/worktree模式并调用domain subguards | `tools/ci/architecture_guards.sh:39-68`、`:932-962`、`:2140-2176` |
+| Observatory guard拒绝写HTTP verb、write-side/runtime依赖、旧C#页面carrier、wwwroot与frontend build，并要求将HTML asset注册为EmbeddedResource | `tools/ci/workflow_observatory_readonly_guard.sh:50-115`；聚合接线见`tools/ci/architecture_guards.sh:960` |
+| Observatory区分own-scope、管理员显式scope/all-scopes与admin run路径，并提供resolve-scope | `src/workflow/Aevatar.Workflow.Infrastructure/CapabilityApi/WorkflowRunObservatoryEndpoints.cs:61-137`、`:171-326` |
+| scope-specific读取按snapshot ownership过滤且缺失/不匹配统一404，admin run则从read model解析所属scope | `src/workflow/Aevatar.Workflow.Application/Observatory/WorkflowRunObservatoryQueryService.cs:87-107`、`:127-137`、`:205-215`、`:255-285`；`src/workflow/Aevatar.Workflow.Infrastructure/CapabilityApi/WorkflowRunObservatoryEndpoints.cs:216-300` |
+| Observatory endpoint按资源后缀查找embedded HTML并在响应前注入配置；该证据不单独证明csproj已完成资源注册 | `src/workflow/Aevatar.Workflow.Infrastructure/CapabilityApi/WorkflowRunObservatoryEndpoints.cs:33-38`、`:140-147` |
 | CI fast-gates阻断architecture/test stability，PR size标为advisory | `.github/workflows/ci.yml:196-234` |
 | build/coverage、slow tests和provider/runtime smoke分属后续job | `tools/ci/README.md:23-59`；`.github/workflows/ci.yml:272-399` |
 | audit guard拒绝raw payload/tool write、截断伪脱敏与弱HMAC默认值 | `tools/ci/audit_trail_guards.sh:35-76` |
