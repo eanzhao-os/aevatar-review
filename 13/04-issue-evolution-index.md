@@ -359,7 +359,7 @@ Snapshot state 只回答 cutoff 时 GitHub 如何标记该成员；classificatio
 
 </details>
 
-`#2954–#2957` 保持 `open / missing-contract / NyxIdChat / profile`，destinations 只在演进层；SSE disconnect、committed progress、普通消息与 UI plan 都不能替它们提供 stop、reconnect-state、steering 或 actor-owned task lifecycle。`#435/#2418/#2737` 保持 open membership，同时 evidence status 标为 partial E1 / drift candidate；这不等于本索引代替 owner 宣布关单。
+`#2954–#2957` 保持 `open / missing-contract / NyxIdChat / profile`，destinations 只在演进层；SSE disconnect、committed progress、普通消息与 UI plan 都不能替它们提供 stop、reconnect-state、steering 或 actor-owned task lifecycle。（冻结账本口径；正文同步目标上游 HEAD `d9db826eb` 上这些能力已在 `NyxIdChatEndpoints.Controls.cs`/`NyxIdChatTaskLifecycle.cs`/`NyxIdChatTaskTransitionPolicy.cs`/`protos/nyxid_chat_task.proto` 落地，见 [07/02](../07/02-nyxid-chat-actor-model-and-progress.md) 边界与演进——两者以 HEAD 为准。）`#435/#2418/#2737` 保持 open membership，同时 evidence status 标为 partial E1 / drift candidate；这不等于本索引代替 owner 宣布关单。
 
 ## 沿一次 issue 查证走读
 

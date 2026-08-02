@@ -207,7 +207,7 @@ PY
 | Actor committed fact → projection → read model | `docs/canon/cqrs-projection.md:55-96`；[05/01](../05/01-command-event-projection-readmodel.md) |
 | profile snapshot 与 turn-local tool catalog | `docs/canon/nyxid-chat-agent-profile-binding.md:9-70`；[07/03](../07/03-agent-profile-and-immutable-binding.md) |
 | accepted ADR 不自动等于完整 landing | `docs/adr/0037-scheduled-invocation-credential-source-model.md:1-60`；账本 `#2688` |
-| `#2954–#2957` 仍属 frozen open 且只进 target | [Issue 演进账本 §3.2、§5](../migration/2026-07-25-issue-evidence-ledger.md) |
+| `#2954–#2957` 仍属 frozen open 且只进 target（冻结账本口径；HEAD 上 stop/steering/task-step 已在 controller/turn 模型落地，以 HEAD 为准，见 [07/02](../07/02-nyxid-chat-actor-model-and-progress.md)） | [Issue 演进账本 §3.2、§5](../migration/2026-07-25-issue-evidence-ledger.md) |
 | 无现役 destination 的六行归属 | `#2377`、`#2645`、`#2851`、`#2209`、`#2935` 归 Security / production；`#2475` 的 Mission Wall summary 归同组的 production/product surface。归属只影响本章聚合，不改账本分类或落点。 |
 
 </details>
