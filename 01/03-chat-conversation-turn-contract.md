@@ -190,6 +190,7 @@ resume / signal / stop 不属于 conversation 协议，它们定位的是 run：
 ## 边界与演进
 
 - **当前（current）**：本章全部论断以冻结基线代码为准。身份服务端签发、续聊准入、scope 信任链、turn 幂等追加均有 E1 证据。
+- **上游同步审查记录（issue #120，`024b959a4f90..d8012534e147`）**：结论是**无需更新本章契约模型**。区间内的提交只强化 NyxID direct Responses / Messages / Chat Completions 共用的 `LlmSessionGAgent` 流式 run 记录边界：执行侧把 chunk、tool 与 terminal fact 发回 session actor，由 `responseId + runId + sequence` 做幂等接受，并保证 cancel flush 落成 typed fact（`docs/canon/llm-streaming.md:38` 到 `:49`、`docs/canon/nyxid-responses-direct.md:120` 到 `:133`）。该区间没有改动本章的 `conversationId / turnId` 服务端签发、continuation admission、caller scope 准入或 `ChatTurn` 终态归档协议，因此正文模型、图和示例保持不变；把 Responses 的 recorder/finalizer 语义并入本章反而会混淆 LLM session run 与 chat conversation 两个状态所有权边界。本条作为该同步 issue 的耐久审查结论。
 - **演进（为什么变成这样）**：上游 issues #2834、#2915、#2920 是本契约成型的直接动因（本仓库 docs/migration 下的 2026-07-25 issue 证据账本中，三行均分类为 landed-current 并各自带 E1 锚点）。#2834 把 `POST /api/chat` 的 conversation 契约重构为"后端拥有 `conversationId` 与 `turnId`"——本章的所有权模型即其落地；#2920 修复"续聊只归档消息、不把历史注入执行"——即上文 `ConversationContext` 注入链路；#2915 修复 LLM delta 未投影到 SSE，属于同一 chat 表面的投影链路闭合，不改变身份契约本身。三者解释了"为什么是服务端拥有 + 准入 + 注入"这个组合，但实现状态以本章 E1 为准，不由 issue 状态证明。
 - **历史/已移除**：HTTP body 里的 `scopeId` 是 legacy 字段，当前被显式忽略；`sessionId` 从来不是 conversation 身份。请求传输、ACK 与终态观察的全链路地图见 [请求与流式生命周期](04-request-streaming-lifecycle.md)。
 - **开放缺口**：`MaxTurns = 250` 触顶后的产品行为（开新会话还是截断）在代码里只有拒绝，没有自动迁移策略；跨 scope 的会话迁移不存在——删除即 `ConversationDeletedEvent`，续聊一律 404。
@@ -223,5 +224,6 @@ resume / signal / stop 不属于 conversation 协议，它们定位的是 run：
 | 控制面 resume 必须 actorId+runId+stepId 且绑定匹配 | E1 | `src/workflow/Aevatar.Workflow.Infrastructure/CapabilityApi/ChatEndpoints.cs:451`、`docs/canon/chat-api.md:274` |
 | sessionId 独立于 conversation 身份、缺省用 correlationId 兜底 | E1 | `src/workflow/Aevatar.Workflow.Infrastructure/CapabilityApi/ChatCapabilityModels.cs:97`、`src/workflow/Aevatar.Workflow.Application/Runs/WorkflowChatRequestEnvelopeFactory.cs:15` |
 | 跨层续聊行为有集成测试覆盖 | E1 | `test/Aevatar.Integration.Tests/WorkflowChatConversationContinuationCrossLayerTests.cs:37` |
+| `d8012534e147` 只强化 Responses `LlmSession` recorder/finalizer，不改变 conversation/turn 契约 | E1 | `docs/canon/llm-streaming.md:38`、`docs/canon/nyxid-responses-direct.md:120`、`src/platform/Aevatar.GAgentService.Application/Responses/LlmRunCore.cs:35` |
 
 </details>
