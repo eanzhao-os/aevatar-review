@@ -6,45 +6,38 @@ verified_at: 2026-07-25
 
 # Team Member Automation：资源 API、所有权与读模型
 
-> 版本与结论：本章描述 `current`。产品导航中的 Team Member Automation 位于 exact scope/team/member 层级下，但该 nested Studio HTTP route **只保留 preflight**；list/read/create/update/enable/disable/delete/run-now 的 current lifecycle surface 统一为携带 typed owner 的 `/api/schedules`。稳定 owner 是 `scopeId + teamId + memberId` 三元组。`ScheduledDispatchGAgent` 持有 schedule/lifecycle 事实，Projection Pipeline 提供查询副本；所有 mutation 的 `202 Accepted` 都只是受理收据，不能替代更高 `stateVersion` 的 projected 终态。
+> 版本与结论：本章描述 `current`。canonical Studio 定时资源位于 exact scope/team/member 层级下；Host 只组合 HTTP，application 每次重新验证 member containment 与 workflow binding，`ScheduledDispatchGAgent` 持有 schedule/lifecycle 事实，Projection Pipeline 提供查询副本。所有 mutation 的 `202 Accepted` 都只是受理收据，不能替代更高 `stateVersion` 的 projected 终态。
 
 ## 设计抽象与事实源
 
-- `docs/canon/scheduled-skill-runners.md:34-88`：nested route 只做 preflight；lifecycle 统一走 owner-aware `/api/schedules`；稳定 owner 是 scope/team/member 三元组。
-- `docs/canon/scheduled-skill-runners.md:97-121`：mutation receipt、projected lifecycle、双轨撤销与 canonical read-after-write 边界。
-- `docs/operations/2026-07-23-scheduled-agent-key-production-canary.md:1625-1851`：首次删除与 pending/failed track 恢复复用同一 canonical `DELETE`、原 owner/reason/operation/idempotency，仅刷新 bearer。
+- `src/Aevatar.Studio.Hosting/Endpoints/StudioMemberAutomationEndpoints.cs:19-47`、`:76-123`、`:227-398`：canonical collection 与 preflight/create/update/reauthorize/pause/resume/run-now/delete/retry-revocation HTTP surface。
+- `src/platform/Aevatar.GAgentService.Abstractions/Schedules/TeamAutomationOperationObservationContracts.cs:5-47`：begin/candidate/complete/delete/fail/revocation 是 committed operation stages，outcome携带 authoritative `StateVersion`。
+- `src/platform/Aevatar.GAgentService.Projection/Queries/ScheduledDispatchQueryPort.cs:47-154`、`:158-235`：read-model query按owner过滤并映射 lifecycle、fire、credential摘要与state version。
 
-## 资源身份：产品层级与 lifecycle API 是两条不同边界
+## 资源身份：owner 是 scope/member，team 是 containment guard
 
-产品资源位置是：
-
-```text
-/scopes/{scopeId}/teams/{teamId}/members/{memberId}/automations
-```
-
-它表达 Studio 中“某个 Team 的某个 member 的 automation”这一产品归属；一旦 owner 已知，Team detail 的 query-string 选择也必须收敛到这条资源路径，不能成为另一种 owner。对应的 nested Host HTTP surface 只有：
+canonical collection root 是：
 
 ```text
-POST /api/scopes/{scopeId}/teams/{teamId}/members/{memberId}/automations/preflight
+/api/scopes/{scopeId}/teams/{teamId}/members/{memberId}/automations
 ```
 
-preflight 纯读地解析 Studio member，验证 path 中的 `teamId` 确实包含该 member、implementation 是 bound workflow，并从 member summary 派生 `publishedServiceId`。浏览器不能提交或替换 `workflowId`、`publishedServiceId`、grant、expiry 或 credential material。
+这条路径不是为了把四个字符串拼成更长URL，而是让每次操作都重做三层判断：authenticated caller可访问 `scopeId`；`memberId` 在该scope内存在；member当前仍属于path中的 `teamId` 且实现类型是workflow，并有可调度的published binding。application从member summary派生 `publishedServiceId`，浏览器不能提交或替换它。
 
-actor 持久 owner 则是 exact `(scopeId, teamId, memberId)`。`teamId` 既参与 preflight containment，也参与稳定 owner identity；它不是可从 member 当前 assignment 临时补回的 guard。owner 一旦写入便不能改变，任一 scope/team/member 不匹配都按 not found 隐藏资源，`scheduleId` 单独出现从不构成 authority。
+actor持久owner是 `(scopeId, memberId)`；`teamId` 保存当前assignment并作为请求时的containment guard，但不是可漂移的第二owner。这样member即使被错误地从另一个team路径访问，也返回not found，不泄露跨team资源；`scheduleId` 单独出现同样不构成权限。actor还拒绝把已经归属一个owner的schedule改给另一个owner。
 
 ```mermaid
 %%{init: {"maxTextSize": 100000, "flowchart": {"useMaxWidth": false, "nodeSpacing": 14, "rankSpacing": 48}, "themeVariables": {"fontSize": "10px"}}}%%
 flowchart LR
     U["Authenticated owner"]
-    N["Nested Studio route\npreflight only"]
-    C["Canonical schedule API\nowner-aware lifecycle"]
+    H["Studio Host\nHTTP composition only"]
     M["Member read model\nscope member team binding"]
     A["Studio application\ncontainment and plan orchestration"]
     S["ScheduledDispatchGAgent\nauthoritative schedule and lifecycle"]
     P["Committed-state projection"]
     Q["Member automation list and detail"]
-    U -->|"scope team member path"| N --> A
-    U -->|"api schedules plus exact owner tuple"| C --> A
+    U -->|"scope team member path"| H
+    H --> A
     A -->|"resolve exact member"| M
     M -->|"team matches and workflow binding exists"| A
     A -->|"owner-scoped command"| S
@@ -52,27 +45,27 @@ flowchart LR
     Q -->|"stateVersion and lifecycle"| U
 ```
 
-为什么不是让前端直接提供 `workflowId` 或 `publishedServiceId`？这些是服务端 binding 事实；接受客户端值会把“选择页面资源”变成“指定授权执行目标”，产生 confused deputy。为什么 owner 必须包含 team？因为同一个 member ID 经由错误 Team path 到达时，系统必须在 authority identity 层拒绝，而不能靠一次易漂移的 assignment lookup 把它归一成同一 owner。转组也不能静默改写已有 schedule/credential owner；原 tuple 的 lifecycle 必须先按权威协议处置。
+为什么不是让前端直接提供 `workflowId` 或 `publishedServiceId`？这些是服务端binding事实；接受客户端值会把“选择页面资源”变成“指定授权执行目标”，产生confused deputy。为什么owner不包含team？member是长期资源，team是可验证assignment；若team也成为可变owner，转组就需要迁移schedule identity与凭据owner，反而扩大并发与补偿面。
 
-## API surface：nested preflight，owner-aware lifecycle
+## API surface：操作很多，事实 owner 仍只有一个
 
-| Operation | Current surface | Owner carrier | HTTP结果能证明什么 | 后续权威观察 |
-|---|---|---|---|---|
-| preflight | nested `POST .../automations/preflight` | path 的 scope/team/member | 当前证据下的 plan 与 digest | 不创建 automation 或 credential |
-| list / detail | owner-aware `/api/schedules` collection/detail | query 中的 `ownerKind/ownerScopeId/ownerTeamId/ownerMemberId` | 读模型当前可见版本 | 比较 `stateVersion` 与 lifecycle 字段 |
-| create | `POST /api/schedules` | request 中的 typed Studio member automation owner | command/effect 被受理 | `active` 或稳定失败状态 |
-| update / reauthorize | canonical `/api/schedules` lifecycle request | request 中的同一 typed owner | mutation/replacement 受理 | 更高版本 definition 与 credential generation |
-| enable / disable / run-now | canonical `/api/schedules` action surface | exact owner query/request | action/fire admission | projected `enabled`、fire record 与 run 终态 |
-| first delete | `DELETE /api/schedules/{scheduleId}` | body 中的 typed owner | tombstone 与双轨 revocation admission | 两条 track 终结后 not found |
-| unfinished revocation recovery | **重放同一** `DELETE /api/schedules/{scheduleId}` | 原 owner/reason/operation/idempotency；仅 bearer 刷新 | 原 cleanup operation 再次准入 | 原 operation 两条 track 终结 |
-
-固定 canon 明确了 canonical root、owner 传递与 operation 集合，并给出了 delete 的 exact wire shape；其他 action 的具体 method/suffix 仍应从部署时同版本 OpenAPI 读取，不能从旧 nested route 猜回。
+| Method / suffix | 语义 | HTTP结果能证明什么 | 后续权威观察 |
+|---|---|---|---|
+| `POST /preflight` | 纯读地构建当前typed authorization plan | 当前证据下的plan与digest | 不创建automation或credential |
+| `GET` / `GET /{scheduleId}` | list/detail exact member-owned projected rows | 读模型当前可见版本 | 比较`stateVersion`与lifecycle字段 |
+| `POST` | begin create与credential lifecycle | command/effect被受理 | `active`或稳定失败状态 |
+| `PUT /{scheduleId}` | revalidate后更新cron/timezone/enabled等 | update受理 | 更高版本的definition与状态 |
+| `POST /reauthorize` | 用fresh plan替换credential generation | replacement受理 | `active`新generation或失败 |
+| `POST /pause` / `/resume` | 改变是否允许fire | action受理 | projected `enabled` |
+| `POST /run-now` | owner-scoped manual fire | fire command受理 | fire record与run终态 |
+| `DELETE` | 先提交tombstone与双轨revocation intent | delete受理 | cleanup终结后not found |
+| `POST /retry-revocation` | fresh bearer重试原cleanup operation | retry受理 | 原operation两条track终结 |
 
 preflight与write-side revalidation故意不同。preflight只读当前证据，适合让用户确认permission digest；create/update/reauthorize在写入前必须再次核验，catalog变化时返回plan conflict或可重试projection lag。否则用户确认的是版本A，系统却可能按版本B签发权限。
 
 ### 最小调用骨架
 
-下面只演示边界切换，不填真实身份、bearer、permission digest 或任何 credential material：
+下面只演示资源协议，不填真实身份、bearer或permission digest：
 
 ```bash
 curl -X POST \
@@ -80,39 +73,9 @@ curl -X POST \
   -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"scheduleCron":"0 9 * * *","scheduleTimezone":"Asia/Shanghai","enabled":true}'
-
-OWNER_QUERY="ownerKind=studio_member_automation&ownerScopeId=$SCOPE&ownerTeamId=$TEAM&ownerMemberId=$MEMBER"
-
-curl -X POST "$HOST/api/schedules" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H 'Content-Type: application/json' \
-  -d "$(jq -n \
-    --arg scope "$SCOPE" --arg team "$TEAM" --arg member "$MEMBER" \
-    --arg digest "$CONFIRMED_PERMISSION_DIGEST" \
-    --arg policy "$CONFIRMED_POLICY_VERSION" \
-    --arg op "$OPERATION_ID" --arg idem "$IDEMPOTENCY_KEY" '{
-      ownerKind: "studio_member_automation",
-      ownerScopeId: $scope,
-      ownerTeamId: $team,
-      ownerMemberId: $member,
-      scheduleCron: "0 9 * * *",
-      scheduleTimezone: "Asia/Shanghai",
-      enabled: false,
-      confirmedPermissionDigest: $digest,
-      confirmedPolicyVersion: $policy,
-      credentialProvisioningKind: "dedicated_scheduled_invocation_agent_key",
-      operationId: $op,
-      idempotencyKey: $idem
-    }')"
-
-curl -H "Authorization: Bearer $TOKEN" \
-  "$HOST/api/schedules/$SCHEDULE_ID?$OWNER_QUERY"
 ```
 
-> Demo status：`verified-static`（按 controller 固定 end-range canon 核对 nested preflight、owner-aware create/read 与 owner 三元组；本轮未启动 Host、未创建 automation）。
-
-!!! warning "固定事实源的 route drift"
-    固定 production runbook 的 create/detail/run-now 示例仍保留较早的 nested lifecycle route，而同一 end-range 的 `docs/canon/scheduled-skill-runners.md:44-82` 已明确 nested route 只剩 preflight、其余 lifecycle 统一走 owner-aware `/api/schedules`。因此这些 runbook 片段只解释当次版本化 canary，不能作为 current route contract；本章以更新后的 canon 为准。
+> Demo status：`verified-static`（核对endpoint request contract、application owner resolution、query mapping与冻结tests；本轮未启动Host、未创建automation）。
 
 ## `202`、committed operation 与 projection 是三个时刻
 
@@ -129,7 +92,7 @@ sequenceDiagram
     participant S as Schedule actor
     participant E as External effect adapter
     participant P as Projection
-    C->>H: mutation on api schedules with typed owner and operation identity
+    C->>H: mutation with owner path and operation identity
     H->>A: typed request
     A->>A: resolve member containment and revalidate
     A->>S: begin owner-scoped operation
@@ -144,7 +107,7 @@ sequenceDiagram
         S->>S: commit terminal stateVersion N plus 1
     end
     S->>P: committed current state
-    C->>H: GET canonical detail with exact owner query
+    C->>H: GET canonical detail
     H->>P: exact owner query
     P-->>C: lifecycle and authoritative stateVersion
 ```
@@ -167,7 +130,7 @@ sequenceDiagram
 
 `enabled=false`不等于credential revoked，`active`也不等于刚才的workflow run成功。schedule resource、credential health与每次run是三组正交事实；将它们压成一个green/red badge会让暂停、授权失败和业务执行失败无法区分。
 
-query还隔离generic schedule与Team automation：generic get/list排除team-owned documents，owner-aware schedule API要求exact scope/team/member tuple，并可在revocation pending时继续看到deleted row。只有required cleanup完成，删除资源才从canonical detail消失。
+query还隔离generic schedule与Team automation：generic get/list排除team-owned documents，Team API要求exact owner并可在revocation pending时继续看到deleted row。只有required cleanup完成，删除资源才从canonical detail消失。
 
 ## 边界与演进：canonical surface 不是所有schedule的别名
 
@@ -179,7 +142,7 @@ query还隔离generic schedule与Team automation：generic get/list排除team-ow
 
 ## 读完应能回答
 
-1. 为什么automation稳定owner必须是`scopeId + teamId + memberId`，而不能在请求时只靠member assignment补回team？
+1. 为什么automation owner是`scopeId + memberId`，而`teamId`是每次重验的containment guard？
 2. 哪些API返回`202`，为什么它们都不能证明resource已经到终态？
 3. preflight与write-side revalidation为什么不能合并成一次长期有效的检查？
 4. committed operation outcome与projected read model分别服务writer和reader的什么需求？
@@ -190,11 +153,14 @@ query还隔离generic schedule与Team automation：generic get/list排除team-ow
 
 | 论断 | 冻结证据 |
 |---|---|
-| nested Studio route 只保留 preflight，并由服务端解析 member containment、binding 与 published service | `docs/canon/scheduled-skill-runners.md:34-50` |
-| list/read/create/update/enable/disable/delete/run-now 统一属于 owner-aware `/api/schedules` | `docs/canon/scheduled-skill-runners.md:52-61` |
-| 初次删除与未完成 revocation 恢复重放同一 DELETE，原 owner/reason/operation/idempotency 不变，仅刷新 bearer | `docs/canon/scheduled-skill-runners.md:63-82`、`docs/operations/2026-07-23-scheduled-agent-key-production-canary.md:1625-1851` |
-| 稳定 owner 精确包含 scope/team/member，任一不匹配按 not found 隔离，owner 不可变 | `docs/canon/scheduled-skill-runners.md:84-95` |
-| receipt 只是 admission，projected `stateVersion` 与 lifecycle 才是 durable reader evidence | `docs/canon/scheduled-skill-runners.md:97-115` |
-| schedule actor 持有 lifecycle 事实，projection 持有 query replica，client 不直接写 actor state | `docs/canon/scheduled-skill-runners.md:86-88`、`:117-129` |
+| Host映射canonical member automation全套route并统一返回typed receipts | `src/Aevatar.Studio.Hosting/Endpoints/StudioMemberAutomationEndpoints.cs:19-47`、`:76-123`、`:227-398` |
+| application按scope读取member、校验team与workflow implementation，并从binding派生published service | `src/Aevatar.Studio.Application/Studio/Services/StudioMemberWorkflowSchedulePort.cs:983-1020` |
+| list/get/update/action都先解析exact member owner | `src/Aevatar.Studio.Application/Studio/Services/StudioMemberWorkflowSchedulePort.cs:242-406` |
+| actor owner比较以scope/member为identity并拒绝owner变化 | `src/platform/Aevatar.GAgentService.Core/Schedules/ScheduledDispatchGAgent.cs:1963-2004`、`:2119-2147` |
+| generic query/mutation排除或拒绝team-owned，Team query要求exact owner | `src/platform/Aevatar.GAgentService.Application/Schedules/ScheduledDispatchApplicationService.cs:164-205`、`:608-668` |
+| operation observation区分stage/rejection并携带state version与effect ownership | `src/platform/Aevatar.GAgentService.Abstractions/Schedules/TeamAutomationOperationObservationContracts.cs:5-47` |
+| public view含lifecycle/fire/credential摘要和stateVersion但不含secret reference | `src/Aevatar.Studio.Application.Abstractions/Provisioning/StudioMemberWorkflowScheduleContracts.cs:109-159` |
+| query document按team owner过滤并映射authoritative summary | `src/platform/Aevatar.GAgentService.Projection/Queries/ScheduledDispatchQueryPort.cs:47-154`、`:158-235` |
+| canon明确Team automation owner、202语义、projected lifecycle与retired runner边界 | `docs/canon/scheduled-skill-runners.md:34-94`、`:9-32` |
 
 </details>

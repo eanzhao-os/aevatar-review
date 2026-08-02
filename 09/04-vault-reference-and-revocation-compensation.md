@@ -10,11 +10,11 @@ verified_at: 2026-07-25
 
 ## 设计抽象与事实源
 
-- `docs/canon/scheduled-skill-runners.md:63-88`、`:117-129`：canonical DELETE 重放、stable owner、actor-owned intent/effect attempt 与双轨 cleanup。
-- `docs/adr/0041-scheduled-invocation-agent-key-credential-reference.md:24-37`：typed `SecretReference`、raw credential 禁入持久状态与 trusted provisioning 边界。
-- `docs/adr/0043-scheduled-credential-lifecycle-compensation.md:20-66`：通用 scheduled credential 的 intent-first 双轨补偿、`REQUESTED_NOT_CONFIRMED` 与 `BLOCKED_MISSING_SECRET_REF` repair；它与 Team Automation schedule actor 是相邻但不同的 owner 边界。
+- `src/platform/Aevatar.GAgentService.Core/Schedules/scheduled_dispatch_state.proto:12-83`、`:251-304`、`:482-678`：active/candidate/pending-revocation credential、deterministic effect locator、operation identity与NyxID/Vault tracks。
+- `src/Aevatar.Foundation.Abstractions/Credentials/credential_secret_references.proto:7-15`、`agents/Aevatar.GAgents.Scheduled/StudioScheduledCredentialMaterializer.cs:30-133`：typed `SecretReference`、requested locator、one-time issued material写Vault及失败清理。
+- `docs/adr/0043-scheduled-credential-lifecycle-compensation.md:20-66`、`agents/Aevatar.GAgents.Scheduled/protos/user_agent_catalog.proto:80-146`：通用scheduled credential的intent-first双轨补偿、`REQUESTED_NOT_CONFIRMED`与`BLOCKED_MISSING_SECRET_REF` repair。第三项属于与Team Automation相邻的历史修复路径，本章会明确owner边界。
 
-这里按 schedule state、secret materialization、历史 repair contract 三个设计边界分组；它们只属于事实源清单，不构成正文骨架。
+这里按 schedule state、secret materialization、历史 repair contract 三个设计边界分组；后两项各含一对相互约束的证据，因此共有五条路径。它们只属于事实源清单，不构成正文骨架。
 
 ## Secret custody：状态保存定位符，不保存可用秘密
 
@@ -112,11 +112,11 @@ Team Automation公开的track wire值是`NotRequired / Pending / Completed / Fai
 
 为什么不能把“NyxID 404”或“Vault absent”一概当失败？revoke是确保资源不再存在的postcondition，exact resource已不存在可以是幂等成功；但owner不匹配、descriptor变化或无权访问不能被吞掉。为什么不在HTTP handler里`try/finally`两次删除？handler崩溃会丢掉未完成track，且重试无法知道哪条已成功。actor facts把两条外部系统的结果拆开，允许只重试仍未完成的effect。
 
-## 删除重放必须回到同一权威 operation
+## Retry 必须回到同一权威 operation
 
-current contract 不存在独立的 public revocation-retry route。首次删除与任何 pending/failed track 恢复都重放同一个 `DELETE /api/schedules/{scheduleId}`：body 中 normalized `scopeId + teamId + memberId` owner、reason、`operationId` 与 `idempotencyKey` 必须逐字段复用；只有 Host 从新认证会话派生的 bearer 可以刷新，而且 bearer 不进入 body。schedule actor核对 pending descriptor 与原 operation，重新授予 fenced effect attempt；executor 只执行仍未完成的 track，再把结果提交回同一 operation。
+canonical `/retry-revocation`不是创建新的cleanup job。请求必须携带原 `operationId + idempotencyKey`、exact Team owner和fresh authenticated credential owner；schedule actor核对pending descriptor与operation，重新授予一个fenced effect attempt。application只执行outcome中仍pending的track，再把结果提交回同一operation。
 
-这样做避免两个并发 repair 各自撤销不同 generation，也避免最终一致 read model 驱动写侧。list/detail 用于观察；是否还有 pending descriptor、谁可 claim attempt，必须由 actor state 决定。`202 Accepted` 只证明同一 delete operation 再次准入，最终要以 owner-aware detail 的更高 `stateVersion`、两条 track 与最终 not found 收敛。
+这样做避免两个并发repair各自撤销不同generation，也避免最终一致read model驱动写侧。list/detail用于观察；是否还有pending descriptor、谁可claim attempt，必须由actor state决定。`202 Accepted`只证明retry command已准入，最终要读更高`stateVersion`以及两条track。
 
 ## 历史缺失 locator：catalog repair 是另一条窄门
 
@@ -146,7 +146,7 @@ flowchart LR
 ```bash
 detail=$(curl -fsS \
   -H "Authorization: Bearer $TOKEN" \
-  "$HOST/api/schedules/$SCHEDULE?ownerKind=studio_member_automation&ownerScopeId=$SCOPE&ownerTeamId=$TEAM&ownerMemberId=$MEMBER")
+  "$HOST/api/scopes/$SCOPE/teams/$TEAM/members/$MEMBER/automations/$SCHEDULE")
 
 jq -e '
   (.credentialSourceKind == "scheduled_invocation_agent_key") and
@@ -168,7 +168,7 @@ jq -e '
 - raw Agent Key只进入issuer result的内部capability与Vault store/resolve局部；actor event、projection、public DTO、exception与日志不得携带。
 - internal operation observation为补偿执行可携带typed locator或credential reference；它不是canonical public list/detail，不能直接暴露给浏览器。
 - pause/resume不撤销credential；reauthorize换generation并清理旧credential；delete先tombstone再等待双轨终态。
-- Team Automation 的 delete replay 绑定原 owner/reason/operation/idempotency，且只刷新 bearer；catalog repair 绑定另一类 actor 与历史 revocation identity，二者不可互相代写。
+- Team Automation retry绑定原operation/idempotency；catalog repair绑定另一类actor与历史revocation identity，二者不可互相代写。
 - 本章不承诺跨NyxID/Vault exactly-once；它承诺每个外部effect有权威intent、可观察track与幂等postcondition。
 
 ## 读完应能回答
@@ -176,7 +176,7 @@ jq -e '
 1. 为什么 `SecretReference` 可以进actor state，而raw key不可以？
 2. candidate credential在crash recovery中提供什么锚点，为什么不能直接视为active？
 3. reauthorize与delete怎样复用同一个NyxID/Vault双轨模型？
-4. 为什么未完成撤销必须重放同一 owner-aware DELETE，并复用原 owner/reason/operation/idempotency，而不能从read model新建cleanup？
+4. `/retry-revocation`为什么必须沿用原operation和actor state，而不能从read model新建cleanup？
 5. `BLOCKED_MISSING_SECRET_REF`属于哪个actor路径，为什么不能用catalog admin repair改写Team Automation？
 
 <details>
@@ -190,7 +190,7 @@ jq -e '
 | delete先提交pending credential与deleted事实，再取消fire/expiry lease | `src/platform/Aevatar.GAgentService.Core/Schedules/ScheduledDispatchGAgent.cs:330-409`、`:3308-3333` |
 | workflow dispatch只借用exact handle且不访问Vault；非workflow path才在dispatch局部resolve | `src/platform/Aevatar.GAgentService.Infrastructure/Schedules/ScheduledServiceInvocationDispatchPort.cs:233-375`、`:531-728` |
 | 两条track独立提交，任一失败保留pending descriptor，双完成才清理 | `src/platform/Aevatar.GAgentService.Core/Schedules/ScheduledDispatchGAgent.cs:758-831`、`:3335-3371` |
-| 首次删除与未完成撤销恢复重放同一 owner-aware DELETE，复用原 owner/reason/operation/idempotency，仅刷新 Host bearer | `docs/canon/scheduled-skill-runners.md:63-82`、`docs/operations/2026-07-23-scheduled-agent-key-production-canary.md:1625-1851` |
+| retry核对同一owner/operation/idempotency与credential owner，并从actor取得effect attempt | `src/platform/Aevatar.GAgentService.Core/Schedules/ScheduledDispatchGAgent.cs:800-831`、`src/Aevatar.Studio.Application/Studio/Services/StudioMemberWorkflowSchedulePort.cs:1323-1425` |
 | canonical projection/public view只有lifecycle、generation、track、error与version，不投影key/ref | `src/platform/Aevatar.GAgentService.Projection/Projectors/ScheduledDispatchCurrentStateProjector.cs:51-132`、`src/Aevatar.Studio.Application/Studio/Services/StudioMemberWorkflowSchedulePort.cs:1023-1056` |
 | 通用catalog revocation fact具有exact identity、双轨、requested/confirmed descriptor与blocked状态 | `agents/Aevatar.GAgents.Scheduled/protos/user_agent_catalog.proto:80-146`、`docs/adr/0043-scheduled-credential-lifecycle-compensation.md:20-66` |
 | elevated admin repair只接受完整reference并等待committed repaired/rejected outcome | `src/Aevatar.Mainnet.Host.Api/Scheduled/ScheduledAgentCredentialRepairAdminEndpoints.cs:18-94`、`agents/Aevatar.GAgents.Scheduled/UserAgentCatalogGAgent.cs:326-390` |
