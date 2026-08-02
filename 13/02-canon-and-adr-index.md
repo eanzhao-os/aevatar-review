@@ -73,7 +73,7 @@ flowchart LR
 | canon | `docs/canon/secret-vault.md` | `active` | Vault keyring、SecretReference、轮换与 fail-fast | [09/04](../09/04-vault-reference-and-revocation-compensation.md) | — |
 | canon | `docs/canon/status-dashboard.md` | `active` | `/status` 展示、`/api/status` read model 与 probe actor 分层 | [10/07](../10/07-observability-status-and-observatory.md) | — |
 | canon | `docs/canon/system-skill-overlay-authoring-contract.md` | `active` | system skill overlay 的 authoring、层序与 authority ceiling | [04/05](../04/05-prompt-overlays-and-agent-context.md) | — |
-| canon | `docs/canon/voice-presence-integration.md` | `active` | Voice control、volatile media、provider 与 edge owner 合同 | [08/05](../08/05-voice-control-and-media-planes.md) | restart 不是 resume |
+| canon | `docs/canon/voice-presence-integration.md` | `active` | Voice control、volatile media，以及 attach 后按 transport lease 绑定 live relay 的交付合同 | [08/05](../08/05-voice-control-and-media-planes.md) | relay 缺失是 topology gap，不得新开 provider socket；restart 不是 resume |
 | canon | `docs/canon/work-orders.md` | `active` | WorkOrder durable intent、approval 与 terminal observation | [06/05](../06/05-work-orders-and-durable-intent.md) | — |
 | canon | `docs/canon/workflow-catalog-visibility.md` | `active` | global template 与 scope-owned runnable resource 可见性 | [06/03](../06/03-catalog-visibility-and-scope-authorization.md) | — |
 | canon | `docs/canon/workflow-primitives.md` | `active` | canonical primitive names、输入输出与组合约束 | [03/04](../03/04-primitives-catalog.md) | — |
