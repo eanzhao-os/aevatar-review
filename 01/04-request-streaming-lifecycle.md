@@ -15,8 +15,8 @@ verified_at: 2026-07-25
 ## 设计抽象与事实源
 
 - `src/workflow/Aevatar.Workflow.Infrastructure/CapabilityApi/ChatSseResponseWriter.cs:52`：`WriteAsync` 定义 chat SSE 数据帧形态（`data: ` + 单行 protobuf JSON），同文件的 15 秒 heartbeat 注释帧支撑「长 run 跨代理 idle 窗口存活」的连接生存性设计——本章帧形态脊柱。
-- `src/Aevatar.AGUI.Contracts/agui_events.proto:15`：`AGUIEvent` 的 oneof 帧族与 `RunCompletionStatus` 终态枚举，是 AGUI 方言帧分类与终态语义的唯一类型事实源——本章 AGUI 帧脊柱。
 - `docs/canon/llm-streaming.md:30`：用户可见实时生命周期统一表达为 `accepted/error -> outbound frames -> completion`，文本/AGUI 与 voice 共享该语义——本章「回执 ≠ 终态」的协议脊柱。
+- `src/workflow/Aevatar.Workflow.Infrastructure/CapabilityApi/WorkflowRunObservatoryEndpoints.cs:15`：Observatory 在 endpoint 层区分 own-scope 与管理员 cross-scope / all-scope 读取，并为数据 GET 标注审计元数据；query service 仍只读 committed query models——本章「实时流 ≠ durable truth」的产品化落点。
 
 ## 先建立模型
 
@@ -161,6 +161,40 @@ sequenceDiagram
 
 SSE 规范定义的 `Last-Event-ID` 续传握手在当前 chat 链路上**不存在**：writer 只写 `data:` 与注释行，没有事件 id 可回执。断线后的客户端语义是「放弃本帧流，转向读模型重建视图」，而不是「从断点续传」。WS 同理——连接关闭即会话观测结束。这不是疏漏的措辞，而是从 writer 实现可直接验证的当前边界；NyxIdChat 的显式 replay + fence 证明系统内存在更严格的范式，但它尚未推广到 chat capability 入口。
 
+### Observatory：把 committed 观测做成只读产品面
+
+`bd9975c8` 初版 Observatory 只有 own-scope 列表、详情和 graph；这是**历史状态**。`f02aa690` 当前面向 run 检查的只读数据面已经扩展为七个 bearer-protected GET：`/me`，`/runs`，`/runs/{runId}`，`/runs/{runId}/graph`，两个 `/admin/runs/{runId}` 入口，以及 `/resolve-scope`。详情组合 current-state 摘要与 committed run-report 的 timeline / usage / step trace，graph 复用已物化的 run 子图。它没有订阅 live sink，也不从 actor write model 旁路取数，因此展示的是**最终一致的已物化视图**，不是断线前帧流的逐 token 回放。
+
+```mermaid
+%%{init: {"maxTextSize": 100000, "flowchart": {"useMaxWidth": false, "nodeSpacing": 12, "rankSpacing": 45}, "themeVariables": {"fontSize": "10px"}}}%%
+flowchart LR
+    CL["Bearer client"] --> EP["Observatory GET endpoints"]
+    EP --> SG["从 scope_id claim 取得 own scope"]
+    SG --> INTENT{"目标是 own scope 吗"}
+    INTENT -->|"是"| OQ["scope query path"]
+    OQ --> OWN{"snapshot.scopeId 与 own scope 相同"}
+    OWN -->|"否或不存在"| NF["404 不披露存在性"]
+    INTENT -->|"否"| ADM{"elevated authorizer 通过吗"}
+    ADM -->|"否"| DENY["401 或 403 且不执行跨 scope 查询"]
+    ADM -->|"是 指定 scope"| OQ
+    ADM -->|"是 __all__ 或 admin runId"| AQ["admin query path"]
+    AQ --> CS["跨 scope current-state query"]
+    OQ --> CS
+    CS --> AR["artifact query port"]
+    AR --> RP["committed timeline 与 usage"]
+    AR --> GR["materialized run graph"]
+    EP -. "审计 action、目标、scope 与 runId" .-> AUD["sanitized audit artifact"]
+    AR -. "无 dispatch、无 stop、无 replay" .-> RO["read-only boundary"]
+```
+
+普通调用者不提供 `scope`（或显式给出自己的 scope）时走 own-scope 路径：列表在 source query 带 `ScopeId` 并二次过滤；详情与 graph 先用 scope-stamped current-state 做所有权门，再读 runId-only artifact。因而普通调用者用本路径探测外部 run 时，与不存在 run 一样得到 404。若请求明确指向其他 scope，endpoint 必须先解析 bearer 的平台管理员身份；缺 bearer 返回 401，非 elevated 返回 403，而且拒绝发生在任何跨 scope query 之前。
+
+管理员通过授权门后有三种读取方式：给普通 runs/detail/graph 入口传 `scope=<id>`；列表传 `scope=__all__`；或在不知道所属 scope 时使用 admin detail/graph 让 current-state 按 runId 解析归属。`/resolve-scope?email=...` 也是 admin-only，用用户目录把邮箱解析为候选 scope；`/me` 则返回调用者 scope 与管理员能力，供页面选择模式。管理员路径扩大的是**授权后的读取集合**，没有取消 bearer、只读或 query-port-only 边界。
+
+每个数据入口都声明 endpoint audit metadata：run 列表、详情和 graph 使用 Confidential，scope 邮箱解析使用 Restricted；审计摘要只拼接清洗后的 route、`scope` 与 `runId`，不把 bearer 写入摘要。这里需要同时保留两条边界：审计记录谁读取了什么，不授予访问权；管理员授权必须在跨 scope query 之前完成，不能靠事后审计补救越权读取。
+
+**为什么不让 Observatory 直接复用实时帧流？** 实时流适合低延迟，但 attached sink 会断开且没有 replay cursor；历史查看需要可重复读取、可按 scope 授权的 committed 结果。反过来，读模型可能尚未物化 run report：此时详情诚实退化为 current-state summary、空 timeline 与零 usage，而不是伪造「尚无事件」。因此 Observatory 补齐的是 durable inspection，不改变 accepted、终态帧或 current-state 的 ACK 强度，也不把 eventually consistent 页面提升为执行事实源。
+
 ## 最小示例
 
 > Demo status：`verified-static`
@@ -207,7 +241,7 @@ data: {"timestamp":"1785000002501","stateSnapshot":{"snapshot":{"@type":"type.go
 
 ## 边界与演进
 
-**当前实现（current）**：入口归一化、双帧方言、心跳保活、ACK 强度阶梯、终态帧收敛，均为冻结基线可验证的行为。
+**当前实现（current）**：入口归一化、双帧方言、心跳保活、ACK 强度阶梯、终态帧收敛，以及区分 own-scope 与管理员 cross-scope / all-scope 的只读 Observatory，均为 `f02aa690` 可验证的行为。Observatory 只消费 committed query models，不改变实时请求链路。
 
 **历史 / 已隔离（legacy）**：streaming-proxy（`/api/scopes/{scopeId}/streaming-proxy/...`）是 room-based 多 participant fan-out 的旧链路，已软废弃，sunset 日期 2026-11-25，所有响应携带 `Deprecation` / `Sunset` / `Link: rel="successor-version"` 头（见 `docs/2026-04-02-streaming-proxy-flow.md:5`）。它的 `messages:stream` 是「长连接订阅房间消息流」的另一种流式形态，与本章主链路的「一次 run 一条观测流」语义不同；room CRUD、participant join/post、room fan-out 均不能被 `/v1/responses` 无损替代。旧章的流式协议与 run 语义已合并进本章；会话身份边界另见 [Chat / Conversation / Turn 服务端身份契约](03-chat-conversation-turn-contract.md)，未落地的断线续传与 retention 契约只在 [开放缺口](../12/05-open-gaps-and-canon-drift.md) 中登记。
 
@@ -222,6 +256,8 @@ data: {"timestamp":"1785000002501","stateSnapshot":{"snapshot":{"@type":"type.go
 3. SSE 帧流断开后，恢复 run 状态的权威路径是什么，为什么不能「续传帧流」？
 4. `: keepalive` 注释帧解决的是什么具体问题，为什么不能用「调大代理超时」替代？
 5. `WorkflowRunEventEnvelope` 与 `AGUIEvent` 是什么关系，客户端在哪条入口会遇到后者？
+6. 普通调用者与管理员分别能走哪些 Observatory 读取路径；401、403 与 404 各自表达哪一道边界？
+7. Observatory 为什么不能用于判断实时帧是否完整，审计记录又为什么不能替代事前授权？
 
 <details>
 <summary>论断—证据映射</summary>
@@ -248,5 +284,11 @@ data: {"timestamp":"1785000002501","stateSnapshot":{"snapshot":{"@type":"type.go
 | run 收敛后统一补发 STATE_SNAPSHOT 帧 | E1 | `docs/canon/llm-streaming.md:448` |
 | streaming-proxy 软废弃与 sunset 边界 | E1 | `docs/2026-04-02-streaming-proxy-flow.md:5` |
 | 用户可见 run-event 类型族（RUN_STARTED 等常量） | E1 | `src/workflow/Aevatar.Workflow.Application.Abstractions/Runs/WorkflowRunEventTypes.cs:5-18` |
+| 当前数据面为七个 bearer-protected GET，包含 caller、own/cross-scope、admin run 与 scope resolution | E1 | `src/workflow/Aevatar.Workflow.Infrastructure/CapabilityApi/WorkflowRunObservatoryEndpoints.cs:59-135` |
+| own-scope 与 cross-scope intent 分流，跨 scope 查询前必须通过 elevated authorizer | E1 | `src/workflow/Aevatar.Workflow.Infrastructure/CapabilityApi/WorkflowRunObservatoryEndpoints.cs:171-265`、`:328-394` |
+| 管理员可按 `__all__` 列表或按 runId 解析所属 scope，仍只依赖 current-state / artifact query ports | E1 | `src/workflow/Aevatar.Workflow.Application/Observatory/WorkflowRunObservatoryQueryService.cs:16-30`、`:62-107` |
+| own-scope 列表按 scope 查询并二次过滤；详情先做所有权门再读取 artifact | E1 | `src/workflow/Aevatar.Workflow.Application/Observatory/WorkflowRunObservatoryQueryService.cs:33-59`、`:127-155` |
+| endpoint 审计目标与摘要只包含清洗后的 route、scope 和 runId | E1 | `src/workflow/Aevatar.Workflow.Infrastructure/CapabilityApi/WorkflowRunObservatoryEndpoints.cs:412-453` |
+| committed view DTO 明示 state version / refresh stamp 与 eventually consistent 边界 | E1 | `src/workflow/Aevatar.Workflow.Application.Abstractions/Observatory/IWorkflowRunObservatoryQueryService.cs:45-66` |
 
 </details>
