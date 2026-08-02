@@ -104,6 +104,47 @@ route 为空且请求没有显式 route 时，provider 可使用部署配置的 
 
 因此 NyxID 在这里拥有 credential/route proxy 边界，不拥有 Aevatar 的 provider catalog、agent identity、tool authorization 或所有模型实现。MEAI/Tornado 可以作为 Host 内其他 provider 路径存在，且不经过 NyxID。
 
+## MEAI 在 provider 边界收窄 tool schema 方言
+
+MEAI 不只适配 stream，也负责把 `IAgentTool.ParametersSchema` 交给 OpenAI-compatible 请求构造器。两侧接受的 JSON Schema 方言并不完全相同：调用方工具可以用 schema object 形式的 `additionalProperties` 表达 map value 类型，而当前 MEAI/OpenAI adapter 在这个位置读取的是 boolean。若直接透传，对象值会在请求发出前触发类型转换异常，使整个 turn 失败。
+
+```mermaid
+%%{init: {"maxTextSize": 100000, "flowchart": {"useMaxWidth": false, "nodeSpacing": 12, "rankSpacing": 48}, "themeVariables": {"fontSize": "10px"}}}%%
+flowchart LR
+    T["IAgentTool<br/>full ParametersSchema"]
+    P["AgentToolAIFunction<br/>parse schema"]
+    W{"additionalProperties<br/>is boolean?"}
+    K["preserve true / false"]
+    C["coerce schema object<br/>to false"]
+    R["recurse through<br/>objects and arrays"]
+    M["MEAI/OpenAI request builder"]
+    T --> P --> W
+    W -->|"yes"| K --> R
+    W -->|"no"| C --> R
+    R --> M
+```
+
+归一化发生在 `AgentToolAIFunction` 的 provider adapter 边界，并递归遍历 object 与 array：已有 boolean 保持不变，任何非 boolean 的 `additionalProperties` 改为 `false`。空白、无法解析或空节点 schema 则退回最小 object schema。这样 caller-supplied tool 不会因为 adapter 的窄方言在序列化阶段击穿整个 turn，同时也不会把不受支持的开放字段悄悄放行。
+
+例如，工具原本声明：
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "env": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    }
+  },
+  "additionalProperties": false
+}
+```
+
+进入 MEAI 请求后，嵌套 `env.additionalProperties` 会变成 `false`，根部本来就是 boolean 的限制保持不变。这是有意的有损降级：请求能按目标 adapter 的契约构造，但 map value schema 的表达能力不会被保留。因此工具设计不能依赖 MEAI 路径替它完整承载任意 JSON Schema 方言；若 map 的动态 key 是业务必需能力，应改成目标方言可表达的显式数组/键值对象，或选择真正支持该 schema 的 provider。
+
+**为什么在 provider adapter 归一化，而不是改写 `IAgentTool`？** `IAgentTool` 是跨 provider 的工具契约，提前收窄会把 MEAI/OpenAI 的限制错误扩散给其他实现。边界适配让损失只发生在需要它的出口，也使测试能从 tool contract 一直验证到实际 HTTP request body。
+
 ## failover 只在尚未产生有意义输出时发生
 
 标准 provider 路径启用 MEAI→Tornado failover 时，factory 先解析 primary/fallback，并用两侧 capability 判断请求模态是否兼容。运行时的切换点非常窄：
@@ -180,6 +221,7 @@ Aevatar:
 3. NyxID preference 在保存时怎样证明 exact service，运行时又有哪些不再验证的边界？
 4. MEAI→Tornado failover 在什么时刻允许发生，为什么 meaningful output 后必须停止切换？
 5. 为什么 NyxID provider 是 adapter，而不是 Aevatar 所有 LLM 的 universal backend？
+6. MEAI 为什么要在自身 adapter 边界收窄 `additionalProperties`，这种兼容处理损失了什么？
 
 <details>
 <summary>论断—证据映射</summary>
@@ -192,6 +234,7 @@ Aevatar:
 | owner bridge 按 exact owner scope 读取 UserConfig，applier 只合入 model/route/max rounds | E1 | `src/Aevatar.Mainnet.Host.Api/Hosting/StudioUserConfigOwnerLlmConfigSource.cs:22`、`src/Aevatar.AI.Core/LLMProviders/OwnerLlmConfigApplier.cs:31` |
 | preference writer 要求 exact inventory identity、allowed/ready，并分别保存 id、slug、route 与 model | E1 | `src/Aevatar.Studio.Application.Abstractions/Studio/Abstractions/UserLlmPreferenceWriteCore.cs:17`、`:40`、`src/Aevatar.Studio.Application/Studio/Services/UserLlmPreferenceWriter.cs:59` |
 | NyxID adapter 分别解析 model、bearer、route，并把 endpoint 限制在配置 authority | E1 | `src/Aevatar.AI.LLMProviders.NyxId/NyxIdLLMProvider.cs:267`、`:405`、`:424`、`:441` |
+| MEAI adapter 递归把非 boolean `additionalProperties` 收窄为 `false`，并保留已有 boolean | E1 | `src/Aevatar.AI.LLMProviders.MEAI/AgentToolAIFunction.cs:52`、`test/Aevatar.AI.Tests/AgentToolAIFunctionSchemaSanitizationTests.cs:21` |
 | standard provider 仅在 meaningful output 前失败/空流或 capability 不兼容时切 fallback | E1 | `src/Aevatar.AI.Core/LLMProviders/FailoverLLMProviderFactory.cs:194`、`:230`、`:263`、`:281` |
 | 当前 turn owner overlay 消费保存的 route/model，不重新读取 UserService inventory | E1 | `src/Aevatar.Mainnet.Host.Api/Hosting/StudioUserConfigOwnerLlmConfigSource.cs:24`、`src/Aevatar.AI.Core/LLMProviders/OwnerLlmConfigApplier.cs:37` |
 
