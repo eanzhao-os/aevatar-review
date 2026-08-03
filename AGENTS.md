@@ -114,8 +114,10 @@
 
 ## 文档补充自动化
 
-- 用户要求在本仓库文档中补充、更新、解释或同步任一 Aevatar feature、模块、协议、流程或技术细节时，必须使用仓库内 `updating-aevatar-review-docs` skill；无需用户显式点名。
-- 该类写入任务默认在全部门禁通过后只提交本轮显式文件并推送 `origin/main`；查询、审阅和仅提供建议不写入、不提交、不推送。
+- 用户要求在本仓库中更新、同步或刷新文档，或检查文档是否落后于上游时，必须使用仓库内 `$updating-aevatar-review-docs`；未限定主题走 `full`，点名 feature、模块、协议、流程或实现细节走 `topic`。
+- 发现 `PLAN.md` 未覆盖的独立职责边界时，已获授权打印 `SCOPE_EXTEND`，创建并唯一核验 chapter issue，然后扩充正文、`PLAN.md`、`mkdocs.yml`、block index、source map 和必要索引。
+- 每轮写入只调度一个全新上下文的只读 reviewer，复核全部语义变更和最多 6 篇轮转旧正文；reviewer 或门禁未通过不得推进状态。
+- 写入任务在全部门禁和状态提交成功后，只提交本轮显式文件并安全推送 `origin/main`；查询、审阅和建议不写入、不提交、不推送。
 
 
 <!-- consensus-rnd:foundational-invariants:start version=1 sha256=f5c24b0c3515993a7b86c4ed78ce7386add665f8c8b84cc7275aedebd6c3e6af -->
