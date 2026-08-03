@@ -16,9 +16,7 @@ theme:
     - navigation.instant
     - navigation.instant.progress
     - navigation.tracking
-    - navigation.tabs
     - navigation.sections
-    - navigation.expand
     - navigation.top
     - navigation.indexes
     - search.suggest
@@ -30,16 +28,12 @@ theme:
     - toc.follow
   palette:
     - media: "(prefers-color-scheme: light)"
-      scheme: default
-      primary: deep purple
-      accent: indigo
+      scheme: aevatar-light
       toggle:
         icon: material/weather-night
         name: 切换到深色模式
     - media: "(prefers-color-scheme: dark)"
-      scheme: slate
-      primary: deep purple
-      accent: indigo
+      scheme: aevatar-dark
       toggle:
         icon: material/weather-sunny
         name: 切换到浅色模式
