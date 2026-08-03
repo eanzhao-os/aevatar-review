@@ -21,7 +21,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 CONFIG_DIR="$REPO_ROOT/.config/upstream-sync"
 MAP_FILE="$CONFIG_DIR/chapter-source-map.json"
-STATE_FILE="$CONFIG_DIR/state.json"
+REAL_STATE_FILE="$CONFIG_DIR/state.json"
+STATE_FILE="$REAL_STATE_FILE"
 LABEL="upstream-sync"
 
 # ─── 解析参数 ────────────────────────────────────────────────────────────────
@@ -37,6 +38,24 @@ for arg in "$@"; do
     *) echo "unknown arg: $arg" >&2; exit 1 ;;
   esac
 done
+
+DRY_STATE_FILE=""
+AFFECTED_TMP=""
+cleanup() {
+  [[ -z "$AFFECTED_TMP" ]] || rm -f "$AFFECTED_TMP"
+  [[ -z "$DRY_STATE_FILE" ]] || rm -f "$DRY_STATE_FILE" "$DRY_STATE_FILE.tmp"
+}
+trap cleanup EXIT
+
+if [[ "$DRY_RUN" -eq 1 ]]; then
+  DRY_STATE_FILE="$(mktemp "${TMPDIR:-/tmp}/aevatar-review-upstream-sync.XXXXXX")"
+  if [[ -f "$REAL_STATE_FILE" ]]; then
+    cp "$REAL_STATE_FILE" "$DRY_STATE_FILE"
+  else
+    rm -f "$DRY_STATE_FILE"
+  fi
+  STATE_FILE="$DRY_STATE_FILE"
+fi
 
 # ─── 加载 host facts(必须经 CONSENSUS_RND_HOST_ENV,FI-002)────────────────
 if [[ -z "${CONSENSUS_RND_HOST_ENV:-}" ]]; then
@@ -83,19 +102,27 @@ log "上游 HEAD = ${NEW_SHA:0:12}"
 
 # ─── INIT 模式:确立基线,不建 issue ──────────────────────────────────────────
 if [[ "$INIT_MODE" -eq 1 ]]; then
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    log "DRY-RUN INIT 模式:将以当前 HEAD ${NEW_SHA:0:12} 为基线；state 保持不变。"
+    exit 0
+  fi
   log "INIT 模式:以当前 HEAD ${NEW_SHA:0:12} 为基线,不建任何 issue。"
   jq -n \
     --arg sha "$NEW_SHA" \
     --arg ts "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
     '{last_processed_sha: $sha, last_run_at: $ts, filed_issues: []}' \
     > "$STATE_FILE"
-  log "state 已写入 ${STATE_FILE}。下次运行将从此 SHA 开始 diff。"
+  log "state 已写入 ${REAL_STATE_FILE}。下次运行将从此 SHA 开始 diff。"
   exit 0
 fi
 
 # ─── 读 last_processed_sha ────────────────────────────────────────────────────
 LAST_SHA="$(jq -r '.last_processed_sha' "$STATE_FILE")"
 if [[ "$LAST_SHA" = "null" || -z "$LAST_SHA" ]]; then
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    log "DRY-RUN:state 中 last_processed_sha 为空；将采用当前 HEAD ${NEW_SHA:0:12}，state 保持不变。"
+    exit 0
+  fi
   log "state 中 last_processed_sha 为空,转入 INIT 模式。"
   jq -n \
     --arg sha "$NEW_SHA" \
@@ -105,8 +132,11 @@ if [[ "$LAST_SHA" = "null" || -z "$LAST_SHA" ]]; then
   exit 0
 fi
 
+STATE_RESULT="更新 state 后退出"
+[[ "$DRY_RUN" -eq 1 ]] && STATE_RESULT="state 保持不变并退出"
+
 if [[ "$LAST_SHA" = "$NEW_SHA" ]]; then
-  log "无新提交($LAST_SHA = $NEW_SHA)。退出。"
+  log "无新提交($LAST_SHA = $NEW_SHA)。${STATE_RESULT}。"
   jq --arg ts "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" '.last_run_at = $ts' "$STATE_FILE" > "$STATE_FILE.tmp" && mv "$STATE_FILE.tmp" "$STATE_FILE"
   exit 0
 fi
@@ -117,7 +147,7 @@ log "检测到新提交区间: ${LAST_SHA:0:12}..${NEW_SHA:0:12}"
 # 只看这些顶层目录(章节映射表覆盖范围)
 CHANGED_FILES="$(git -C "$AEVATAR_UPSTREAM_ROOT" diff --name-only "$LAST_SHA..$NEW_SHA" -- src/ docs/ agents/ apps/ workflows/ tools/ 2>/dev/null || true)"
 if [[ -z "$CHANGED_FILES" ]]; then
-  log "区间内无 src/docs/agents/apps/workflows/tools 变更。更新 state 后退出。"
+  log "区间内无 src/docs/agents/apps/workflows/tools 变更。${STATE_RESULT}。"
   jq --arg sha "$NEW_SHA" --arg ts "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
     '.last_processed_sha = $sha | .last_run_at = $ts' "$STATE_FILE" > "$STATE_FILE.tmp" && mv "$STATE_FILE.tmp" "$STATE_FILE"
   exit 0
@@ -130,7 +160,7 @@ COMMITS_RAW="$(git -C "$AEVATAR_UPSTREAM_ROOT" log "$LAST_SHA..$NEW_SHA" --no-me
 # 注意:docs(canon/adr) 的设计变更不过滤,因为是事实源文档
 FILTERED_COMMITS="$(echo "$COMMITS_RAW" | grep -vE '^[a-f0-9]+\|(chore|test|ci|style|revert|perf)\b' || true)"
 if [[ -z "$FILTERED_COMMITS" ]]; then
-  log "区间内 commit 全部为 chore/test/ci/style/revert/perf,过滤后无设计性变更。更新 state 后退出。"
+  log "区间内 commit 全部为 chore/test/ci/style/revert/perf,过滤后无设计性变更。${STATE_RESULT}。"
   jq --arg sha "$NEW_SHA" --arg ts "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
     '.last_processed_sha = $sha | .last_run_at = $ts' "$STATE_FILE" > "$STATE_FILE.tmp" && mv "$STATE_FILE.tmp" "$STATE_FILE"
   exit 0
@@ -177,7 +207,6 @@ log "反向索引条目数: $INDEX_LINES"
 #   否则 → 精确相等命中
 # 输出: 临时文件 "<chapter>\t<changed_file>" 每行一个
 AFFECTED_TMP="$(mktemp)"
-trap 'rm -f "$AFFECTED_TMP"' EXIT
 
 while IFS= read -r changed; do
   [[ -z "$changed" ]] && continue
@@ -202,7 +231,7 @@ AFFECTED_CHAPTERS="$(awk -F'\t' '{print $1}' "$AFFECTED_TMP" | sort -u)"
 CHAP_COUNT=$(echo "$AFFECTED_CHAPTERS" | grep -c . || true)
 
 if [[ "$CHAP_COUNT" -eq 0 ]]; then
-  log "变更文件未命中任何章节映射。可能命中未覆盖的目录。更新 state 后退出。"
+  log "变更文件未命中任何章节映射。可能命中未覆盖的目录。${STATE_RESULT}。"
   jq --arg sha "$NEW_SHA" --arg ts "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
     '.last_processed_sha = $sha | .last_run_at = $ts' "$STATE_FILE" > "$STATE_FILE.tmp" && mv "$STATE_FILE.tmp" "$STATE_FILE"
   exit 0
@@ -268,9 +297,18 @@ already_filed_in_state() {
 
 # GitHub 兜底去重:搜同 chapter 在 body 里且仍 open 的 issue
 already_open_on_github() {
-  local chapter="$1"
-  gh issue list --repo "$GH_REPO_SLUG" --state open --search "$chapter in:body" --label "$LABEL" --limit 5 --json number,title 2>/dev/null \
-    | jq -e '.[0]' >/dev/null 2>&1
+  local chapter="$1" response
+  if ! response="$(gh issue list --repo "$GH_REPO_SLUG" --state open \
+    --search "$chapter in:body" --label "$LABEL" --limit 5 \
+    --json number,title 2>&1)"; then
+    log "ERROR: GitHub issue list 失败 ($chapter): $response"
+    return 2
+  fi
+  if ! jq -e 'type == "array"' <<< "$response" >/dev/null 2>&1; then
+    log "ERROR: GitHub issue list 返回无效 JSON ($chapter)"
+    return 2
+  fi
+  jq -e '.[0]' <<< "$response" >/dev/null 2>&1
 }
 
 CREATED_COUNT=0
@@ -292,6 +330,9 @@ while IFS= read -r chapter; do
     log "SKIP(已有 open issue on GitHub): $chapter"
     SKIPPED_COUNT=$((SKIPPED_COUNT+1))
     continue
+  else
+    lookup_status=$?
+    [[ "$lookup_status" -ne 2 ]] || exit 1
   fi
 
   # 构建 body(变量全部显式 ${} 界定,避免全角字符干扰 bash 变量名解析)
@@ -331,7 +372,8 @@ EOF
   if [[ "$DRY_RUN" -eq 1 ]]; then
     log "DRY-RUN 会建 issue: $chapter"
     echo "  标题: $ISSUE_TITLE"
-    echo "  变更文件数: $(echo "$changed_list" | wc -l | tr -d ' ')"
+    echo "  变更文件:"
+    echo "$changed_list" | sed 's/^/    - /'
     echo "  规模: $SCALE"
     CREATED_COUNT=$((CREATED_COUNT+1))
     continue

@@ -7,6 +7,7 @@
 #   issue-replay     snapshot-upstream-issues.py historical state replay + boundaries
 #   issue-cli        create_issues.py manifest parsing and issue idempotency
 #   validators       check-md.sh / check-links.py / check-drift.sh contracts
+#   openwiki-adapter upstream-sync dry-run and OpenWiki adapter contracts
 #   all              every suite above
 #
 # Every suite builds its own throwaway fixtures under a temporary directory and
@@ -641,6 +642,194 @@ MANIFEST
 
 # --------------------------------------------------------------------------
 
+test_openwiki_adapter() {
+  local tmp review upstream remote fakebin base head
+  tmp="$(mktemp -d)"
+  review="$tmp/review"
+  upstream="$tmp/upstream"
+  remote="$tmp/upstream.git"
+  fakebin="$tmp/bin"
+  mkdir -p "$review/scripts" "$review/.config/upstream-sync" \
+    "$review/.config/consensus-rnd" "$review/00" "$fakebin"
+  cp "$ROOT/scripts/upstream-sync.sh" "$review/scripts/upstream-sync.sh"
+
+  git init --bare -q "$remote"
+  git clone -q "$remote" "$upstream" 2>/dev/null
+  (
+    cd "$upstream" || exit 1
+    git config user.email fixture@example.invalid
+    git config user.name fixture
+    git switch -qc feature/integrate
+    mkdir -p src
+    printf 'initial\n' > src/demo.cs
+    git add -- src/demo.cs
+    git commit -qm 'feat: initial demo'
+    git push -qu origin feature/integrate
+  ) || { fail "openwiki-adapter: upstream fixture setup failed"; rm -rf "$tmp"; return; }
+  base="$(git -C "$upstream" rev-parse HEAD)"
+  (
+    cd "$upstream" || exit 1
+    printf 'changed\n' > src/demo.cs
+    git add -- src/demo.cs
+    git commit -qm 'feat: change demo'
+    git push -q
+  ) || { fail "openwiki-adapter: upstream fixture update failed"; rm -rf "$tmp"; return; }
+  head="$(git -C "$upstream" rev-parse HEAD)"
+
+  printf '%s\n' \
+    '{"alias_expansion":{"canon":{}},"chapters":{"00/01-demo.md":["src/demo.cs"]}}' \
+    > "$review/.config/upstream-sync/chapter-source-map.json"
+  printf '# Demo chapter\n' > "$review/00/01-demo.md"
+  printf 'AEVATAR_UPSTREAM_ROOT="%s"\nGH_REPO_SLUG="fixture/review"\n' "$upstream" \
+    > "$review/.config/consensus-rnd/host.env"
+  cat > "$fakebin/gh" <<'FAKE_GH'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$GH_CALL_LOG"
+if [ "${1:-} ${2:-}" = "issue list" ]; then
+  if [ "${GH_LIST_FAIL:-0}" = 1 ]; then
+    printf 'fixture GitHub unavailable\n' >&2
+    exit 91
+  fi
+  printf '[]\n'
+  exit 0
+fi
+printf 'unexpected mutation: %s\n' "$*" >&2
+exit 90
+FAKE_GH
+  chmod +x "$fakebin/gh"
+
+  printf '{"last_processed_sha":"%s","last_run_at":"fixed","filed_issues":[]}\n' "$base" \
+    > "$review/.config/upstream-sync/state.json"
+  cp "$review/.config/upstream-sync/state.json" "$tmp/state.before"
+  : > "$tmp/gh.log"
+  PATH="$fakebin:$PATH" GH_CALL_LOG="$tmp/gh.log" \
+    CONSENSUS_RND_HOST_ENV="$review/.config/consensus-rnd/host.env" \
+    bash "$review/scripts/upstream-sync.sh" --dry-run > "$tmp/hit.log" 2>&1
+  assert_eq "0" "$?" "openwiki-adapter: mapped dry-run exits zero"
+  cmp -s "$tmp/state.before" "$review/.config/upstream-sync/state.json" || \
+    fail "openwiki-adapter: mapped dry-run changed state"
+  assert_contains "$tmp/hit.log" "${base:0:12}..${head:0:12}" \
+    "openwiki-adapter: dry-run names SHA range"
+  assert_contains "$tmp/hit.log" "00/01-demo.md" "openwiki-adapter: dry-run names chapter"
+  assert_contains "$tmp/hit.log" "src/demo.cs" "openwiki-adapter: dry-run names source"
+  assert_contains "$tmp/hit.log" "规模: minor" "openwiki-adapter: dry-run names scale"
+  if grep -Eq '(^| )(label|issue) create( |$)' "$tmp/gh.log"; then
+    fail "openwiki-adapter: dry-run attempted GitHub mutation"
+  fi
+
+  PATH="$fakebin:$PATH" GH_CALL_LOG="$tmp/gh.log" GH_LIST_FAIL=1 \
+    CONSENSUS_RND_HOST_ENV="$review/.config/consensus-rnd/host.env" \
+    bash "$review/scripts/upstream-sync.sh" --dry-run > "$tmp/gh-fail.log" 2>&1
+  assert_eq "1" "$?" "openwiki-adapter: GitHub lookup failure is explicit"
+  cmp -s "$tmp/state.before" "$review/.config/upstream-sync/state.json" || \
+    fail "openwiki-adapter: failed GitHub lookup changed state"
+  assert_contains "$tmp/gh-fail.log" "GitHub issue list 失败" \
+    "openwiki-adapter: GitHub lookup failure is diagnosed"
+
+  base="$head"
+  (
+    cd "$upstream" || exit 1
+    printf 'outside mapped roots\n' > README.md
+    git add -- README.md
+    git commit -qm 'feat: update repository note'
+    git push -q
+  ) || { fail "openwiki-adapter: unrelated commit setup failed"; rm -rf "$tmp"; return; }
+  head="$(git -C "$upstream" rev-parse HEAD)"
+  printf '{"last_processed_sha":"%s","last_run_at":"fixed","filed_issues":[]}\n' "$base" > "$review/.config/upstream-sync/state.json"
+  cp "$review/.config/upstream-sync/state.json" "$tmp/state.before"
+  PATH="$fakebin:$PATH" GH_CALL_LOG="$tmp/gh.log" \
+    CONSENSUS_RND_HOST_ENV="$review/.config/consensus-rnd/host.env" \
+    bash "$review/scripts/upstream-sync.sh" --dry-run > "$tmp/unrelated.log" 2>&1
+  assert_eq "0" "$?" "openwiki-adapter: unrelated dry-run exits zero"
+  cmp -s "$tmp/state.before" "$review/.config/upstream-sync/state.json" || \
+    fail "openwiki-adapter: unrelated dry-run changed state"
+
+  base="$head"
+  (
+    cd "$upstream" || exit 1
+    printf 'test-only change\n' > src/demo.cs
+    git add -- src/demo.cs
+    git commit -qm 'test: update demo fixture'
+    git push -q
+  ) || { fail "openwiki-adapter: filtered commit setup failed"; rm -rf "$tmp"; return; }
+  head="$(git -C "$upstream" rev-parse HEAD)"
+  printf '{"last_processed_sha":"%s","last_run_at":"fixed","filed_issues":[]}\n' "$base" > "$review/.config/upstream-sync/state.json"
+  cp "$review/.config/upstream-sync/state.json" "$tmp/state.before"
+  PATH="$fakebin:$PATH" GH_CALL_LOG="$tmp/gh.log" \
+    CONSENSUS_RND_HOST_ENV="$review/.config/consensus-rnd/host.env" \
+    bash "$review/scripts/upstream-sync.sh" --dry-run > "$tmp/filtered.log" 2>&1
+  assert_eq "0" "$?" "openwiki-adapter: filtered dry-run exits zero"
+  cmp -s "$tmp/state.before" "$review/.config/upstream-sync/state.json" || \
+    fail "openwiki-adapter: filtered dry-run changed state"
+
+  base="$head"
+  (
+    cd "$upstream" || exit 1
+    printf 'unmapped\n' > src/unmapped.cs
+    git add -- src/unmapped.cs
+    git commit -qm 'feat: add unmapped source'
+    git push -q
+  ) || { fail "openwiki-adapter: unmapped commit setup failed"; rm -rf "$tmp"; return; }
+  head="$(git -C "$upstream" rev-parse HEAD)"
+  printf '{"last_processed_sha":"%s","last_run_at":"fixed","filed_issues":[]}\n' "$base" > "$review/.config/upstream-sync/state.json"
+  cp "$review/.config/upstream-sync/state.json" "$tmp/state.before"
+  PATH="$fakebin:$PATH" GH_CALL_LOG="$tmp/gh.log" \
+    CONSENSUS_RND_HOST_ENV="$review/.config/consensus-rnd/host.env" \
+    bash "$review/scripts/upstream-sync.sh" --dry-run > "$tmp/unmapped.log" 2>&1
+  assert_eq "0" "$?" "openwiki-adapter: unmapped dry-run exits zero"
+  cmp -s "$tmp/state.before" "$review/.config/upstream-sync/state.json" || \
+    fail "openwiki-adapter: unmapped dry-run changed state"
+
+  printf '{"last_processed_sha":null,"last_run_at":"fixed","filed_issues":[]}\n' \
+    > "$review/.config/upstream-sync/state.json"
+  cp "$review/.config/upstream-sync/state.json" "$tmp/state.before"
+  PATH="$fakebin:$PATH" GH_CALL_LOG="$tmp/gh.log" \
+    CONSENSUS_RND_HOST_ENV="$review/.config/consensus-rnd/host.env" \
+    bash "$review/scripts/upstream-sync.sh" --dry-run > "$tmp/null-sha.log" 2>&1
+  assert_eq "0" "$?" "openwiki-adapter: null-SHA dry-run exits zero"
+  cmp -s "$tmp/state.before" "$review/.config/upstream-sync/state.json" || \
+    fail "openwiki-adapter: null-SHA dry-run changed state"
+
+  printf '{"last_processed_sha":"%s","last_run_at":"fixed","filed_issues":[]}\n' "$head" > "$review/.config/upstream-sync/state.json"
+  cp "$review/.config/upstream-sync/state.json" "$tmp/state.before"
+  PATH="$fakebin:$PATH" GH_CALL_LOG="$tmp/gh.log" \
+    CONSENSUS_RND_HOST_ENV="$review/.config/consensus-rnd/host.env" \
+    bash "$review/scripts/upstream-sync.sh" --dry-run > "$tmp/no-change.log" 2>&1
+  assert_eq "0" "$?" "openwiki-adapter: no-change dry-run exits zero"
+  cmp -s "$tmp/state.before" "$review/.config/upstream-sync/state.json" || \
+    fail "openwiki-adapter: no-change dry-run changed state"
+
+  rm -f "$review/.config/upstream-sync/state.json"
+  PATH="$fakebin:$PATH" GH_CALL_LOG="$tmp/gh.log" \
+    CONSENSUS_RND_HOST_ENV="$review/.config/consensus-rnd/host.env" \
+    bash "$review/scripts/upstream-sync.sh" --init --dry-run > "$tmp/init.log" 2>&1
+  assert_eq "0" "$?" "openwiki-adapter: init dry-run exits zero"
+  if [ -e "$review/.config/upstream-sync/state.json" ]; then
+    fail "openwiki-adapter: init dry-run created state"
+  fi
+  assert_contains "$tmp/init.log" "state 保持不变" "openwiki-adapter: init explains no write"
+
+  PATH="$fakebin:$PATH" GH_CALL_LOG="$tmp/gh.log" \
+    CONSENSUS_RND_HOST_ENV="$review/.config/consensus-rnd/host.env" \
+    bash "$review/scripts/upstream-sync.sh" --dry-run > "$tmp/implicit-init.log" 2>&1
+  assert_eq "0" "$?" "openwiki-adapter: missing-state dry-run exits zero"
+  if [ -e "$review/.config/upstream-sync/state.json" ]; then
+    fail "openwiki-adapter: missing-state dry-run created state"
+  fi
+
+  PATH="$fakebin:$PATH" GH_CALL_LOG="$tmp/gh.log" \
+    CONSENSUS_RND_HOST_ENV="$review/.config/consensus-rnd/host.env" \
+    bash "$review/scripts/upstream-sync.sh" --init > "$tmp/real-init.log" 2>&1
+  assert_eq "0" "$?" "openwiki-adapter: real init exits zero"
+  assert_eq "$head" \
+    "$(jq -r '.last_processed_sha' "$review/.config/upstream-sync/state.json")" \
+    "openwiki-adapter: real init writes current upstream SHA"
+
+  rm -rf "$tmp"
+}
+
+# --------------------------------------------------------------------------
+
 run_suite() {
   case "$1" in
     frozen-upstream) test_frozen_upstream ;;
@@ -648,6 +837,7 @@ run_suite() {
     issue-replay)    test_issue_replay ;;
     issue-cli)       test_issue_cli ;;
     validators)      test_validators ;;
+    openwiki-adapter) test_openwiki_adapter ;;
     *) printf 'unknown suite: %s\n' "$1" >&2; exit 2 ;;
   esac
   if [ "$FAILURES" -eq 0 ]; then
@@ -659,12 +849,12 @@ run_suite() {
 
 main() {
   if [ "$#" -ne 1 ]; then
-    printf 'usage: %s <frozen-upstream|issue-snapshot|issue-replay|issue-cli|validators|all>\n' "$0" >&2
+    printf 'usage: %s <frozen-upstream|issue-snapshot|issue-replay|issue-cli|validators|openwiki-adapter|all>\n' "$0" >&2
     exit 2
   fi
   if [ "$1" = "all" ]; then
     local rc=0
-    for suite in frozen-upstream issue-snapshot issue-replay issue-cli validators; do
+    for suite in frozen-upstream issue-snapshot issue-replay issue-cli validators openwiki-adapter; do
       FAILURES=0
       run_suite "$suite"
       [ "$FAILURES" -eq 0 ] || rc=1
