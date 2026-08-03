@@ -1,273 +1,117 @@
-# Aevatar Review 文档更新 Skill 设计
+# Aevatar Review 文档补充 Skill 设计
 
-> 批准日期：2026-08-02
+> 批准日期：2026-08-03
 >
 > 适用仓库：`~/Code/aevatar-review`
 >
 > 只读事实源：`~/Code/aevatar` 的 `origin/feature/integrate`
->
-> 产物位置：`.agents/skills/updating-aevatar-review-docs/`
 
-## 1. 目标
+## 目标
 
-为本仓库提供一个项目专用 skill。当用户表达“更新文档”“同步 aevatar 后修订文档”或“检查文档是否落后于上游”等意图时，Codex 必须先同步 `origin/feature/integrate` 的远端引用，再以固定提交的只读快照为事实源修订或增加中文章节。
+用户只需说明要补充的 feature 或技术细节。仓库内 skill 自动寻找最合适的现有章节，以最新 `origin/feature/integrate` 的固定提交快照为依据完成中文文档更新；全部门禁通过后，只提交本轮文件并直接推送当前仓库的 `origin/main`。
 
-每轮更新同时解决三个问题：
+本能力只处理用户明确点名的主题，不顺带扫描或重写全书。
 
-1. 审查上次成功正文同步水位之后的全部上游变化，更新受影响章节；
-2. 枚举目标快照中的架构能力，补回没有明确文档归属的既有 feature；
-3. 调度一个全新上下文的独立 reviewer，复核本轮改动和 6 篇旧正文，使多轮更新最终覆盖全书。
+## 方案
 
-“尽可能记录所有 feature 和实现细节”以架构可理解性为边界：覆盖职责、协议、状态、不变量、授权、持久化、失败与恢复、运行拓扑和关键实现取舍；不把逐文件或逐方法清单当作正文。
-
-## 2. 方案选择
-
-### 方案 A：轻量 skill 加确定性辅助脚本（采用）
-
-`SKILL.md` 承担语义判断，辅助脚本承担 Git、快照、差异事实包、映射和抽样。复用仓库已有脚本，不重复实现文档门禁或快照生成。
-
-优点是安全边界明确、结果可测试、重复调用稳定；代价是 skill 目录中需要维护一个小脚本。
-
-### 方案 B：纯 `SKILL.md`（未采用）
-
-每次由 agent 临时拼装 Git、抽样和状态命令。文件较少，但容易在多次调用间产生状态格式和失败语义漂移。
-
-### 方案 C：全自动文档生成程序（未采用）
-
-把 feature 分类、章节归属和写作编码成程序。它无法可靠替代架构语义判断，还会复制 agent 和现有脚本的职责。
-
-## 3. 文件与职责
+采用最小的 repo-local skill：
 
 ```text
 .agents/skills/updating-aevatar-review-docs/
 ├── SKILL.md
-├── agents/openai.yaml
-└── scripts/prepare-update.py
+└── agents/openai.yaml
 
-.config/aevatar-doc-update/
-└── state.json
+AGENTS.md  # 登记自然语言触发规则
 ```
 
-- `SKILL.md`：规定触发条件、主流程、证据要求、新章节扩展、独立复核、失败边界和完成条件。
-- `agents/openai.yaml`：提供仓库内 skill 的展示名、简述和默认调用提示。
-- `prepare-update.py`：执行安全 fetch、固定同步目标 SHA、生成目标提交快照、输出增量事实包、在本轮修改范围确定后选择旧正文复核样本，并在成功后只推进正文同步水位与复核覆盖。
-- `.config/aevatar-doc-update/state.json`：仓库级、可提交的跨 turn 权威记录。skill 私有目录不保存冻结证据、正文同步水位或覆盖台账。
+`SKILL.md` 只编排现有 Git 和仓库脚本，不新增状态台账、后台任务、通用工作流引擎或辅助程序。语义定位和写作需要 agent 判断；Git 快照及文档验证直接复用现有脚本。
 
-复用现有组件：
+未采用的方案：
 
-- `scripts/materialize-frozen-upstream.sh` 生成只读提交快照；
-- `.config/upstream-sync/chapter-source-map.json` 提供章节到源码路径的导航映射；
-- `scripts/check-md.sh`、`scripts/check-links.py`、`scripts/check-drift.sh`、`scripts/check-mermaid.py` 和 `mkdocs build --strict` 承担现有质量门禁；
-- `scripts/upstream-sync.sh` 继续服务定时 issue watch loop，其未提交的运行状态不作为“文档已经同步”的证据。
+- 只改 `AGENTS.md`：足以记录规则，但触发说明和完整执行契约会持续占用项目上下文。
+- 新增自动生成程序：章节归属和设计论证不能可靠机械化，维护成本高于收益。
 
-活跃书目以 `PLAN.md` 为准。`docs/migration/2026-07-25-target-chapters.md` 保持为 2026-07-25 重构的冻结迁移证据；未来自动扩章不得改写它，也不得继续让验证器把它当作当前章节清单。
+## 触发
 
-本仓库采用双基线：`frozen_upstream_sha` / `frozen_verified_at` 固定章节 frontmatter 的可回放证据版本；`synced_upstream_sha` 记录正文已经完整审查到的 `feature/integrate` 水位。正文可以同步目标提交的新事实，但不得把这次同步冒充为全书 frontmatter 的重新冻结。
+在本仓库中，只要用户要求补充、更新、解释或同步某个 aevatar feature、模块、协议、流程或实现细节，就使用该 skill；用户无需显式点名 skill，也无需重复说明事实分支、验证或推送要求。
 
-## 4. 上游同步与事实快照
+查询、审阅或仅要求建议时不触发写入和推送。
 
-同步只允许以下操作：
+## 执行流程
 
-1. 校验 `~/Code/aevatar` 是 Git 仓库且存在 `origin`；
-2. 执行 `git fetch origin feature/integrate`；
-3. 解析完整的 `origin/feature/integrate` commit SHA；
-4. 从该提交对象生成只读目标快照；
-5. 增量扫描与正文写作读取目标快照；最终引用校验同时读取冻结证据快照与该目标快照。
+### 1. 建立安全基线
 
-不得对上游执行 `pull`、`checkout`、`switch`、`reset`、`clean`、`stash` 或任何文件写入。上游工作树脏、位于其他分支或 detached HEAD 都不得触发“整理”动作，也不阻止从远端引用读取提交对象。
+1. 确认当前仓库是 `aevatar-review`，当前分支为 `main`，且不是 linked worktree。
+2. 读取根 `AGENTS.md`、`PLAN.md` 和当前 `git status`。
+3. `git fetch origin main`，记录 `origin/main` SHA。
+4. 本地若含尚未存在于 `origin/main` 的既有提交，立即停止，避免将旧提交顺带推送。
+5. 本地仅落后且工作树允许安全快进时，可执行 `git merge --ff-only origin/main`；发生分叉或无法快进时停止。
 
-每轮开始即固定一个目标 SHA。即使同步过程中远端继续推进，本轮也不移动目标；后续提交留给下一轮。
+既有未提交改动归用户所有。它们可以留在工作树中，但一旦与本轮目标文件重叠，就停止并报告；不得 stash、覆盖或顺带提交。
 
-### 4.1 非快进改写
+### 2. 固定上游事实
 
-若旧 `synced_upstream_sha` 不是目标 SHA 的祖先：
+1. 在 `~/Code/aevatar` 执行 `git fetch origin feature/integrate`。
+2. 解析一次完整的 `origin/feature/integrate` SHA，并在本轮保持不变。
+3. 调用 `scripts/materialize-frozen-upstream.sh` 生成本轮只读快照，并同时复用仓库既定的冻结基线快照。
+4. 新增或更新的事实从本轮快照取得；普通章节 frontmatter 继续保留仓库既定的冻结 SHA/date，不顺手移动全书审查基线。
 
-- 旧提交对象仍存在时，明确报告 history rewrite，并比较旧树与新树的最终差异；
-- 旧对象不存在时停止，不推断缺失历史，也不推进正文同步水位。
+禁止对上游执行 `pull`、`checkout`、`switch`、`reset`、`clean`、`stash` 或文件写入；上游当前分支和工作树状态不影响读取远端提交对象。fetch 或快照失败时停止，不退回到可能陈旧的 live working tree。
 
-## 5. 更新事实包
+### 3. 自动定位
 
-`prepare-update.py` 产出机器可读 JSON，并在终端给出简洁摘要。事实包至少包含：
+综合搜索以下入口：
 
-- 冻结证据 SHA、正文同步水位 SHA、目标 SHA、祖先关系和是否发生 history rewrite；
-- 提交列表，包括 merge、fix、test、docs、删除和重命名；
-- changed files 及其状态；
-- 由章节映射命中的现有章节；
-- 未被章节映射覆盖的上游路径；
-- 目标快照中的架构候选及其现有文档命中情况；
-- 本轮应交给独立 reviewer 的 6 篇旧正文。
+- 用户主题及源码标识符；
+- `PLAN.md`、现有正文和 block `index.md`；
+- `.config/upstream-sync/chapter-source-map.json`；
+- 快照中的实现、contract、canon 与 ADR。
 
-提交前缀不能替代语义判断。`test`、`fix`、`docs` 或 `chore` 变化可能揭示真实协议、失败语义或部署边界，因此事实包不做设计性提交过滤。章节映射也只负责导航；未命中映射不能被解释为“无需更新”。
+优先修改能够完整承接该读者问题的一个现有章节；只有跨越清晰的新职责边界、现有章节无法合理容纳时才扩章。扩章必须先按根 `AGENTS.md` 输出 `SCOPE_EXTEND` 并补 issue，再更新 `PLAN.md`、`mkdocs.yml`、block index 和必要索引。
 
-### 5.1 架构候选
+### 4. 编写
 
-候选扫描面至少包括：
+文档遵守仓库写作原则：
 
-- solution/project 与模块边界；
-- Host、Agent/GAgent 和 runtime；
-- proto、公开 contract、endpoint 和消息协议；
-- Tool Provider、Connector 和 Workflow primitive；
-- 持久化、Projection、授权、配置与运行拓扑实现；
-- `docs/canon/*` 和 `docs/adr/*`。
+- 用职责、边界、协议、状态和不变量解释设计，而不是堆实现清单；
+- 开头保留不超过 3 条高价值事实源入口；事实论断必须能回指固定快照中的真实路径和行号；
+- 说明“为什么采用当前设计，而不是其他方案”，无法论证时诚实登记 `设计待论证`；
+- 流程、状态或分层关系用 Mermaid 表达，普通章节最终至少有两张图；每个 Mermaid 块包含规定的 init 行；
+- 适用时补最小 YAML、协议或调用示例；
+- 当前实现、目标态、历史或已移除组件必须明确区分。
 
-脚本只列出候选和搜索命中，不判断“是否值得单独成章”。主 agent 必须结合已有章节、读者问题和职责边界作出判断。
+修改范围只覆盖本主题及维持导航、索引和一致性所必需的文件。
 
-## 6. 主更新流程
+### 5. 验证
 
-1. 确认当前目录和仓库身份，读取 `AGENTS.md`、`PLAN.md`、`mkdocs.yml`、章节映射、状态及当前工作树 diff。
-2. 运行辅助脚本的 prepare 阶段，固定目标 SHA、生成冻结快照和事实包。
-3. 逐项检查全部 commit、changed files、映射结果、未覆盖路径和架构候选。
-4. 目标 SHA 变化时，逐项判断正文中的旧 SHA、旧计数和旧结论是否仍是历史证据；保留所有普通章节的冻结 SHA/date frontmatter，不做全书机械迁移。对真正受目标快照影响的能力，修改最少数量的现有章节，并同步事实源入口、设计图、示例、状态标记和相关索引。block index 没有 SHA/date frontmatter 契约，但其中的事实与计数仍须同步。
-5. 对新职责边界或独立读者问题，按第 7 节扩展新章节。
-6. 以本轮最终语义修订章节为排除集重选旧正文样本，再调度一个全新上下文、只读的独立 reviewer，审查全部语义修订章节和抽中的 6 篇旧正文。
-7. 修复 findings；存在 blocking finding 时，由同一 reviewer 复核修订。
-8. 执行全量文档门禁。
-9. 全部通过后调用辅助脚本的 commit-state 阶段，原子推进正文同步水位和覆盖台账；冻结证据 SHA/date 永不由该命令推进。
-
-即使目标 SHA 与正文同步水位相同，也执行旧正文抽样复核和全量门禁。
-
-## 7. 自动扩展新章节
-
-当一项能力无法合理归入现有章节，且形成独立职责边界、协议或读者问题时，主 agent 自动完成扩章，不等待额外确认：
-
-1. 搜索现有正文、`PLAN.md` 和 GitHub issues，排除重复主题；
-2. 在最合适的现有 block 中选择下一个合法编号和 slug；
-3. 创建 chapter GitHub issue，写明目标 SHA、高价值事实源、目标路径、范围和读者验收问题；
-4. issue 创建成功后，新增正文并更新 `PLAN.md`、`mkdocs.yml`、block `index.md`、章节映射以及受影响的计数和索引；
-5. 按普通章节要求加入至少两张 Mermaid 图，并论证“为什么采用当前设计，而不是其他选择”。
-
-Issue 创建是一次有外部副作用的操作。调用失败或返回不明确时，先按标题、目标路径和目标 SHA readback：
-
-- 已存在唯一匹配 issue：复用它；
-- 明确不存在：只允许一次经诊断后的创建尝试；
-- 仍无法判定：停止扩章，不留下正文或导航的半成品。
-
-## 8. 独立复核与轮转覆盖
-
-每轮更新只调度一个全新上下文的独立 reviewer。它不得参与本轮写作，只能读取文档、目标冻结快照和必要的仓库规则；作者的结论不能作为事实输入。
-
-Reviewer 范围包括：
-
-- 本轮全部新增或发生正文、图、事实源、示例或状态结论变化的语义修订章节；
-- 由脚本选出的 6 篇旧正文。
-
-Reviewer 按章节返回 `blocking` 和 `non-blocking` findings。事实错误、遗漏关键架构边界、把目标态写成当前实现、无证据论断、损坏的图或导航属于 blocking。存在 blocking finding 时不能推进状态。
-辅助脚本在语义修订范围确定后写入 `semantic_changed_chapters` 和最终 `review_sample`；它同时对比旧状态与新 `PLAN.md`，要求每个新增章节都记录唯一且与 PLAN 行一致的 GitHub issue URL。状态提交要求 reviewer 已覆盖二者的并集，并且新增章节 issue 记录完整。
-
-### 8.1 抽样算法
-
-旧正文选择顺序为：
-
-1. 排除本轮语义修订章节；
-2. 按 `review_count` 升序，优先覆盖审查次数最低的章节；
-3. 同计数按 `last_reviewed_at` 升序，未审查视为最早；
-4. 仍相同时，以目标 SHA 为种子做稳定打散；
-5. 默认选择 6 篇。大规模增量时，主 agent 可以减少数量，但不得降为 0，并须在结果中说明。
-
-只有 reviewer 通过的旧正文才增加 `review_count`。所有正文的最小 `review_count` 增加一次，代表完成一轮全书覆盖。新章节从 `review_count: 0` 开始，因此会在后续轮次优先进入抽样。
-
-## 9. 状态模型与提交时机
-
-`.config/aevatar-doc-update/state.json` 采用版本化 JSON：
-
-```json
-{
-  "schema_version": 1,
-  "frozen_upstream_sha": "f02aa690bbebb9cabeac30a553d737486b0eb661",
-  "frozen_verified_at": "2026-07-25",
-  "synced_upstream_sha": "f02aa690bbebb9cabeac30a553d737486b0eb661",
-  "last_successful_update_at": "2026-08-02T00:00:00Z",
-  "chapters": {
-    "02/01-agent-actor-runtime.md": {
-      "review_count": 1,
-      "last_reviewed_sha": "f02aa690bbebb9cabeac30a553d737486b0eb661",
-      "last_reviewed_at": "2026-08-02T00:00:00Z",
-      "result": "pass"
-    }
-  }
-}
-```
-
-初次启用时，以当前文档明确声明的冻结上游 SHA 和核验日期初始化 `frozen_upstream_sha`、`frozen_verified_at` 与 `synced_upstream_sha`；若无法唯一解析，停止并报告，不能直接把最新远端 SHA 当作“已经完整同步”。三者最初都绑定 `f02aa690bbebb9cabeac30a553d737486b0eb661` / `2026-07-25`，因此第一次真实“更新文档”会完整审查冻结版本之后的全部差异。已有零散正文同步不被冒充为完整水位。所有现有普通章节以 `review_count: 0` 初始化。`last_successful_update_at` 记录最近一次完整更新或抽样复核完成的时间，不能冒充 frontmatter 的冻结核验日期。
-
-Prepare 阶段不改状态。只有以下条件全部满足后才原子替换状态文件：
-
-- 本轮所有目标章节已经完成；
-- 独立 reviewer 没有未关闭的 blocking finding；
-- 全量门禁通过；
-- 新章节 issue 均有可核验编号。
-
-任一阶段失败都保留旧状态，使下一次调用能够从同一基线完整重试。
-目标 SHA 没有变化时，成功的抽样复核只更新运行时间和章节覆盖记录。目标 SHA 前进时，成功提交只推进 `synced_upstream_sha`；`frozen_upstream_sha` 与 `frozen_verified_at` 始终不变。
-
-## 10. 工作树与权限边界
-
-- `~/Code/aevatar` 永久只读。
-- 当前文档仓库的既有改动均视为用户所有；目标文件有重叠修改时，先读取 diff 并做局部合并，无法确认所有权则停止该文件。
-- skill 默认不 commit、push、merge 或安装后台调度。
-- 默认允许的外部写操作只有新章节所需的 GitHub issue；其他 issue、PR、通知和发布不在范围内。
-- 独立 reviewer 不修改文件，不创建 issue，不推进状态。
-
-## 11. 失败处理
-
-- fetch 失败：报告错误并停止，不读取可能过期的远端引用作为最新事实。
-- 快照失败：停止，不回退到上游 live working tree。
-- 基线对象缺失：停止，不猜测提交区间。
-- `gh` 未认证或 issue 结果不明确：按第 7 节 readback；仍不明确则停止扩章。
-- reviewer 不可用：停止，不以作者自审替代独立复核。
-- blocking finding 未关闭：不推进状态。
-- 任一门禁失败：保留旧状态，并在交付中列明失败命令和最小诊断。
-
-## 12. 测试与验证
-
-### 12.1 Skill 的 RED-GREEN-REFACTOR
-
-创建 skill 前，用独立 agent 在没有该 skill 的情况下执行包含时间压力、脏上游工作树、遗漏映射和 GitHub 副作用的真实场景，记录它实际省略或误做的步骤。最小 skill 只针对观察到的失败编写，再用相同场景复测并关闭新漏洞。
-
-### 12.2 辅助脚本测试
-
-使用临时合成 Git 仓库留下一个最小可运行测试，覆盖：
-
-- fetch 后解析远端目标 SHA，但不修改上游工作树；
-- 正常增量与非快进树差异；
-- 冻结快照调用；
-- changed files、章节映射和未覆盖路径；
-- 以目标 SHA 为种子的稳定抽样；
-- prepare 失败和门禁失败时不推进状态；
-- commit-state 成功时只原子推进正文同步水位与复核覆盖，冻结基线字段保持不变。
-
-### 12.3 仓库验收
-
-- skill 元数据通过 `skill-creator` 的 `quick_validate.py`；
-- 在当前仓库执行一次不写文档、不建 issue、不推进状态的 dry-run 前向测试；
-- 对实际 skill 行为做一次独立 agent 前向测试；
-- 最终执行：
+按仓库既有“双基准”契约执行全部门禁：`AEVATAR_SRC` 指向 frontmatter 的冻结基线，`AEVATAR_SRC2` 指向本轮 `origin/feature/integrate` 快照。
 
 ```bash
-AEVATAR_SRC="$FROZEN_SNAPSHOT" AEVATAR_SRC2="$TARGET_SNAPSHOT" \
-  EXPECTED_UPSTREAM_COMMIT="$FROZEN_SHA" EXPECTED_VERIFIED_AT="$FROZEN_VERIFIED_AT" \
-  bash scripts/check-md.sh --all
+AEVATAR_SRC="$FROZEN_SNAPSHOT" AEVATAR_SRC2="$TARGET_SNAPSHOT" bash scripts/check-md.sh --all
 python3 scripts/check-links.py --all
 bash scripts/check-drift.sh
 python3 scripts/check-mermaid.py
 mkdocs build --strict --clean
 ```
 
-## 13. 完成定义
+任一门禁失败就停止，不 commit、不 push。只修复本轮造成或本轮目标范围内的失败；无关既有失败应报告，不能扩大范围掩盖。
 
-- 仓库内 skill 可被显式调用，且根 `AGENTS.md` 明确登记“更新文档”类触发规则；
-- 上游同步只 fetch 并读取 commit 对象，测试证明不会改变上游工作树；
-- 每轮都生成完整增量事实包和架构候选覆盖报告；
-- 已有能力被修订到正确章节，新独立能力会先建 issue 再完整接入导航与索引；
-- 每轮由一个独立 reviewer 检查所有本轮变更及默认 6 篇旧正文；
-- 覆盖台账可跨 turn 累积，并以最低 `review_count` 衡量全书轮次；
-- 任何失败都不会错误推进 `synced_upstream_sha` 或审查计数；冻结证据 SHA/date 在所有更新中保持不变；
-- 全量文档门禁通过。
+### 6. 精确提交并推送
 
-## 14. 非目标
+1. 仅用显式路径暂存本轮文件，禁止 `git add .` 或 `git add -A`。
+2. 检查 cached diff，确认没有用户原有改动、临时文件或上游文件。
+3. 创建一个 `docs:` 提交。
+4. 再次 `git fetch origin main`；只有远端仍等于步骤 1 记录的 SHA，才执行 `git push origin HEAD:main`。
+5. push 后读取 `refs/heads/main`，确认远端 SHA 等于本地 `HEAD`。
 
-- 不修改、整理或提交 `~/Code/aevatar`；
-- 不把 skill 变成后台 daemon 或 OS scheduler；
-- 不自动 commit、push、开 PR 或部署站点；
-- 不以代码目录镜像替代面向读者问题的章节结构；
-- 不为语义写作建立新的生成框架或长期服务。
+远端在本轮期间推进、push 被拒或本地历史分叉时，不自动 merge、rebase 或 force-push；保留本地提交并报告。push 结果不明确时先 readback，远端已是目标 SHA 即视为成功，明确未更新后才允许一次经诊断的重试。
+
+## 完成条件
+
+- 用户主题位于语义最合适的章节，且没有无关改动；
+- 新增或更新的事实基于本轮固定的 `origin/feature/integrate` SHA，并与冻结 frontmatter 基线清楚区分；
+- 仓库全部文档门禁通过；
+- 本轮文件形成一个独立提交；
+- `origin/main` 经 readback 确认指向该提交。
+
+若任一条件未满足，结果必须明确标为未完成，并指出停在哪个安全边界。
