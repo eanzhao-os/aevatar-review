@@ -825,6 +825,142 @@ FAKE_GH
     "$(jq -r '.last_processed_sha' "$review/.config/upstream-sync/state.json")" \
     "openwiki-adapter: real init writes current upstream SHA"
 
+  mkdir -p "$review/docs/assets"
+  printf '# Fixture home\n' > "$review/docs/index.md"
+  printf 'site asset\n' > "$review/docs/assets/site.png"
+  : > "$review/PLAN.md"
+  local block chapter_number chapter_limit rel wiki_root
+  for block in 00 01 02 03 04 05 06 07 08 09 10 11 12 13; do
+    mkdir -p "$review/$block"
+    printf '# %s index\n' "$block" > "$review/$block/index.md"
+    chapter_limit=5
+    if [ "$block" = 00 ] || [ "$block" = 01 ]; then
+      chapter_limit=6
+    fi
+    chapter_number=1
+    while [ "$chapter_number" -le "$chapter_limit" ]; do
+      rel="$block/$(printf '%02d' "$chapter_number")-fixture.md"
+      printf '# %s\n\n[index](index.md)\n' "$rel" > "$review/$rel"
+      printf -- '- [x] [%s](%s) — `current`\n' "$rel" "$rel" >> "$review/PLAN.md"
+      chapter_number=$((chapter_number + 1))
+    done
+  done
+  mkdir -p "$review/00/assets"
+  printf 'block asset\n' > "$review/00/assets/block.png"
+  printf '# Orphan\n' > "$review/00/99-orphan.md"
+  printf '# Outside book\n' > "$review/README.md"
+
+  cat > "$fakebin/node" <<'FAKE_NODE'
+#!/bin/bash
+printf '%s\n' "${FAKE_NODE_VERSION:-v22.0.0}"
+FAKE_NODE
+  cat > "$fakebin/npx" <<'FAKE_NPX'
+#!/bin/bash
+printf '%s\n' "$*" > "$FAKE_NPX_ARGS"
+wiki_root="${4:-}"
+printf '%s\n' "$wiki_root" > "$FAKE_WIKI_ROOT"
+(cd "$wiki_root" && find . -type f | LC_ALL=C sort) > "$FAKE_WIKI_TREE"
+if [ "${FAKE_NPX_SIGNAL_PARENT:-0}" = 1 ]; then
+  kill -TERM "$PPID"
+  exit 0
+fi
+exit "${FAKE_NPX_EXIT:-0}"
+FAKE_NPX
+  chmod +x "$fakebin/node" "$fakebin/npx"
+  cp "$ROOT/scripts/visualize-wiki.sh" "$review/scripts/visualize-wiki.sh" 2>/dev/null || true
+  : > "$tmp/npx.args"
+  : > "$tmp/wiki.root"
+  : > "$tmp/wiki.tree"
+
+  PATH="$fakebin:$PATH" FAKE_NPX_ARGS="$tmp/npx.args" \
+    FAKE_WIKI_ROOT="$tmp/wiki.root" FAKE_WIKI_TREE="$tmp/wiki.tree" \
+    bash "$review/scripts/visualize-wiki.sh" --port 4400 --no-open > "$tmp/visualize.log" 2>&1
+  assert_eq "0" "$?" "openwiki-adapter: visualizer wrapper exits zero"
+  assert_contains "$tmp/npx.args" "--yes openwiki@0.2.5 visualize" "openwiki-adapter: OpenWiki version is pinned"
+  assert_contains "$tmp/npx.args" "--port 4400 --no-open" "openwiki-adapter: visualizer args pass through"
+  assert_eq "87" "$(grep -c '\.md$' "$tmp/wiki.tree")" "openwiki-adapter: mirror node count"
+  assert_contains "$tmp/wiki.tree" "./index.md" "openwiki-adapter: mirror contains home"
+  assert_contains "$tmp/wiki.tree" "./00/index.md" "openwiki-adapter: mirror contains block index"
+  assert_contains "$tmp/wiki.tree" "./assets/site.png" "openwiki-adapter: mirror contains site assets"
+  assert_contains "$tmp/wiki.tree" "./00/assets/block.png" "openwiki-adapter: mirror contains block assets"
+  assert_not_contains "$tmp/wiki.tree" "99-orphan.md" "openwiki-adapter: mirror excludes orphan Markdown"
+  assert_not_contains "$tmp/wiki.tree" "README.md" "openwiki-adapter: mirror excludes repository README"
+  assert_not_contains "$tmp/wiki.tree" "PLAN.md" "openwiki-adapter: mirror excludes PLAN"
+  wiki_root="$(cat "$tmp/wiki.root")"
+  if [ -n "$wiki_root" ] && [ -e "$wiki_root" ]; then
+    fail "openwiki-adapter: temporary wiki survived successful exit"
+  fi
+  if [ -e "$review/openwiki" ]; then
+    fail "openwiki-adapter: wrapper created repository openwiki directory"
+  fi
+
+  mkdir -p "$tmp/no-node-bin"
+  ln -s "$(command -v dirname)" "$tmp/no-node-bin/dirname"
+  PATH="$tmp/no-node-bin" /bin/bash "$review/scripts/visualize-wiki.sh" \
+    > "$tmp/no-node.log" 2>&1
+  assert_eq "1" "$?" "openwiki-adapter: missing Node is rejected"
+  assert_contains "$tmp/no-node.log" "Node.js 22+ is required" \
+    "openwiki-adapter: missing Node is diagnosed"
+
+  mkdir -p "$tmp/no-npx-bin"
+  ln -s "$(command -v dirname)" "$tmp/no-npx-bin/dirname"
+  ln -s "$fakebin/node" "$tmp/no-npx-bin/node"
+  PATH="$tmp/no-npx-bin" /bin/bash "$review/scripts/visualize-wiki.sh" \
+    > "$tmp/no-npx.log" 2>&1
+  assert_eq "1" "$?" "openwiki-adapter: missing npx is rejected"
+  assert_contains "$tmp/no-npx.log" "npx is required" \
+    "openwiki-adapter: missing npx is diagnosed"
+
+  : > "$tmp/npx.args"
+  PATH="$fakebin:$PATH" FAKE_NODE_VERSION=v20.19.0 \
+    FAKE_NPX_ARGS="$tmp/npx.args" FAKE_WIKI_ROOT="$tmp/wiki.root" \
+    FAKE_WIKI_TREE="$tmp/wiki.tree" \
+    bash "$review/scripts/visualize-wiki.sh" > "$tmp/node20.log" 2>&1
+  assert_eq "1" "$?" "openwiki-adapter: Node 20 is rejected"
+  assert_eq "" "$(cat "$tmp/npx.args")" "openwiki-adapter: rejected Node never calls npx"
+
+  mv "$review/13/index.md" "$tmp/13-index.md"
+  : > "$tmp/npx.args"
+  PATH="$fakebin:$PATH" FAKE_NPX_ARGS="$tmp/npx.args" \
+    FAKE_WIKI_ROOT="$tmp/wiki.root" FAKE_WIKI_TREE="$tmp/wiki.tree" \
+    bash "$review/scripts/visualize-wiki.sh" > "$tmp/missing.log" 2>&1
+  assert_eq "1" "$?" "openwiki-adapter: missing block index is rejected"
+  assert_contains "$tmp/missing.log" "13/index.md" "openwiki-adapter: missing path is named"
+  assert_eq "" "$(cat "$tmp/npx.args")" "openwiki-adapter: invalid book never calls npx"
+  mv "$tmp/13-index.md" "$review/13/index.md"
+
+  sed '$d' "$review/PLAN.md" > "$tmp/PLAN-71.md"
+  mv "$review/PLAN.md" "$tmp/PLAN-72.md"
+  mv "$tmp/PLAN-71.md" "$review/PLAN.md"
+  : > "$tmp/npx.args"
+  PATH="$fakebin:$PATH" FAKE_NPX_ARGS="$tmp/npx.args" \
+    FAKE_WIKI_ROOT="$tmp/wiki.root" FAKE_WIKI_TREE="$tmp/wiki.tree" \
+    bash "$review/scripts/visualize-wiki.sh" > "$tmp/count.log" 2>&1
+  assert_eq "1" "$?" "openwiki-adapter: 71-chapter PLAN is rejected"
+  assert_contains "$tmp/count.log" "must contain 72 completed chapters" \
+    "openwiki-adapter: invalid chapter count is diagnosed"
+  assert_eq "" "$(cat "$tmp/npx.args")" "openwiki-adapter: invalid count never calls npx"
+  mv "$tmp/PLAN-72.md" "$review/PLAN.md"
+
+  PATH="$fakebin:$PATH" FAKE_NPX_EXIT=23 FAKE_NPX_ARGS="$tmp/npx.args" \
+    FAKE_WIKI_ROOT="$tmp/wiki.root" FAKE_WIKI_TREE="$tmp/wiki.tree" \
+    bash "$review/scripts/visualize-wiki.sh" > "$tmp/npx-fail.log" 2>&1
+  assert_eq "23" "$?" "openwiki-adapter: npx exit code is preserved"
+  wiki_root="$(cat "$tmp/wiki.root")"
+  if [ -n "$wiki_root" ] && [ -e "$wiki_root" ]; then
+    fail "openwiki-adapter: temporary wiki survived failed npx"
+  fi
+
+  PATH="$fakebin:$PATH" FAKE_NPX_SIGNAL_PARENT=1 \
+    FAKE_NPX_ARGS="$tmp/npx.args" FAKE_WIKI_ROOT="$tmp/wiki.root" \
+    FAKE_WIKI_TREE="$tmp/wiki.tree" \
+    bash "$review/scripts/visualize-wiki.sh" > "$tmp/signal.log" 2>&1
+  assert_eq "143" "$?" "openwiki-adapter: TERM exit code is conventional"
+  wiki_root="$(cat "$tmp/wiki.root")"
+  if [ -n "$wiki_root" ] && [ -e "$wiki_root" ]; then
+    fail "openwiki-adapter: temporary wiki survived TERM"
+  fi
+
   rm -rf "$tmp"
 }
 
