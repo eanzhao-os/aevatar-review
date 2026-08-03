@@ -52,6 +52,8 @@ jobs:
           rm -rf .ci-upstream
 
       - name: Checkout live upstream (sync baseline)
+        # sync baseline: feature/integrate tip（同步目标分支，随上游前进；
+        # 与 00/02「正文同步例外」一致——不锁定 commit，避免 CI 落后于同步目标）
         uses: actions/checkout@v4
         with:
           repository: aevatarAI/aevatar

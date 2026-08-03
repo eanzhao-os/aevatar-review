@@ -435,12 +435,14 @@ make_chapter() {
 }
 
 test_validators() {
-  local tmp repo src
+  local tmp repo src src2
   tmp="$(mktemp -d)"
   repo="$tmp/repo"
   src="$tmp/src"
-  mkdir -p "$repo/docs/migration" "$src/src/Aevatar.Foundation.Abstractions" "$src/docs/canon"
+  src2="$tmp/src2"
+  mkdir -p "$repo/docs/migration" "$src/src/Aevatar.Foundation.Abstractions" "$src/docs/canon" "$src2/src/Only/In/Sync"
   printf 'line1\nline2\nline3\n' > "$src/src/Aevatar.Foundation.Abstractions/IActorRuntime.cs"
+  printf 'public sealed class OnlyInSync { }\n' > "$src2/src/Only/In/Sync/OnlyInSync.cs"
   printf 'canon\n' > "$src/docs/canon/overview.md"
   printf '<Solution />\n' > "$src/aevatar.slnx"
 
@@ -452,6 +454,8 @@ test_validators() {
 
 - [ ] \`00/01-good.md\` — status:current — issue:https://example.invalid/1
 - [ ] \`00/02-planned.md\` — status:current — issue:https://example.invalid/2
+- [ ] \`00/03-sync.md\` — status:current — issue:https://example.invalid/3
+- [ ] \`00/04-miss.md\` — status:current — issue:https://example.invalid/4
 MANIFEST
   printf '01/01-old.md\n' > "$repo/docs/migration/2026-07-25-old-retire-paths.txt"
 
@@ -462,6 +466,18 @@ MANIFEST
   make_chapter "$repo/00/01-good.md" current "$SHA" "$GOOD_SPINE" 2
   AEVATAR_SRC="$src" AEVATAR_SRC2="" bash "$ROOT/scripts/check-md.sh" --repo-root "$repo" --paths 00/01-good.md > "$tmp/ok.log" 2>&1
   assert_eq "0" "$?" "validators: conforming chapter must pass"
+
+  # 1b. dual baseline: a path missing from the frozen tree but present in
+  #     AEVATAR_SRC2 must pass (sync-baseline resolution)
+  local SYNC_SPINE='- `src/Only/In/Sync/OnlyInSync.cs:1`：sync-only path。\n'
+  make_chapter "$repo/00/03-sync.md" current "$SHA" "$SYNC_SPINE" 2
+  AEVATAR_SRC="$src" AEVATAR_SRC2="$src2" bash "$ROOT/scripts/check-md.sh" --repo-root "$repo" --paths 00/03-sync.md > "$tmp/sync.log" 2>&1
+  assert_eq "0" "$?" "validators: sync baseline path must pass"
+  # 1c. …and must fail when the path exists in neither baseline
+  local MISS_SPINE='- `src/Nope/Missing.cs:1`：missing everywhere。\n'
+  make_chapter "$repo/00/04-miss.md" current "$SHA" "$MISS_SPINE" 2
+  AEVATAR_SRC="$src" AEVATAR_SRC2="$src2" bash "$ROOT/scripts/check-md.sh" --repo-root "$repo" --paths 00/04-miss.md > "$tmp/miss.log" 2>&1
+  assert_eq "1" "$?" "validators: path missing in both baselines must fail"
 
   # 2. missing frontmatter
   mkdir -p "$repo/probe"
@@ -533,6 +549,8 @@ MANIFEST
     printf -- '---\nstatus: index\nupstream_commit: %s\nverified_at: 2026-07-25\n---\n\n# %s 导读\n\n阅读顺序。\n' "$SHA" "$b" > "$repo/$b/index.md"
   done
   rm -rf "$repo/probe"
+  grep -v '00/03-sync\|00/04-miss' "$repo/docs/migration/2026-07-25-target-chapters.md" > "$tmp/manifest.tmp" && mv "$tmp/manifest.tmp" "$repo/docs/migration/2026-07-25-target-chapters.md"
+  rm -f "$repo/00/03-sync.md" "$repo/00/04-miss.md"
   make_chapter "$repo/01/01-old.md" current "$SHA" "$GOOD_SPINE" 2
   AEVATAR_SRC="$src" AEVATAR_SRC2="" bash "$ROOT/scripts/check-md.sh" --repo-root "$repo" --all > "$tmp/orphan.log" 2>&1
   assert_eq "1" "$?" "validators: --all must reject an orphan substantive chapter"
