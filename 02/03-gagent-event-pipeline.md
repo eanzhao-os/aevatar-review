@@ -36,7 +36,7 @@ flowchart TB
     subgraph L2["Actor 容器 · turn 边界"]
         MB["mailbox<br/>unbounded channel · single reader"]
         PUMP["mailbox pump<br/>一次一条 · 一条 = 一个 turn"]
-        DEDUP["可选去重<br/>IEventDeduplicator"]
+        DEDUP["可选去重<br/>IEventDeduplicator<br/>（HEAD 已移除，见 2026-08-02 标注）"]
     end
     subgraph L3["Agent 分发 · GAgentBase.HandleEventAsync"]
         SG["StateGuard 写作用域"]
@@ -136,6 +136,9 @@ sequenceDiagram
 **静默丢弃协议**。整条管线没有任何 entry 匹配时，envelope 被静默丢弃、只留 Debug 日志（`src/Aevatar.Foundation.Core/GAgentBase.cs:188`）。这是显式设计（修复过「消息被悄悄吞掉无从排查」的真实问题），但它意味着发错事件类型不会报错。
 
 **去重协议**。turn 入口先过可选的 `IEventDeduplicator`：能构造出去重键且已见过的 envelope 直接丢弃（`src/Aevatar.Foundation.Runtime.Implementations.Local/Actors/LocalActor.cs:195`）。
+
+!!! warning "HEAD 漂移（2026-08-02 登记）"
+    `IEventDeduplicator` / `MemoryCacheDeduplicator` 已在同步目标之后的 HEAD（`origin/feature/integrate`）移除（`1215ca6b95` Remove process-local envelope duplicate filtering），上述去重协议是冻结基线 `f02aa690` 的事实。HEAD 上 turn 入口不再做进程内 envelope 去重；重复投递防护的责任回归 handler 幂等与 committed state，而不是 runtime 入口过滤。以 HEAD 为准。
 
 **传播协议**。自我继续的 envelope 会克隆 inbound envelope 的 Propagation（CorrelationId 等）（`src/Aevatar.Foundation.Core/Pipeline/SelfEventEnvelopeFactory.cs:25`），因此跨 turn 的链路追踪不会断。
 

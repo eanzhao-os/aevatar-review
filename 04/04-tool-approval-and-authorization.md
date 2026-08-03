@@ -8,6 +8,9 @@ verified_at: 2026-07-25
 
 > 版本与结论：本章描述 `current`。工具被模型选中不代表可以执行：固定 admission 先决定本次调用能否使用正确的 caller credential，再依据 invocation safety 判断是否需要审批。需要跨 turn 等待时，middleware 只产出 typed pending outcome；`RoleGAgent` 持久化 continuation、接收决定并安排后续 turn。UI、通知和远端审批服务都不是 pending state 的所有者。
 
+!!! warning "HEAD 漂移（2026-08-02 登记）"
+    同步目标之后的 HEAD（`origin/feature/integrate`）把本章描述的整条 middleware 固定链重构为准入制：`IToolCallMiddleware` / `IToolApprovalHandler` / `ToolApprovalMiddleware` / `ToolCallCredentialPolicyMiddleware` / `ToolCallMiddlewareChainFactory` 均已删除（`1eb93b0ab2` Implement issue #3038），改为 `AdmittedAgentToolExecutor` + `AgentToolAdmissionLedger` + `agent_tool_admission.proto`（ADR-0046）。本章正文是冻结基线 `f02aa690` 的事实；HEAD 上 credential 政策与 approval 决定收敛到 admission ledger，execution 走 admitted executor。以 HEAD 为准。
+
 ## 设计抽象与事实源
 
 - `src/Aevatar.AI.Core/Middleware/ToolCallCredentialPolicyMiddleware.cs:12`：按 typed sender binding、credential 与 invocation mutation classification 选择调用身份或 fail closed。

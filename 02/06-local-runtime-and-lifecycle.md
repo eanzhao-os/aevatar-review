@@ -32,7 +32,7 @@ flowchart TB
     SS["self stream 订阅<br/>route 分类后匹配本 actor 才入队"]
     DP["IActorDispatchPort 受理<br/>外部命令入队"]
     MB["mailbox<br/>SingleReader Channel 一次一个 turn"]
-    DD["入口去重<br/>IEventDeduplicator"]
+    DD["入口去重<br/>IEventDeduplicator<br/>（HEAD 已移除，见 2026-08-02 标注）"]
     AG["Agent.HandleEventAsync<br/>逐条 await 串行执行"]
     ES["IEventStore<br/>StateEvent 提交点 即 committed"]
     PUB["publisher<br/>发布含自我继续 同样回到 stream 或 inbox"]
@@ -108,6 +108,9 @@ actor 模型的标准取舍， Orleans 一侧以 grain 的 turn-based 调度表�
   committed；committed 只发生在 StateEvent 写入 EventStore 之后。
 - **入口去重**：mailbox 取出条目后、调用 handler 前，先按 envelope 构建 dedup key 查 `IEventDeduplicator`，
   重复投递直接置成功返回。去重发生在"串行点之后、handler 之前"，因此不会破坏 turn 顺序。
+
+  !!! warning "HEAD 漂移（2026-08-02 登记）"
+      `IEventDeduplicator` / `MemoryCacheDeduplicator` 已在同步目标之后的 HEAD（`origin/feature/integrate`）移除（`1215ca6b95` Remove process-local envelope duplicate filtering）。上述入口去重是冻结基线 `f02aa690` 的事实；HEAD 上 mailbox 取出条目后直接调用 handler，不再有进程内去重节点。以 HEAD 为准。
 - **拓扑不是生命周期**：`LinkAsync` / `UnlinkAsync` 只改 parent/children 关系与 stream relay 绑定，不触发
   activation 或 deactivation；`DestroyAsync` 则负责在退役前先摘除这些绑定，避免悬挂 relay。
 - **deactivation hook**：退役收尾动作（默认是 EventStore 压缩）挂在 hook dispatcher 上异步触发，不阻塞

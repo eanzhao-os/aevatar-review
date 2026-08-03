@@ -89,6 +89,9 @@ Event-sourced agent的事件历史仍写入 `IEventStore`；snapshot不替代历
 
 grain还可以调用 `IEventDeduplicator`，冻结默认注册是 `MemoryCacheDeduplicator`。它只降低单进程重复处理，silo重启或跨节点redelivery后不能证明全局exactly-once。因此领域副作用仍要依赖stable command/effect identity、actor committed state和外部幂等键。
 
+!!! warning "HEAD 漂移（2026-08-02 登记）"
+    `IEventDeduplicator` / `MemoryCacheDeduplicator` 已在同步目标之后的 HEAD（`origin/feature/integrate`）移除（`1215ca6b95` Remove process-local envelope duplicate filtering），本段是冻结基线 `f02aa690` 的事实。HEAD 上 RuntimeActorGrain 不再调用进程内去重器；跨 silo 的 exactly-once 依旧不成立，业务幂等仍依赖 stable identity 与 committed state。以 HEAD 为准。
+
 ## 最小静态核对
 
 ```bash
