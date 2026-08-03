@@ -149,6 +149,14 @@ def validate_source() -> int:
         ratio >= 4.5,
         f"light primary text contrast must be at least 4.5:1 (got {ratio:.2f}:1)",
     )
+    light_muted = scheme_color(css, "aevatar-light", "--aevatar-muted")
+    light_sidebar = scheme_color(css, "aevatar-light", "--aevatar-sidebar")
+    muted_ratio = contrast_ratio(light_muted, light_sidebar)
+    require(
+        muted_ratio >= 4.5,
+        f"light sidebar text contrast must be at least 4.5:1 "
+        f"(got {muted_ratio:.2f}:1)",
+    )
     dark_action = scheme_color(css, "aevatar-dark", "--md-primary-fg-color")
     for label, background in (
         ("light", light_primary),
@@ -185,6 +193,16 @@ def validate_source() -> int:
         )
         is not None,
         "primary actions must use the contrast-safe Material header color",
+    )
+    require(
+        re.search(
+            r"\.md-footer-meta\s*\{[^}]*"
+            r"background:\s*var\(--md-primary-fg-color--dark\);",
+            css,
+            re.DOTALL,
+        )
+        is not None,
+        "footer metadata must keep a dark contrast-safe background",
     )
     require(
         re.search(r"\.md-typeset \.mermaid\s*\{[^}]*overflow-x\s*:\s*auto", css, re.DOTALL)

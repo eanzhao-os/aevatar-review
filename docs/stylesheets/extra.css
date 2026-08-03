@@ -6,7 +6,7 @@
   --aevatar-primary: #08745b;
   --aevatar-accent: #0eaf83;
   --aevatar-text: #17352f;
-  --aevatar-muted: #607973;
+  --aevatar-muted: #5b746e;
   --aevatar-border: #cfe9e0;
   --aevatar-code: #edf8f4;
   --aevatar-shadow: 0 0.6rem 1.8rem rgba(20, 86, 70, 0.08);
@@ -252,7 +252,7 @@ body {
 }
 
 .md-footer-meta {
-  background: var(--aevatar-text);
+  background: var(--md-primary-fg-color--dark);
 }
 
 .md-footer__link:hover {
