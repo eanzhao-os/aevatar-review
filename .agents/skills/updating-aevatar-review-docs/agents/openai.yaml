@@ -1,0 +1,4 @@
+interface:
+  display_name: "Aevatar Review 文档补充"
+  short_description: "定位、核验并发布 Aevatar 中文技术文档更新"
+  default_prompt: "Use $updating-aevatar-review-docs to document the requested Aevatar feature or technical detail."

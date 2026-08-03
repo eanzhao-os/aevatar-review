@@ -112,6 +112,11 @@
 - 实现者(写章节)的 `scope_paths` 限定在该章节对应的目录/文件;不越界改其它章节。
 - 若发现需要扩展新章节(PLAN.md 未列),先 print `SCOPE_EXTEND` 并补 issue,再写。
 
+## 文档补充自动化
+
+- 用户要求在本仓库文档中补充、更新、解释或同步任一 Aevatar feature、模块、协议、流程或技术细节时，必须使用仓库内 `updating-aevatar-review-docs` skill；无需用户显式点名。
+- 该类写入任务默认在全部门禁通过后只提交本轮显式文件并推送 `origin/main`；查询、审阅和仅提供建议不写入、不提交、不推送。
+
 
 <!-- consensus-rnd:foundational-invariants:start version=1 sha256=f5c24b0c3515993a7b86c4ed78ce7386add665f8c8b84cc7275aedebd6c3e6af -->
 ## 共识研发不动点（由 consensus-rnd 管理）
