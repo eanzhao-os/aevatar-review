@@ -70,11 +70,14 @@ export CONSENSUS_RND_HOST_ENV=.config/consensus-rnd/host.env
 bash scripts/upstream-sync.sh
 ```
 
-### 先看会建什么(dry-run,不真建)
+### 严格只读预览
 
 ```bash
 bash scripts/upstream-sync.sh --dry-run
+bash scripts/upstream-sync.sh --init --dry-run
 ```
+
+两种 dry-run 都可以 fetch 和执行 GitHub `issue list` 只读查询，但不会创建 label/issue，且 `.config/upstream-sync/state.json 保持不变`；没有 state 时也不会创建。只有去掉 `--dry-run` 后，脚本才推进基线或记录已建 issue。
 
 ### 看日志
 
@@ -146,6 +149,7 @@ chore:  test:  ci:  style:  revert:  perf:
 - **不绕过 cooldown/cap**(skill 契约:节流是设计,不是 bug)
 - **不自动装 launchd**(SKILL.md:OS 调度由 host operator 执行)
 - **`host.env` 不进 git**(含本地路径,FI-002)
+- **dry-run 零写入**：允许更新本地 remote-tracking Git 对象和执行 GitHub 只读查询；不写 state，不创建 GitHub 资源。
 
 ## 卸载
 

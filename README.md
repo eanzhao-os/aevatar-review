@@ -13,6 +13,18 @@
 
 完整清单见 [PLAN.md](PLAN.md)，站点入口见 [docs/index.md](docs/index.md)。
 
+## 本地知识图
+
+Node.js 22+ 环境可以把当前首页、14 个 block index 和 `PLAN.md` 中的 72 篇完成章节临时投影为 OpenWiki 关系图：
+
+```bash
+bash scripts/visualize-wiki.sh
+# 只启动服务，不自动打开浏览器
+bash scripts/visualize-wiki.sh --port 4400 --no-open
+```
+
+脚本固定调用 `openwiki@0.2.5 visualize`，不运行文档生成 agent，不需要 LLM/API key，也不会在仓库内创建第二套 wiki。首次运行需要 npm 网络，浏览器页面还会从公共 CDN 加载前端库；进程退出后临时镜像自动删除。
+
 ## 三条阅读路线
 
 | 目标 | 路线 |
@@ -33,6 +45,7 @@
 ## 验证
 
 ```bash
+bash scripts/tests/test-doc-checks.sh openwiki-adapter
 AEVATAR_SRC=<frozen-f02aa690-archive> bash scripts/check-md.sh --all
 python3 scripts/check-links.py --all
 bash scripts/check-drift.sh

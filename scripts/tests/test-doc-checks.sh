@@ -961,6 +961,16 @@ FAKE_NPX
     fail "openwiki-adapter: temporary wiki survived TERM"
   fi
 
+  assert_contains "$ROOT/README.md" "bash scripts/visualize-wiki.sh" \
+    "openwiki-adapter: README exposes visualizer"
+  assert_contains "$ROOT/README.md" "Node.js 22+" \
+    "openwiki-adapter: README names Node floor"
+  assert_contains "$ROOT/docs/upstream-sync.md" "state.json 保持不变" \
+    "openwiki-adapter: runbook promises dry-run state isolation"
+  assert_contains "$ROOT/.github/workflows/docs.yml" \
+    "bash scripts/tests/test-doc-checks.sh openwiki-adapter" \
+    "openwiki-adapter: CI runs adapter suite"
+
   rm -rf "$tmp"
 }
 
