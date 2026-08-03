@@ -1,0 +1,441 @@
+{
+  "schema_version": 1,
+  "frozen_upstream_sha": "f02aa690bbebb9cabeac30a553d737486b0eb661",
+  "frozen_verified_at": "2026-07-25",
+  "synced_upstream_sha": "f02aa690bbebb9cabeac30a553d737486b0eb661",
+  "last_successful_update_at": null,
+  "chapters": {
+    "00/01-reading-guide.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "00/02-version-evidence-and-status.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "00/03-repository-map.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "01/01-quick-start.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "01/02-hosts-and-composition.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "01/03-chat-conversation-turn-contract.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "01/04-request-streaming-lifecycle.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "02/01-agent-actor-runtime.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "02/02-envelope-command-event-query.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "02/03-gagent-event-pipeline.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "02/04-state-event-sourcing-and-guard.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "02/05-dispatch-routing-and-topology.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "02/06-local-runtime-and-lifecycle.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "03/01-workflow-model-and-identities.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "03/02-yaml-schema-and-validation.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "03/03-execution-kernel-and-outcomes.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "03/04-primitives-catalog.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "03/05-pause-signal-approval-and-resume.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "03/06-saga-compensation-and-recovery.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "03/07-connectors-and-capability-admission.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "04/01-role-agent-and-streaming-run.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "04/02-llm-providers-and-route-selection.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "04/03-tool-loop-catalog-and-presentation.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "04/04-tool-approval-and-authorization.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "04/05-prompt-overlays-and-agent-context.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "05/01-command-event-projection-readmodel.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "05/02-committed-state-and-observation.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "05/03-projection-lifecycle-and-leases.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "05/04-readmodel-stores-versioning-and-rebuild.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "05/05-workflow-agui-and-live-observation.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "05/06-audit-trail-lifecycle-and-export.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "06/01-scope-team-member-resource-model.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "06/02-draft-revision-binding-and-published-service.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "06/03-catalog-visibility-and-scope-authorization.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "06/04-studio-commands-acks-and-readmodels.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "06/05-work-orders-and-durable-intent.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "07/01-conversation-turn-and-chat-history.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "07/02-nyxid-chat-actor-model-and-progress.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "07/03-agent-profile-and-immutable-binding.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "07/04-turn-authority-tool-catalog-and-retry.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "08/01-ingress-normalization-and-routing.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "08/02-channel-runtime-and-credential-boundary.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "08/03-lark-delivery-interaction-and-repair.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "08/04-file-artifacts-and-attachments.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "08/05-voice-control-and-media-planes.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "09/01-automation-resource-api-and-readmodels.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "09/02-scheduled-actor-callback-and-fire.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "09/03-owner-authorization-and-agent-key.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "09/04-vault-reference-and-revocation-compensation.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "09/05-production-canary-and-recovery.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "10/01-production-topology-and-configuration.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "10/02-orleans-runtime.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "10/03-garnet-clustering-and-secret-storage.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "10/04-streaming-transport-and-kafka.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "10/05-authentication-scope-and-admin-authorization.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "10/06-managed-codex-sandbox-and-delegation.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "10/07-observability-status-and-observatory.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "10/08-architecture-and-security-guards.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "11/01-run-a-simple-workflow.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "11/02-build-a-branching-tool-workflow.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "11/03-create-bind-and-invoke-a-team-member.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "11/04-connect-a-channel-and-handle-files.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "11/05-create-verify-and-troubleshoot-automation.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "12/01-evolution-method-and-timeline.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "12/02-issue-decisions-by-theme.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "12/03-retired-and-superseded-components.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "12/04-incident-case-studies.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "12/05-open-gaps-and-canon-drift.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "13/01-glossary.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "13/02-canon-and-adr-index.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "13/03-chapter-source-matrix.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    },
+    "13/04-issue-evolution-index.md": {
+      "review_count": 0,
+      "last_reviewed_sha": null,
+      "last_reviewed_at": null,
+      "result": null
+    }
+  }
+}

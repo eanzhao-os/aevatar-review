@@ -14,5 +14,8 @@
 # upstream-sync runtime state (last processed sha + filed issue ledger)
 .config/upstream-sync/state.json
 
+# aevatar documentation update facts and pressure-test traces
+.superpowers/aevatar-doc-update/
+
 # mkdocs build output
 site/
