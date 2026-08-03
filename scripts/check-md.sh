@@ -139,7 +139,7 @@ upstream_refs() {
 }
 
 check_upstream_refs() {
-  local rel="$1" f="$2" ref path anchors candidate one total
+  local rel="$1" f="$2" ref path anchors candidate one total existing sizes ok in_range base
   while IFS= read -r ref; do
     [ -z "$ref" ] && continue
     path="$ref"
