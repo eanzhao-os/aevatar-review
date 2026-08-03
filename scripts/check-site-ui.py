@@ -149,6 +149,17 @@ def validate_source() -> int:
         ratio >= 4.5,
         f"light primary text contrast must be at least 4.5:1 (got {ratio:.2f}:1)",
     )
+    dark_action = scheme_color(css, "aevatar-dark", "--md-primary-fg-color")
+    for label, background in (
+        ("light", light_primary),
+        ("dark", dark_action),
+    ):
+        action_ratio = contrast_ratio("#ffffff", background)
+        require(
+            action_ratio >= 4.5,
+            f"{label} primary action contrast must be at least 4.5:1 "
+            f"(got {action_ratio:.2f}:1)",
+        )
     require(
         re.search(
             r"(?m)^\s*color:\s*var\(--aevatar-accent\);\s*$",
@@ -164,6 +175,16 @@ def validate_source() -> int:
     require(
         "outline: 0.14rem solid var(--aevatar-primary);" in css,
         "keyboard focus must use the contrast-safe primary color",
+    )
+    require(
+        re.search(
+            r"\.md-typeset \.hero-actions \.primary-action\s*\{[^}]*"
+            r"background:\s*var\(--md-primary-fg-color\);",
+            css,
+            re.DOTALL,
+        )
+        is not None,
+        "primary actions must use the contrast-safe Material header color",
     )
     require(
         re.search(r"\.md-typeset \.mermaid\s*\{[^}]*overflow-x\s*:\s*auto", css, re.DOTALL)
