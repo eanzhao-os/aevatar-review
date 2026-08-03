@@ -109,8 +109,9 @@ actor 模型的标准取舍， Orleans 一侧以 grain 的 turn-based 调度表�
 - **入口去重**：mailbox 取出条目后、调用 handler 前，先按 envelope 构建 dedup key 查 `IEventDeduplicator`，
   重复投递直接置成功返回。去重发生在"串行点之后、handler 之前"，因此不会破坏 turn 顺序。
 
-  !!! warning "HEAD 漂移（2026-08-02 登记）"
-      `IEventDeduplicator` / `MemoryCacheDeduplicator` 已在同步目标之后的 HEAD（`origin/feature/integrate`）移除（`1215ca6b95` Remove process-local envelope duplicate filtering）。上述入口去重是冻结基线 `f02aa690` 的事实；HEAD 上 mailbox 取出条目后直接调用 handler，不再有进程内去重节点。以 HEAD 为准。
+!!! warning "HEAD 漂移（2026-08-02 登记）"
+    `IEventDeduplicator` / `MemoryCacheDeduplicator` 已在同步目标之后的 HEAD（`origin/feature/integrate`）移除（`1215ca6b95` Remove process-local envelope duplicate filtering）。上述入口去重是冻结基线 `f02aa690` 的事实；HEAD 上 mailbox 取出条目后直接调用 handler，不再有进程内去重节点。以 HEAD 为准。
+
 - **拓扑不是生命周期**：`LinkAsync` / `UnlinkAsync` 只改 parent/children 关系与 stream relay 绑定，不触发
   activation 或 deactivation；`DestroyAsync` 则负责在退役前先摘除这些绑定，避免悬挂 relay。
 - **deactivation hook**：退役收尾动作（默认是 EventStore 压缩）挂在 hook dispatcher 上异步触发，不阻塞
