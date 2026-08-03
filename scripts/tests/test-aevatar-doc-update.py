@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -346,10 +347,19 @@ class GitPrepareTests(CliFixture):
         self.run_command("git", "commit", "-qm", "rewrite", cwd=self.publisher)
         self.run_command("git", "push", "-q", "--force", "origin", "HEAD:feature/integrate", cwd=self.publisher)
 
-    def test_prepare_fetches_without_touching_upstream_head_or_status(self):
+    def test_prepare_fetches_without_touching_upstream_head_status_or_index(self):
         before_head = self.git("rev-parse", "HEAD")
         before_status = self.git("status", "--porcelain=v1")
+        index = Path(self.git("rev-parse", "--git-path", "index"))
+        if not index.is_absolute():
+            index = self.upstream / index
+        before_index = index.read_bytes() if index.exists() else None
+        tracked = self.upstream / "aevatar.slnx"
+        stat = tracked.stat()
+        os.utime(tracked, ns=(stat.st_atime_ns, stat.st_mtime_ns + 2_000_000_000))
         facts = self.prepare(mode="full")
+        after_index = index.read_bytes() if index.exists() else None
+        self.assertTrue(after_index == before_index, "prepare changed upstream index bytes")
         self.assertEqual(self.git("rev-parse", "HEAD"), before_head)
         self.assertEqual(self.git("status", "--porcelain=v1"), before_status)
         self.assertEqual(facts["target_sha"], self.remote_integrate_sha)
@@ -381,6 +391,13 @@ class GitPrepareTests(CliFixture):
         )
         self.assertNotIn("01/01-existing.md", facts["review_sample"])
         self.assertNotIn("01/03-user-owned.md", facts["review_sample"])
+
+    def test_select_review_rejects_sample_size_above_six_without_output(self):
+        result, output = self.select_review_result(
+            self.prepare(mode="full"), changed=["01/01-existing.md"], sample_size=7
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(output.exists())
 
     def test_select_review_requires_exact_issue_for_each_new_chapter(self):
         self.add_plan_chapter("01/02-new.md", "https://github.com/fix/review/issues/42")

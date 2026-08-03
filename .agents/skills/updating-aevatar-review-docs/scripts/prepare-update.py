@@ -289,7 +289,7 @@ def mapped_chapters(path: str, source_map: dict[str, tuple[str, ...]]) -> list[s
 
 def upstream_evidence(upstream: Path) -> dict[str, str]:
     head = git(upstream, "rev-parse", "--verify", "HEAD^{commit}").stdout.strip()
-    status = git(upstream, "status", "--porcelain=v1").stdout
+    status = git(upstream, "--no-optional-locks", "status", "--porcelain=v1").stdout
     return {"head": head, "status": status}
 
 
@@ -589,8 +589,8 @@ def select_review(
 ) -> None:
     facts = load_facts(facts_path)
     _, state = facts_state(facts, state_path)
-    if sample_size < 0:
-        raise ValueError("sample size must not be negative")
+    if not 0 <= sample_size <= 6:
+        raise ValueError("sample size must be between zero and six")
     semantic = unique_chapters(changed, "changed chapter", sort=True)
     rows = chapter_rows(plan)
     if any(chapter not in rows for chapter in semantic):
