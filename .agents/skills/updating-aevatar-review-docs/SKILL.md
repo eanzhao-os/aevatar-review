@@ -60,7 +60,12 @@ python3 .agents/skills/updating-aevatar-review-docs/scripts/prepare-update.py se
   --output .superpowers/aevatar-doc-update/provisional.json
 ```
 
-立即调度一个未参与写作的新 reviewer，使旧文复核与写作并行。调用必须有非空 `task_name`、自包含非空 `message`、显式 `fork_turns: "none"`，以及当前可用的 reviewer model。消息只提供根规则、固定目标快照、`provisional.json`、最多 6 篇 `review_sample` 和只读边界；不给作者结论。Reviewer 不修改文件、不建 issue、不推进状态。
+立即调度恰好一个未参与写作、无继承作者上下文的只读 reviewer，使旧文复核与写作并行。先检查实际调度工具 schema，只发送它支持的字段：
+
+1. 标准 `spawn_agent` 支持时，传非空 `task_name`、自包含非空 `message`、`fork_turns: "none"` 和显式可用的 reviewer model；
+2. 等价 API 用 `fork_context` 表示上下文继承时，传 `fork_context: false` 和显式可用的 reviewer model，并在自包含 `message` 中写入非空 task identifier。
+
+消息只提供根规则、固定目标快照、`provisional.json`、最多 6 篇 `review_sample` 和只读边界；不给作者结论。Reviewer 不修改文件、不建 issue、不推进状态。无法保证 fresh、无上下文继承、只读且独立时停止。
 
 ## 4. 写作与最终复核
 
