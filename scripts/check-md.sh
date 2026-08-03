@@ -14,6 +14,11 @@
 # Environment:
 #   AEVATAR_SRC                 frozen upstream snapshot root (see
 #                               scripts/materialize-frozen-upstream.sh)
+#   AEVATAR_SRC2                secondary sync baseline (default: live
+#                               upstream working tree $HOME/Code/aevatar);
+#                               a referenced path passes if it exists in
+#                               either baseline, anchors pass if in range in
+#                               at least one baseline
 #   EXPECTED_UPSTREAM_COMMIT    approved fact baseline (default below)
 #   EXPECTED_VERIFIED_AT        approved verification date (default below)
 #
@@ -31,6 +36,7 @@ set -uo pipefail
 SCRIPT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 REPO_ROOT="${REPO_ROOT:-$SCRIPT_ROOT}"
 AEVATAR_SRC="${AEVATAR_SRC:-$HOME/Code/aevatar}"
+if [ -z "${AEVATAR_SRC2+x}" ]; then AEVATAR_SRC2="$HOME/Code/aevatar"; fi
 EXPECTED_UPSTREAM_COMMIT="${EXPECTED_UPSTREAM_COMMIT:-f02aa690bbebb9cabeac30a553d737486b0eb661}"
 EXPECTED_VERIFIED_AT="${EXPECTED_VERIFIED_AT:-2026-07-25}"
 
@@ -150,18 +156,36 @@ check_upstream_refs() {
         fi
         ;;
     esac
-    if [ ! -e "$AEVATAR_SRC/$path" ]; then
-      add_error "$rel: referenced source path does not exist at the frozen baseline: $path"
+    # Dual-baseline resolution: a path (and its line anchors) passes if it
+    # exists in the primary frozen baseline ($AEVATAR_SRC) OR in the secondary
+    # sync baseline ($AEVATAR_SRC2, default: the live upstream working tree).
+    # Anchors are checked against every baseline where the file exists; the
+    # reference is accepted if at least one baseline contains the full range.
+    existing=""
+    if [ -e "$AEVATAR_SRC/$path" ]; then existing="$AEVATAR_SRC"; fi
+    if [ -n "$AEVATAR_SRC2" ] && [ -e "$AEVATAR_SRC2/$path" ]; then
+      existing="${existing:+$existing }$AEVATAR_SRC2"
+    fi
+    if [ -z "$existing" ]; then
+      add_error "$rel: referenced source path does not exist at the frozen baseline or sync baseline: $path"
       return 1
     fi
-    if [ -n "$anchors" ] && [ -f "$AEVATAR_SRC/$path" ]; then
-      total=$(wc -l < "$AEVATAR_SRC/$path" | tr -d ' ')
-      for one in $(printf '%s' "$anchors" | tr ',-' '  '); do
-        if [ "$one" -lt 1 ] || [ "$one" -gt "$total" ]; then
-          add_error "$rel: source line anchor out of range: $path:$one (file has $total lines)"
-          return 1
-        fi
+    if [ -n "$anchors" ]; then
+      ok=0
+      for base in $existing; do
+        [ -f "$base/$path" ] || continue
+        total=$(wc -l < "$base/$path" | tr -d ' ')
+        [ "$total" -lt 1 ] && continue
+        in_range=1
+        for one in $(printf '%s' "$anchors" | tr ',-' '  '); do
+          if [ "$one" -lt 1 ] || [ "$one" -gt "$total" ]; then in_range=0; break; fi
+        done
+        [ "$in_range" -eq 1 ] && ok=1
       done
+      if [ "$ok" -eq 0 ]; then
+        add_error "$rel: source line anchor out of range in every baseline: $path:$anchors"
+        return 1
+      fi
     fi
   done <<EOF
 $(upstream_refs "$f")

@@ -51,8 +51,16 @@ jobs:
           git -C .ci-upstream/aevatar archive f02aa690bbebb9cabeac30a553d737486b0eb661 | tar -x -C "$RUNNER_TEMP/aevatar-f02aa690"
           rm -rf .ci-upstream
 
+      - name: Checkout live upstream (sync baseline)
+        uses: actions/checkout@v4
+        with:
+          repository: aevatarAI/aevatar
+          ref: feature/integrate
+          path: .ci-upstream/aevatar-live
+          fetch-depth: 1
+
       - name: Validate chapter contracts
-        run: AEVATAR_SRC="$RUNNER_TEMP/aevatar-f02aa690" bash scripts/check-md.sh --all
+        run: AEVATAR_SRC="$RUNNER_TEMP/aevatar-f02aa690" AEVATAR_SRC2="$GITHUB_WORKSPACE/.ci-upstream/aevatar-live" bash scripts/check-md.sh --all
 
       - name: Validate links and anchors
         run: python3 scripts/check-links.py --all
