@@ -14,7 +14,7 @@
 
 每轮更新同时解决三个问题：
 
-1. 审查上次文档基线之后的全部上游变化，更新受影响章节；
+1. 审查上次成功正文同步水位之后的全部上游变化，更新受影响章节；
 2. 枚举目标快照中的架构能力，补回没有明确文档归属的既有 feature；
 3. 调度一个全新上下文的独立 reviewer，复核本轮改动和 6 篇旧正文，使多轮更新最终覆盖全书。
 
@@ -50,8 +50,8 @@
 
 - `SKILL.md`：规定触发条件、主流程、证据要求、新章节扩展、独立复核、失败边界和完成条件。
 - `agents/openai.yaml`：提供仓库内 skill 的展示名、简述和默认调用提示。
-- `prepare-update.py`：执行安全 fetch、固定目标 SHA、生成冻结快照、输出增量事实包、在本轮修改范围确定后选择旧正文复核样本，并在成功后更新状态。
-- `.config/aevatar-doc-update/state.json`：仓库级、可提交的跨 turn 权威记录。skill 私有目录不保存文档基线或覆盖台账。
+- `prepare-update.py`：执行安全 fetch、固定同步目标 SHA、生成目标提交快照、输出增量事实包、在本轮修改范围确定后选择旧正文复核样本，并在成功后只推进正文同步水位与复核覆盖。
+- `.config/aevatar-doc-update/state.json`：仓库级、可提交的跨 turn 权威记录。skill 私有目录不保存冻结证据、正文同步水位或覆盖台账。
 
 复用现有组件：
 
@@ -62,6 +62,8 @@
 
 活跃书目以 `PLAN.md` 为准。`docs/migration/2026-07-25-target-chapters.md` 保持为 2026-07-25 重构的冻结迁移证据；未来自动扩章不得改写它，也不得继续让验证器把它当作当前章节清单。
 
+本仓库采用双基线：`frozen_upstream_sha` / `frozen_verified_at` 固定章节 frontmatter 的可回放证据版本；`synced_upstream_sha` 记录正文已经完整审查到的 `feature/integrate` 水位。正文可以同步目标提交的新事实，但不得把这次同步冒充为全书 frontmatter 的重新冻结。
+
 ## 4. 上游同步与事实快照
 
 同步只允许以下操作：
@@ -69,8 +71,8 @@
 1. 校验 `~/Code/aevatar` 是 Git 仓库且存在 `origin`；
 2. 执行 `git fetch origin feature/integrate`；
 3. 解析完整的 `origin/feature/integrate` commit SHA；
-4. 从该提交对象生成只读冻结快照；
-5. 后续扫描、引用校验和写作都读取该快照。
+4. 从该提交对象生成只读目标快照；
+5. 增量扫描与正文写作读取目标快照；最终引用校验同时读取冻结证据快照与该目标快照。
 
 不得对上游执行 `pull`、`checkout`、`switch`、`reset`、`clean`、`stash` 或任何文件写入。上游工作树脏、位于其他分支或 detached HEAD 都不得触发“整理”动作，也不阻止从远端引用读取提交对象。
 
@@ -78,16 +80,16 @@
 
 ### 4.1 非快进改写
 
-若旧 `documented_upstream_sha` 不是目标 SHA 的祖先：
+若旧 `synced_upstream_sha` 不是目标 SHA 的祖先：
 
 - 旧提交对象仍存在时，明确报告 history rewrite，并比较旧树与新树的最终差异；
-- 旧对象不存在时停止，不推断缺失历史，也不推进文档基线。
+- 旧对象不存在时停止，不推断缺失历史，也不推进正文同步水位。
 
 ## 5. 更新事实包
 
 `prepare-update.py` 产出机器可读 JSON，并在终端给出简洁摘要。事实包至少包含：
 
-- 文档基线 SHA、目标 SHA、祖先关系和是否发生 history rewrite；
+- 冻结证据 SHA、正文同步水位 SHA、目标 SHA、祖先关系和是否发生 history rewrite；
 - 提交列表，包括 merge、fix、test、docs、删除和重命名；
 - changed files 及其状态；
 - 由章节映射命中的现有章节；
@@ -115,14 +117,14 @@
 1. 确认当前目录和仓库身份，读取 `AGENTS.md`、`PLAN.md`、`mkdocs.yml`、章节映射、状态及当前工作树 diff。
 2. 运行辅助脚本的 prepare 阶段，固定目标 SHA、生成冻结快照和事实包。
 3. 逐项检查全部 commit、changed files、映射结果、未覆盖路径和架构候选。
-4. 目标 SHA 变化时，先把所有普通章节 frontmatter 和公共版本入口机械迁移到同一基线；逐项判断正文中的旧 SHA、旧计数和旧结论是否仍是历史证据。block index 没有 SHA/date frontmatter 契约，但其中的事实与计数仍须同步。对真正受证据影响的能力，修改最少数量的现有章节，并同步事实源入口、设计图、示例、状态标记和相关索引。
+4. 目标 SHA 变化时，逐项判断正文中的旧 SHA、旧计数和旧结论是否仍是历史证据；保留所有普通章节的冻结 SHA/date frontmatter，不做全书机械迁移。对真正受目标快照影响的能力，修改最少数量的现有章节，并同步事实源入口、设计图、示例、状态标记和相关索引。block index 没有 SHA/date frontmatter 契约，但其中的事实与计数仍须同步。
 5. 对新职责边界或独立读者问题，按第 7 节扩展新章节。
-6. 以本轮最终语义修订章节为排除集重选旧正文样本，再调度一个全新上下文、只读的独立 reviewer，审查全部语义修订章节和抽中的 6 篇旧正文。只改公共 SHA/date frontmatter 的机械迁移由全量门禁验证，不把 72 篇全部伪装成语义修订。
+6. 以本轮最终语义修订章节为排除集重选旧正文样本，再调度一个全新上下文、只读的独立 reviewer，审查全部语义修订章节和抽中的 6 篇旧正文。
 7. 修复 findings；存在 blocking finding 时，由同一 reviewer 复核修订。
 8. 执行全量文档门禁。
-9. 全部通过后调用辅助脚本的 commit-state 阶段，原子推进文档基线和覆盖台账。
+9. 全部通过后调用辅助脚本的 commit-state 阶段，原子推进正文同步水位和覆盖台账；冻结证据 SHA/date 永不由该命令推进。
 
-即使目标 SHA 与文档基线相同，也执行旧正文抽样复核和全量门禁。
+即使目标 SHA 与正文同步水位相同，也执行旧正文抽样复核和全量门禁。
 
 ## 7. 自动扩展新章节
 
@@ -171,8 +173,9 @@ Reviewer 按章节返回 `blocking` 和 `non-blocking` findings。事实错误�
 ```json
 {
   "schema_version": 1,
-  "documented_upstream_sha": "f02aa690bbebb9cabeac30a553d737486b0eb661",
-  "documented_verified_at": "2026-07-25",
+  "frozen_upstream_sha": "f02aa690bbebb9cabeac30a553d737486b0eb661",
+  "frozen_verified_at": "2026-07-25",
+  "synced_upstream_sha": "f02aa690bbebb9cabeac30a553d737486b0eb661",
   "last_successful_update_at": "2026-08-02T00:00:00Z",
   "chapters": {
     "02/01-agent-actor-runtime.md": {
@@ -185,7 +188,7 @@ Reviewer 按章节返回 `blocking` 和 `non-blocking` findings。事实错误�
 }
 ```
 
-初次启用时，以当前文档明确声明的冻结上游 SHA 和核验日期初始化 `documented_upstream_sha` 与 `documented_verified_at`；若无法唯一解析，停止并报告，不能直接把最新远端 SHA 当作“已经记录”。所有现有普通章节以 `review_count: 0` 初始化。`last_successful_update_at` 记录最近一次完整更新或抽样复核完成的时间，不能冒充正文绑定的核验日期。
+初次启用时，以当前文档明确声明的冻结上游 SHA 和核验日期初始化 `frozen_upstream_sha`、`frozen_verified_at` 与 `synced_upstream_sha`；若无法唯一解析，停止并报告，不能直接把最新远端 SHA 当作“已经完整同步”。三者最初都绑定 `f02aa690bbebb9cabeac30a553d737486b0eb661` / `2026-07-25`，因此第一次真实“更新文档”会完整审查冻结版本之后的全部差异。已有零散正文同步不被冒充为完整水位。所有现有普通章节以 `review_count: 0` 初始化。`last_successful_update_at` 记录最近一次完整更新或抽样复核完成的时间，不能冒充 frontmatter 的冻结核验日期。
 
 Prepare 阶段不改状态。只有以下条件全部满足后才原子替换状态文件：
 
@@ -195,7 +198,7 @@ Prepare 阶段不改状态。只有以下条件全部满足后才原子替换状
 - 新章节 issue 均有可核验编号。
 
 任一阶段失败都保留旧状态，使下一次调用能够从同一基线完整重试。
-目标 SHA 没有变化时，成功的抽样复核只更新运行时间和章节覆盖记录，保留 `documented_verified_at`，避免把未重新判定的正文统一标成新的核验日期。
+目标 SHA 没有变化时，成功的抽样复核只更新运行时间和章节覆盖记录。目标 SHA 前进时，成功提交只推进 `synced_upstream_sha`；`frozen_upstream_sha` 与 `frozen_verified_at` 始终不变。
 
 ## 10. 工作树与权限边界
 
@@ -231,7 +234,7 @@ Prepare 阶段不改状态。只有以下条件全部满足后才原子替换状
 - changed files、章节映射和未覆盖路径；
 - 以目标 SHA 为种子的稳定抽样；
 - prepare 失败和门禁失败时不推进状态；
-- commit-state 成功时原子更新状态。
+- commit-state 成功时只原子推进正文同步水位与复核覆盖，冻结基线字段保持不变。
 
 ### 12.3 仓库验收
 
@@ -241,7 +244,9 @@ Prepare 阶段不改状态。只有以下条件全部满足后才原子替换状
 - 最终执行：
 
 ```bash
-AEVATAR_SRC="$TARGET_SNAPSHOT" bash scripts/check-md.sh --all
+AEVATAR_SRC="$FROZEN_SNAPSHOT" AEVATAR_SRC2="$TARGET_SNAPSHOT" \
+  EXPECTED_UPSTREAM_COMMIT="$FROZEN_SHA" EXPECTED_VERIFIED_AT="$FROZEN_VERIFIED_AT" \
+  bash scripts/check-md.sh --all
 python3 scripts/check-links.py --all
 bash scripts/check-drift.sh
 python3 scripts/check-mermaid.py
@@ -256,7 +261,7 @@ mkdocs build --strict --clean
 - 已有能力被修订到正确章节，新独立能力会先建 issue 再完整接入导航与索引；
 - 每轮由一个独立 reviewer 检查所有本轮变更及默认 6 篇旧正文；
 - 覆盖台账可跨 turn 累积，并以最低 `review_count` 衡量全书轮次；
-- 任何失败都不会错误推进 `documented_upstream_sha` 或审查计数；
+- 任何失败都不会错误推进 `synced_upstream_sha` 或审查计数；冻结证据 SHA/date 在所有更新中保持不变；
 - 全量文档门禁通过。
 
 ## 14. 非目标
