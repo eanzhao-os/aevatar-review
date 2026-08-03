@@ -158,6 +158,10 @@ def validate_source() -> int:
         "bright accent color must not carry text",
     )
     require(
+        "--md-accent-fg-color: var(--aevatar-primary);" in css,
+        "Material interaction text must use the contrast-safe primary color",
+    )
+    require(
         "outline: 0.14rem solid var(--aevatar-primary);" in css,
         "keyboard focus must use the contrast-safe primary color",
     )

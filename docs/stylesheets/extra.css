@@ -14,7 +14,7 @@
   --md-primary-fg-color--light: #35aa8d;
   --md-primary-fg-color--dark: #08745b;
   --md-primary-bg-color: #ffffff;
-  --md-accent-fg-color: var(--aevatar-accent);
+  --md-accent-fg-color: var(--aevatar-primary);
   --md-accent-fg-color--transparent: rgba(14, 175, 131, 0.12);
   --md-default-fg-color: var(--aevatar-text);
   --md-default-fg-color--light: var(--aevatar-muted);
