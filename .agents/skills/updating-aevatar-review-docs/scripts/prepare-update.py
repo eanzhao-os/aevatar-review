@@ -11,9 +11,11 @@ from pathlib import Path
 
 SHA_RE = re.compile(r"[0-9a-f]{40}")
 CHAPTER_RE = re.compile(r"(?:0[0-9]|1[0-3])/[0-9]{2}-[a-z0-9-]+\.md")
+ISSUE_URL_PATTERN = r"https://github\.com/[^/\s)]+/[^/\s)]+/issues/[0-9]+"
+ISSUE_URL_RE = re.compile(ISSUE_URL_PATTERN)
 ROW_RE = re.compile(
     r"^- \[x\] \[([^]]+)\]\(([^)]+)\).+"
-    r"\[issue\]\((https://github\.com/[^/]+/[^/]+/issues/[0-9]+)\)\s*$"
+    rf"\[issue\]\(({ISSUE_URL_PATTERN})\)\s*$"
 )
 UTC_RE = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z")
 STATE_KEYS = {
@@ -53,6 +55,8 @@ def chapter_rows(plan: Path) -> dict[str, str]:
     for line in plan.read_text(encoding="utf-8").splitlines():
         if not line.startswith("- [x]"):
             continue
+        if len(ISSUE_URL_RE.findall(line)) != 1:
+            raise ValueError(f"checked chapter row must contain exactly one GitHub issue URL: {line}")
         match = ROW_RE.fullmatch(line)
         if match is None:
             raise ValueError(f"malformed checked chapter row: {line}")

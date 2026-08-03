@@ -93,6 +93,19 @@ class StateAndSamplingTests(CliFixture):
         with self.assertRaises(ValueError):
             MODULE.chapter_rows(self.plan_with_mismatched_link)
 
+    def test_plan_rejects_row_with_multiple_github_issue_urls(self):
+        path = self.root / "multiple-issues.md"
+        path.write_text(
+            self.plan.read_text(encoding="utf-8").replace(
+                "One — [issue](https://github.com/fix/review/issues/1)",
+                "One — [issue](https://github.com/fix/review/issues/2) — "
+                "[issue](https://github.com/fix/review/issues/1)",
+            ),
+            encoding="utf-8",
+        )
+        with self.assertRaises(ValueError):
+            MODULE.chapter_rows(path)
+
     def test_sample_prefers_low_count_then_oldest_then_stable_hash(self):
         first = MODULE.stable_sample(self.chapters, self.coverage_state, self.excluded, 3, "b" * 40)
         second = MODULE.stable_sample(self.chapters, self.coverage_state, self.excluded, 3, "b" * 40)
