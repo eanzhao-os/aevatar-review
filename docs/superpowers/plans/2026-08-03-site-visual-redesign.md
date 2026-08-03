@@ -40,7 +40,8 @@ Keep the current standard-library parser and icon checks. Replace wrapped-tab as
 ```python
 require("navigation.tabs" not in config, "top navigation tabs must be disabled")
 require("navigation.expand" not in config, "the sidebar must expand only the current section")
-require(config.count("scheme: custom") == 2, "both palettes must use the custom scheme")
+for scheme in ("aevatar-light", "aevatar-dark"):
+    require(f"scheme: {scheme}" in config, f"missing custom palette scheme: {scheme}")
 for token in ("--aevatar-bg", "--aevatar-sidebar", "--aevatar-primary", "--aevatar-accent"):
     require(token in css, f"missing visual token: {token}")
 for selector in (".md-sidebar--primary", ".md-header", ".md-typeset .home-hero", ".md-typeset .route-grid"):
@@ -87,11 +88,11 @@ git commit -m "test: define sidebar site design contract"
 
 - [ ] **Step 1: Switch Material to native sidebar navigation**
 
-Remove only `navigation.tabs` and `navigation.expand` from `theme.features`. Keep `navigation.sections` and `navigation.indexes`. Change both palette entries from `scheme: default/slate` to `scheme: custom`; CSS differentiates them through their existing `media` values.
+Remove only `navigation.tabs` and `navigation.expand` from `theme.features`. Keep `navigation.sections` and `navigation.indexes`. Rename the palette schemes to `aevatar-light` and `aevatar-dark` so the manual toggle changes a stable DOM attribute as well as respecting each entry’s `media` default.
 
 - [ ] **Step 2: Replace old wrapped-tab CSS with the complete theme**
 
-Define light tokens on `[data-md-color-scheme="custom"]` and dark overrides inside `@media (prefers-color-scheme: dark)`. Map Material variables `--md-primary-fg-color`, `--md-accent-fg-color`, `--md-default-bg-color`, and text/code variables to the approved palette.
+Define light tokens on `[data-md-color-scheme="aevatar-light"]` and dark tokens on `[data-md-color-scheme="aevatar-dark"]`. Map Material variables `--md-primary-fg-color`, `--md-accent-fg-color`, `--md-default-bg-color`, and text/code variables to the approved palette.
 
 Style only existing Material contracts and homepage classes. Cover header, primary sidebar, active/hover/focus nav items, content width and typography, links, code, tables, admonitions, pagination, Mermaid overflow, homepage hero/actions/stats/routes, mobile breakpoints, and reduced motion. Delete all `.md-tabs` wrapping rules because tabs no longer render.
 

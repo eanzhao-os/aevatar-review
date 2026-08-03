@@ -90,10 +90,11 @@ def validate_source() -> int:
     )
     require(feature_enabled(config, "navigation.sections"), "sidebar sections must remain enabled")
     require(feature_enabled(config, "navigation.indexes"), "section index pages must remain enabled")
-    require(
-        config.count("scheme: custom") == 2,
-        "both palettes must use the custom scheme",
-    )
+    for scheme in ("aevatar-light", "aevatar-dark"):
+        require(
+            f"scheme: {scheme}" in config,
+            f"missing custom palette scheme: {scheme}",
+        )
 
     for token in (
         "--aevatar-bg",
