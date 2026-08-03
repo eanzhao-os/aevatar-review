@@ -23,6 +23,10 @@
 #   EXPECTED_UPSTREAM_COMMIT    approved fact baseline (default below)
 #   EXPECTED_VERIFIED_AT        approved verification date (default below)
 #
+# upstream_refs filters out references containing ".." (path-traversal
+# guard): such references are silently skipped, never probed against a
+# baseline, and never reported.
+#
 # A file is classified before it is validated:
 #   target    listed in the target manifest -> full chapter contract
 #   index     NN/index.md                   -> index contract

@@ -479,6 +479,13 @@ MANIFEST
   AEVATAR_SRC="$src" AEVATAR_SRC2="$src2" bash "$ROOT/scripts/check-md.sh" --repo-root "$repo" --paths 00/04-miss.md > "$tmp/miss.log" 2>&1
   assert_eq "1" "$?" "validators: path missing in both baselines must fail"
 
+  # 1d. path-traversal refs (containing "..") are filtered out by
+  #     upstream_refs and must not trigger baseline probing
+  local DOTDOT_SPINE='- `src/../../etc/passwd:1`：traversal ref。\n'
+  make_chapter "$repo/00/05-dotdot.md" current "$SHA" "$DOTDOT_SPINE" 2
+  AEVATAR_SRC="$src" AEVATAR_SRC2="$src2" bash "$ROOT/scripts/check-md.sh" --repo-root "$repo" --paths 00/05-dotdot.md > "$tmp/dotdot.log" 2>&1
+  assert_eq "0" "$?" "validators: dotdot ref must be filtered (pass)"
+
   # 2. missing frontmatter
   mkdir -p "$repo/probe"
   printf '# 无 frontmatter\n\n正文。\n' > "$repo/probe/00-nofm.md"
@@ -549,8 +556,8 @@ MANIFEST
     printf -- '---\nstatus: index\nupstream_commit: %s\nverified_at: 2026-07-25\n---\n\n# %s 导读\n\n阅读顺序。\n' "$SHA" "$b" > "$repo/$b/index.md"
   done
   rm -rf "$repo/probe"
-  grep -v '00/03-sync\|00/04-miss' "$repo/docs/migration/2026-07-25-target-chapters.md" > "$tmp/manifest.tmp" && mv "$tmp/manifest.tmp" "$repo/docs/migration/2026-07-25-target-chapters.md"
-  rm -f "$repo/00/03-sync.md" "$repo/00/04-miss.md"
+  grep -v '00/03-sync\|00/04-miss\|00/05-dotdot' "$repo/docs/migration/2026-07-25-target-chapters.md" > "$tmp/manifest.tmp" && mv "$tmp/manifest.tmp" "$repo/docs/migration/2026-07-25-target-chapters.md"
+  rm -f "$repo/00/03-sync.md" "$repo/00/04-miss.md" "$repo/00/05-dotdot.md"
   make_chapter "$repo/01/01-old.md" current "$SHA" "$GOOD_SPINE" 2
   AEVATAR_SRC="$src" AEVATAR_SRC2="" bash "$ROOT/scripts/check-md.sh" --repo-root "$repo" --all > "$tmp/orphan.log" 2>&1
   assert_eq "1" "$?" "validators: --all must reject an orphan substantive chapter"
