@@ -69,7 +69,7 @@
 本仓库无编译产物。验证手段:
 
 - **BUILD**:`AEVATAR_SRC=<frozen-f02aa690-archive> bash scripts/check-md.sh --all` —— 校验所有章节 Markdown 文件存在、frontmatter /
-  标题层级 / 空文件 / 孤儿链接基本结构合规。
+  标题层级 / 空文件 / 孤儿链接基本结构合规。`check-md.sh` 对引用的上游路径采用**双基准**：冻结树（`AEVATAR_SRC`）与同步基线工作树（`AEVATAR_SRC2`，默认 `~/Code/aevatar`，可设空串禁用）任一存在且行号锚点在任一基准内即通过；正文同步 HEAD 的章节可引用 HEAD 特有文件（见 `00/02` 正文同步例外）。
 - **TEST**:同上脚本 + `python3 scripts/check-links.py --all` + `bash scripts/check-drift.sh`，并检查每篇章节是否含「事实源/设计抽象」入口(可回指
   `~/Code/aevatar` 的真实路径),且引用的源码文件真实存在。
 - **MERMAID**:`python3 scripts/check-mermaid.py` —— 用真实 mermaid 引擎(`mermaid-cli`,

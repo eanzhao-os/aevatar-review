@@ -18,7 +18,8 @@
 #                               upstream working tree $HOME/Code/aevatar);
 #                               a referenced path passes if it exists in
 #                               either baseline, anchors pass if in range in
-#                               at least one baseline
+#                               at least one baseline; set AEVATAR_SRC2=""
+#                               to disable the secondary baseline
 #   EXPECTED_UPSTREAM_COMMIT    approved fact baseline (default below)
 #   EXPECTED_VERIFIED_AT        approved verification date (default below)
 #
@@ -164,7 +165,8 @@ check_upstream_refs() {
     existing=""
     if [ -e "$AEVATAR_SRC/$path" ]; then existing="$AEVATAR_SRC"; fi
     if [ -n "$AEVATAR_SRC2" ] && [ -e "$AEVATAR_SRC2/$path" ]; then
-      existing="${existing:+$existing }$AEVATAR_SRC2"
+      existing="${existing:+$existing
+}$AEVATAR_SRC2"
     fi
     if [ -z "$existing" ]; then
       add_error "$rel: referenced source path does not exist at the frozen baseline or sync baseline: $path"
@@ -172,18 +174,22 @@ check_upstream_refs() {
     fi
     if [ -n "$anchors" ]; then
       ok=0
-      for base in $existing; do
+      sizes=""
+      while IFS= read -r base; do
         [ -f "$base/$path" ] || continue
         total=$(wc -l < "$base/$path" | tr -d ' ')
+        sizes="${sizes:+$sizes }$total"
         [ "$total" -lt 1 ] && continue
         in_range=1
         for one in $(printf '%s' "$anchors" | tr ',-' '  '); do
           if [ "$one" -lt 1 ] || [ "$one" -gt "$total" ]; then in_range=0; break; fi
         done
         [ "$in_range" -eq 1 ] && ok=1
-      done
+      done <<EOF
+$existing
+EOF
       if [ "$ok" -eq 0 ]; then
-        add_error "$rel: source line anchor out of range in every baseline: $path:$anchors"
+        add_error "$rel: source line anchor out of range in every baseline: $path:$anchors (baseline line counts: ${sizes:-unknown})"
         return 1
       fi
     fi

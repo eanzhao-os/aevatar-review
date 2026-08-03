@@ -456,72 +456,72 @@ MANIFEST
   printf '01/01-old.md\n' > "$repo/docs/migration/2026-07-25-old-retire-paths.txt"
 
   local GOOD_SPINE='- `src/Aevatar.Foundation.Abstractions/IActorRuntime.cs:2`：运行时查找与生命周期。\n'
-  local run="AEVATAR_SRC=$src bash $ROOT/scripts/check-md.sh --repo-root $repo"
+  local run="AEVATAR_SRC=$src AEVATAR_SRC2="" bash $ROOT/scripts/check-md.sh --repo-root $repo"
 
   # 1. a fully conforming chapter must pass
   make_chapter "$repo/00/01-good.md" current "$SHA" "$GOOD_SPINE" 2
-  AEVATAR_SRC="$src" bash "$ROOT/scripts/check-md.sh" --repo-root "$repo" --paths 00/01-good.md > "$tmp/ok.log" 2>&1
+  AEVATAR_SRC="$src" AEVATAR_SRC2="" bash "$ROOT/scripts/check-md.sh" --repo-root "$repo" --paths 00/01-good.md > "$tmp/ok.log" 2>&1
   assert_eq "0" "$?" "validators: conforming chapter must pass"
 
   # 2. missing frontmatter
   mkdir -p "$repo/probe"
   printf '# 无 frontmatter\n\n正文。\n' > "$repo/probe/00-nofm.md"
-  AEVATAR_SRC="$src" bash "$ROOT/scripts/check-md.sh" --repo-root "$repo" --paths probe/00-nofm.md > "$tmp/nofm.log" 2>&1
+  AEVATAR_SRC="$src" AEVATAR_SRC2="" bash "$ROOT/scripts/check-md.sh" --repo-root "$repo" --paths probe/00-nofm.md > "$tmp/nofm.log" 2>&1
   assert_eq "1" "$?" "validators: missing frontmatter must fail"
   assert_contains "$tmp/nofm.log" "frontmatter" "validators: frontmatter failure must be named"
 
   # 3. invalid status
   make_chapter "$repo/probe/01-badstatus.md" draft "$SHA" "$GOOD_SPINE" 2
-  AEVATAR_SRC="$src" bash "$ROOT/scripts/check-md.sh" --repo-root "$repo" --paths probe/01-badstatus.md > "$tmp/badstatus.log" 2>&1
+  AEVATAR_SRC="$src" AEVATAR_SRC2="" bash "$ROOT/scripts/check-md.sh" --repo-root "$repo" --paths probe/01-badstatus.md > "$tmp/badstatus.log" 2>&1
   assert_eq "1" "$?" "validators: invalid status must fail"
   assert_contains "$tmp/badstatus.log" "status" "validators: status failure must be named"
 
   # 4. wrong upstream_commit
   make_chapter "$repo/probe/02-badsha.md" current "$BAD" "$GOOD_SPINE" 2
-  AEVATAR_SRC="$src" bash "$ROOT/scripts/check-md.sh" --repo-root "$repo" --paths probe/02-badsha.md > "$tmp/badsha.log" 2>&1
+  AEVATAR_SRC="$src" AEVATAR_SRC2="" bash "$ROOT/scripts/check-md.sh" --repo-root "$repo" --paths probe/02-badsha.md > "$tmp/badsha.log" 2>&1
   assert_eq "1" "$?" "validators: wrong upstream_commit must fail"
   assert_contains "$tmp/badsha.log" "upstream_commit" "validators: baseline failure must be named"
 
   # 5. only one diagram
   make_chapter "$repo/probe/03-onediagram.md" current "$SHA" "$GOOD_SPINE" 1
-  AEVATAR_SRC="$src" bash "$ROOT/scripts/check-md.sh" --repo-root "$repo" --paths probe/03-onediagram.md > "$tmp/onediagram.log" 2>&1
+  AEVATAR_SRC="$src" AEVATAR_SRC2="" bash "$ROOT/scripts/check-md.sh" --repo-root "$repo" --paths probe/03-onediagram.md > "$tmp/onediagram.log" 2>&1
   assert_eq "1" "$?" "validators: single diagram must fail"
   assert_contains "$tmp/onediagram.log" "diagram" "validators: diagram failure must be named"
 
   # 6. four source-spine paths
   local FOUR='- `src/Aevatar.Foundation.Abstractions/IActorRuntime.cs:1`：a。\n- `docs/canon/overview.md:1`：b。\n- `aevatar.slnx:1`：c。\n- `docs/canon/overview.md:1`：d。\n'
   make_chapter "$repo/probe/04-fourspine.md" current "$SHA" "$FOUR" 2
-  AEVATAR_SRC="$src" bash "$ROOT/scripts/check-md.sh" --repo-root "$repo" --paths probe/04-fourspine.md > "$tmp/four.log" 2>&1
+  AEVATAR_SRC="$src" AEVATAR_SRC2="" bash "$ROOT/scripts/check-md.sh" --repo-root "$repo" --paths probe/04-fourspine.md > "$tmp/four.log" 2>&1
   assert_eq "1" "$?" "validators: more than three spine paths must fail"
   assert_contains "$tmp/four.log" "spine" "validators: spine-count failure must be named"
 
   # 7. out-of-range source line anchor
   local OOR='- `src/Aevatar.Foundation.Abstractions/IActorRuntime.cs:900`：越界锚点。\n'
   make_chapter "$repo/probe/05-oorline.md" current "$SHA" "$OOR" 2
-  AEVATAR_SRC="$src" bash "$ROOT/scripts/check-md.sh" --repo-root "$repo" --paths probe/05-oorline.md > "$tmp/oor.log" 2>&1
+  AEVATAR_SRC="$src" AEVATAR_SRC2="" bash "$ROOT/scripts/check-md.sh" --repo-root "$repo" --paths probe/05-oorline.md > "$tmp/oor.log" 2>&1
   assert_eq "1" "$?" "validators: out-of-range line anchor must fail"
   assert_contains "$tmp/oor.log" "line" "validators: line-anchor failure must be named"
 
   # 7b. multi-line and range anchors are validated element by element
   local MULTI='- `src/Aevatar.Foundation.Abstractions/IActorRuntime.cs:1,3`：多行锚点。\n'
   make_chapter "$repo/probe/05b-multiline.md" current "$SHA" "$MULTI" 2
-  AEVATAR_SRC="$src" bash "$ROOT/scripts/check-md.sh" --repo-root "$repo" --paths probe/05b-multiline.md > "$tmp/multi.log" 2>&1
+  AEVATAR_SRC="$src" AEVATAR_SRC2="" bash "$ROOT/scripts/check-md.sh" --repo-root "$repo" --paths probe/05b-multiline.md > "$tmp/multi.log" 2>&1
   assert_eq "0" "$?" "validators: valid multi-line anchor must pass"
 
   local MULTIBAD='- `src/Aevatar.Foundation.Abstractions/IActorRuntime.cs:1,900`：一个越界。\n'
   make_chapter "$repo/probe/05c-multibad.md" current "$SHA" "$MULTIBAD" 2
-  AEVATAR_SRC="$src" bash "$ROOT/scripts/check-md.sh" --repo-root "$repo" --paths probe/05c-multibad.md > "$tmp/multibad.log" 2>&1
+  AEVATAR_SRC="$src" AEVATAR_SRC2="" bash "$ROOT/scripts/check-md.sh" --repo-root "$repo" --paths probe/05c-multibad.md > "$tmp/multibad.log" 2>&1
   assert_eq "1" "$?" "validators: one out-of-range element in a multi-line anchor must fail"
   assert_contains "$tmp/multibad.log" "900" "validators: the offending element must be named"
 
   # 8. nonexistent source path
   local MISS='- `src/Nope/Missing.cs:1`：不存在。\n'
   make_chapter "$repo/probe/06-misssrc.md" current "$SHA" "$MISS" 2
-  AEVATAR_SRC="$src" bash "$ROOT/scripts/check-md.sh" --repo-root "$repo" --paths probe/06-misssrc.md > "$tmp/misssrc.log" 2>&1
+  AEVATAR_SRC="$src" AEVATAR_SRC2="" bash "$ROOT/scripts/check-md.sh" --repo-root "$repo" --paths probe/06-misssrc.md > "$tmp/misssrc.log" 2>&1
   assert_eq "1" "$?" "validators: nonexistent source path must fail"
 
   # 9. --all rejects a missing target chapter
-  AEVATAR_SRC="$src" bash "$ROOT/scripts/check-md.sh" --repo-root "$repo" --all > "$tmp/all.log" 2>&1
+  AEVATAR_SRC="$src" AEVATAR_SRC2="" bash "$ROOT/scripts/check-md.sh" --repo-root "$repo" --all > "$tmp/all.log" 2>&1
   assert_eq "1" "$?" "validators: --all must fail while a target chapter is missing"
   assert_contains "$tmp/all.log" "00/02-planned.md" "validators: --all must name the missing target"
 
@@ -534,11 +534,11 @@ MANIFEST
   done
   rm -rf "$repo/probe"
   make_chapter "$repo/01/01-old.md" current "$SHA" "$GOOD_SPINE" 2
-  AEVATAR_SRC="$src" bash "$ROOT/scripts/check-md.sh" --repo-root "$repo" --all > "$tmp/orphan.log" 2>&1
+  AEVATAR_SRC="$src" AEVATAR_SRC2="" bash "$ROOT/scripts/check-md.sh" --repo-root "$repo" --all > "$tmp/orphan.log" 2>&1
   assert_eq "1" "$?" "validators: --all must reject an orphan substantive chapter"
   assert_contains "$tmp/orphan.log" "01/01-old.md" "validators: orphan must be named"
 
-  AEVATAR_SRC="$src" bash "$ROOT/scripts/check-md.sh" --repo-root "$repo" --all --allow-retiring > "$tmp/retiring.log" 2>&1
+  AEVATAR_SRC="$src" AEVATAR_SRC2="" bash "$ROOT/scripts/check-md.sh" --repo-root "$repo" --all --allow-retiring > "$tmp/retiring.log" 2>&1
   assert_eq "0" "$?" "validators: --all --allow-retiring must tolerate listed retire paths"
 
   # ---------------- check-links ----------------

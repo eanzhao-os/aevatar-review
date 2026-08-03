@@ -85,7 +85,7 @@ flowchart TB
 - 全书共用一个基线 commit：f02aa690bbebb9cabeac30a553d737486b0eb661，以只读快照形式物化，写作过程对快照**只读引用，零写权限**。
 - 每章 frontmatter 的 `upstream_commit` 与 `verified_at` 是核验凭证：声明"这一章的 current 论断是在哪个基线、哪一天核验的"。
 - **执行期间不移动基线。** 若上游必须前进，re-baseline 是一个显式事件：更换 commit、重新生成全部易漂移信息（数量、模块清单、默认端口、API 字段）、重核全书 verified_at。不允许"顺手用一下新 HEAD"式的悄悄移动——那会让不同章节的 current 指向不同事实。
-- **正文同步例外（2026-08-03 登记）**：章节正文可随上游 HEAD（当前 `d9db826eb`，feature/integrate 末端）前进并声明"正文同步目标"，frontmatter 的 `upstream_commit`/`verified_at` 仍冻结在 f02aa690/2026-07-25 作为审查基线。采用该模式的章节必须在版本结论中同时注明两个基线（见 [01/01](../01/01-quick-start.md)、[07/02](../07/02-nyxid-chat-actor-model-and-progress.md)）；易漂移信息仍须按冻结基线核验，正文与冻结账本冲突处显式标注"以 HEAD 为准"。机械校验（`check-md.sh`）对引用的上游路径与行号锚点采用**双基准**：冻结树（`AEVATAR_SRC`）与同步基线工作树（`AEVATAR_SRC2`，CI 为上游 `feature/integrate` checkout）任一存在且行号在任一基准内即通过，因此冻结引用与 HEAD 新文件引用可共存。
+- **正文同步例外（2026-08-03 登记）**：章节正文可随上游 HEAD（当前 `d9db826eb`，feature/integrate 末端）前进并声明"正文同步目标"，frontmatter 的 `upstream_commit`/`verified_at` 仍冻结在 f02aa690/2026-07-25 作为审查基线。采用该模式的章节必须在版本结论中同时注明两个基线（见 [01/01](../01/01-quick-start.md)、[07/02](../07/02-nyxid-chat-actor-model-and-progress.md)）；易漂移信息仍须按冻结基线核验，正文与冻结账本冲突处显式标注"以 HEAD 为准"。机械校验（`check-md.sh`）对引用的上游路径与行号锚点采用**双基准**：冻结树（`AEVATAR_SRC`）与同步基线工作树（`AEVATAR_SRC2`，CI 为上游 `feature/integrate` checkout，即当前 `d9db826eb` 所在分支的 tip）任一存在且行号在任一基准内即通过，因此冻结引用与 HEAD 新文件引用可共存。
 - 易漂移信息一律从固定基线重新生成或核验，不凭记忆转写。
 
 ### 一条论断该写什么状态：决策树
