@@ -130,7 +130,8 @@ upstream_refs() {
   grep -oE '`[^`]+`' "$1" 2>/dev/null \
     | sed 's/^`//; s/`$//' \
     | sed 's|^~/Code/aevatar/||; s|.*Code/aevatar/||' \
-    | grep -E '^(docs|src|workflows|demos|apps|tools|agents|test)/[^ ]+|^aevatar\.slnx|^[A-Za-z0-9_.-]+\.slnf' || true
+    | grep -E '^(docs|src|workflows|demos|apps|tools|agents|test)/[^ ]+|^aevatar\.slnx|^[A-Za-z0-9_.-]+\.slnf' \
+    | grep -vE '\.\.' || true
 }
 
 check_upstream_refs() {
