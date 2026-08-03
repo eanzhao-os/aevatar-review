@@ -64,6 +64,36 @@ def feature_enabled(config: str, feature: str) -> bool:
     return re.search(rf"(?m)^\s+- {re.escape(feature)}\s*$", config) is not None
 
 
+def scheme_color(css: str, scheme: str, token: str) -> str:
+    block = re.search(
+        rf'\[data-md-color-scheme="{re.escape(scheme)}"\]\s*\{{([^}}]+)\}}',
+        css,
+        re.DOTALL,
+    )
+    require(block is not None, f"missing color scheme block: {scheme}")
+    value = re.search(rf"{re.escape(token)}\s*:\s*(#[0-9a-fA-F]{{6}})", block.group(1))
+    require(value is not None, f"missing {scheme} color token: {token}")
+    return value.group(1)
+
+
+def relative_luminance(color: str) -> float:
+    channels = [int(color[index : index + 2], 16) / 255 for index in (1, 3, 5)]
+    linear = [
+        channel / 12.92
+        if channel <= 0.04045
+        else ((channel + 0.055) / 1.055) ** 2.4
+        for channel in channels
+    ]
+    return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+
+
+def contrast_ratio(foreground: str, background: str) -> float:
+    low, high = sorted(
+        (relative_luminance(foreground), relative_luminance(background))
+    )
+    return (high + 0.05) / (low + 0.05)
+
+
 def validate_source() -> int:
     config = CONFIG.read_text(encoding="utf-8")
     workflow = WORKFLOW.read_text(encoding="utf-8")
@@ -112,6 +142,25 @@ def validate_source() -> int:
         require(selector in css, f"missing redesigned component: {selector}")
     require(".md-tabs" not in css, "obsolete top-tab styling must be removed")
     require("prefers-reduced-motion: reduce" in css, "missing reduced-motion support")
+    light_primary = scheme_color(css, "aevatar-light", "--aevatar-primary")
+    light_background = scheme_color(css, "aevatar-light", "--aevatar-bg")
+    ratio = contrast_ratio(light_primary, light_background)
+    require(
+        ratio >= 4.5,
+        f"light primary text contrast must be at least 4.5:1 (got {ratio:.2f}:1)",
+    )
+    require(
+        re.search(
+            r"(?m)^\s*color:\s*var\(--aevatar-accent\);\s*$",
+            css,
+        )
+        is None,
+        "bright accent color must not carry text",
+    )
+    require(
+        "outline: 0.14rem solid var(--aevatar-primary);" in css,
+        "keyboard focus must use the contrast-safe primary color",
+    )
     require(
         re.search(r"\.md-typeset \.mermaid\s*\{[^}]*overflow-x\s*:\s*auto", css, re.DOTALL)
         is not None,

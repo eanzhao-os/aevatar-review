@@ -3,7 +3,7 @@
   --aevatar-bg: #f7fffc;
   --aevatar-surface: #ffffff;
   --aevatar-sidebar: #e9fbf4;
-  --aevatar-primary: #0e8f70;
+  --aevatar-primary: #08745b;
   --aevatar-accent: #0eaf83;
   --aevatar-text: #17352f;
   --aevatar-muted: #607973;
@@ -180,14 +180,14 @@ body {
 }
 
 .md-typeset a:hover {
-  color: var(--aevatar-accent);
+  color: var(--aevatar-primary);
   text-decoration-color: currentColor;
 }
 
 .md-typeset :focus-visible,
 .md-nav__link:focus-visible,
 .md-header__button:focus-visible {
-  outline: 0.14rem solid var(--aevatar-accent);
+  outline: 0.14rem solid var(--aevatar-primary);
   outline-offset: 0.14rem;
 }
 

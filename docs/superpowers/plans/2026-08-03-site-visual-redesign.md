@@ -16,7 +16,7 @@
 - Do not add JavaScript, template overrides, images, frontend frameworks, or dependencies.
 - Keep `mkdocs.yml` as the only complete navigation fact source.
 - Preserve unrelated tracked and untracked user changes; stage only files named by this plan.
-- Use the approved light colors `#F7FFFC`, `#E9FBF4`, `#0E8F70`, `#0EAF83`, and `#17352F`, plus a corresponding dark teal palette.
+- Use the approved light colors `#F7FFFC`, `#E9FBF4`, `#08745B`, `#0EAF83`, and `#17352F`, plus a corresponding dark teal palette. Primary text contrast must be at least `4.5:1`; the bright accent does not carry text or keyboard focus by itself.
 - Maintain keyboard focus, non-color selection cues, mobile drawer access, wide-content containment, and `prefers-reduced-motion` support.
 
 ---
