@@ -89,7 +89,7 @@ timeline mapper把committed report stage转换成`RunStarted`、`StepStarted`、
 
 ## 从 committed payload 到 typed live frame
 
-mapper先尝试把 `CommittedStateEventPublished` 解成 observed envelope，只把内部 `state_event.event_data` 交给 handlers；`state_root` 不会被整包发往客户端。handlers按 `Order`全部执行，因此一个 `WorkflowLlmStreamChunkEvent` 可以同时产生文本 delta与 reasoning custom frame。主要映射是：
+mapper先尝试把 `CommittedStateEventPublished` 解成 observed envelope，只把内部 `state_event.event_data` 交给 handlers；`state_root` 不会被整包发往客户端。handlers按 `Order`全部执行，因此一个 committed progress 事件可以同时产生文本 delta与 reasoning custom frame。主要映射是：
 
 | observed payload | `WorkflowRunEventEnvelope` 输出 |
 |---|---|
@@ -97,7 +97,7 @@ mapper先尝试把 `CommittedStateEventPublished` 解成 observed envelope，只
 | `StepRequestEvent` | `step_started` + `aevatar.step.request` |
 | `StepCompletedEvent` | `step_finished` + `aevatar.step.completed` |
 | text start/content/end、`ChatResponseEvent` | `text_message_start/content/end` |
-| `WorkflowLlmStreamChunkEvent` | content → text delta，reasoning → `aevatar.llm.reasoning` |
+| `RoleChatSessionProgressedEvent`（text/reasoning/tool/usage progress） | content → text delta，reasoning → `aevatar.llm.reasoning` |
 | tool call/result | `tool_call_start/end` |
 | suspension、wait signal、buffered signal | typed `custom` payload |
 | successful `WorkflowCompletedEvent` | usage unavailable marker + `run_finished` |
@@ -195,9 +195,10 @@ interaction:
   accepted_frame:
     custom: { name: aevatar.run.context, actor_id: workflow-run-42, command_id: cmd-9 }
 committed_observations:
-  - WorkflowLlmStreamChunkEvent:
-      delta_content: "结论"
-      delta_reasoning_content: "比较两个方案"
+  - RoleChatSessionProgressedEvent:
+      payload: { text_delta: { delta: "结论" } }
+  - RoleChatSessionProgressedEvent:
+      payload: { reasoning_delta: { delta: "比较两个方案" } }
   - WorkflowCompletedEvent:
       success: true
       output: "结论"

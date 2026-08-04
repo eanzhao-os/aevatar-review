@@ -119,6 +119,7 @@ provider-native方案更贴近Orleans Persistent Streams的queue adapter/receive
 - offset commit证明transport delivery ACK，不证明actor event、Projection或外部effect已到终态。
 - `Acks.All`与idempotent producer不提供端到端exactly-once。
 - partition/queue数量必须一致；扩容partition需要显式迁移设计，而不是直接改配置。
+- **共享队列缓存是缓冲维度，不是 partition 契约**：`Orleans:QueueCacheSize` 默认从 4096 提升到 32768（`AevatarOrleansRuntimeOptions.DefaultQueueCacheSize = 32*1024`，`KafkaProviderQueueAdapterFactory` 落地为 `CacheSize = Math.Max(128, ...)`），吸收消费端瞬时高峰（burst headroom）。它不改变 partition 映射、不改变 at-least-once、不改变 `QueueCount=8` 的 partition 对齐不变量；缓存堆积不能当业务背压，有界队列/高水位治理仍在（2026-08-04 补充）。
 - InMemory stream适合单机profile；多silo KafkaProvider依赖Garnet persistent runtime/pubsub和正确membership。
 - MassTransit只属历史，不得写成current可选backend。
 

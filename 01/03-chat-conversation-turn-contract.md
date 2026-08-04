@@ -140,6 +140,10 @@ sequenceDiagram
 
 accepted 之后、业务事件流之前，服务端先写一帧 `aevatar.chat.context`，payload 是 `WorkflowChatContextPayload`（`scope_id / conversation_id / turn_id / state_version`，见 `src/workflow/Aevatar.Workflow.Application.Abstractions/Runs/workflow_run_events.proto:159` 到 `:164`）。客户端续聊时必须回传其中的 `conversationId`，并把 `stateVersion` 作为下一轮的 `minimumStateVersion`——这是这个协议里唯一的"客户端义务"。
 
+### 观察截止：accepted 不等于可观测（2026-08-04 补充）
+
+Workflow chat 被 accepted 后，首个 projection-backed 业务帧必须在 **30 秒**内到达（`WorkflowRunBehaviorOptions.ObservationDeadline` 语义）；超时则 interaction 抛出 typed observation timeout（`CommandObservationTimeoutException`），external adapter 输出 `RUN_OBSERVATION_TIMEOUT` terminal error 并关闭 stream。`: keepalive` 只维持传输连接，**不表示业务进展、不延长 deadline**（`docs/adr/0015-agui-sse-projection-session-pipeline.md` 2026-08-03 update #3170）。
+
 ### 归档协议：turn 的幂等追加
 
 run 终态后，delivery actor 把这一轮（user 文本 + assistant 文本 + 终态）作为 `ChatTurn` 追加给 `ChatConversationGAgent`。会话 actor 的追加判定（`agents/Aevatar.GAgents.ChatHistory/ChatConversationGAgent.cs:28` 起）：

@@ -193,6 +193,19 @@ Studio或Automation页面可以生成带schedule/definition/run筛选的Observat
 
 因此排障顺序通常是：先看Status确认依赖与projection freshness，再用Observatory定位run和`StateVersion`，最后用OTel correlation查延迟/错误路径；若读侧落后，走显式repair/replay，不在页面里直接改业务状态。
 
+### 进行中审批的 typed 识别（2026-08-04 补充）
+
+进行中审批只从 **typed 且未完成的 step** 识别，不从文本或通用 bag 推断：
+
+- `human_approval` 挂起以无 completion timestamp 的 step 识别。
+- `tool_approval` 挂起必须携带完整 typed 身份：`executionId`、`toolCallId`、`approvalRequestId`（`WorkflowToolApprovalReadModel`，`WorkflowExecutionStepTrace.tool_approval_value`）。UI 不得从文本或 generic bag 猜这些值；该只读投影只暴露审批对账键，不暴露工具参数或 digest。
+
+resume 对账精度是 `run_id + step_id + execution_id + tool_call_id + approval_request_id`，与 `docs/canon/workflow-primitives.md:456-458` 的 actor 侧事实一致；HTTP 202 语义维持不变（accepted ≠ committed）。
+
+### Backend Console 会话可续期（2026-08-04 补充）
+
+`Aevatar:BackendConsole:OidcScope` 对每个非空配置 scope 追加 `offline_access`，获得轮换（rotating）refresh token 支撑 durable console session；NyxID access token 15 分钟过期，只有 broker-capable 客户端在授予该 scope 时才返回 refresh token。前端在过期前预刷新并轮换（用过的 refresh token 不复用），嵌入 iframe 通过 typed 消息 `auth-refresh-request` / `auth-refresh-result` 与 admin shell 协调；失败提示重新登录。`OidcResources` 同时追加 Ornn proxy resource（`Aevatar:Ornn:NyxIdSlug`，默认 `ornn-api`）。
+
 ## 最小静态检查
 
 ```bash
