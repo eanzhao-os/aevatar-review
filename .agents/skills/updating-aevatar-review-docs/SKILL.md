@@ -9,11 +9,20 @@ description: Use when a user requests an aevatar-review documentation change, a 
 
 ## 1. 选择模式并守住发布基线
 
-- 未限定主题而要求“更新、同步、刷新文档”或检查覆盖时，使用 `full`。
-- 点名 feature、模块、协议、流程或实现细节时，使用 `topic` 并保留原始主题文本。
+- 未限定主题而要求补充、更新、解释或同步文档，或检查覆盖时，使用 `full`。
+- 点名一个 feature、模块、协议、流程或实现细节并要求补充、更新、解释或同步时，使用 `topic` 并保留原始主题文本。
 - 查询、审阅或建议只读：不建 issue、不推进状态、不提交、不推送。
 
-读取根 `AGENTS.md`、批准设计、`PLAN.md`、`mkdocs.yml`、状态和完整 `git status`。确认当前仓库为 `aevatar-review`、分支为 `main`、不是 linked worktree 且 index 为空。执行 `git fetch origin main`；本地含未在 `origin/main` 的既有提交或双方分叉时停止。记录 `BASE_SHA=$(git rev-parse origin/main)`。既有修改归用户所有；目标文件重叠时停止，非重叠文件永不暂存。
+读取根 `AGENTS.md`、批准设计、`PLAN.md`、`mkdocs.yml`、状态和完整 `git status`。确认当前仓库为 `aevatar-review`、分支为 `main`、不是 linked worktree 且 index 为空。执行：
+
+```bash
+git fetch origin main
+BASE_SHA="$(git rev-parse origin/main)"
+python3 .agents/skills/updating-aevatar-review-docs/scripts/prepare-update.py \
+  verify-publication --review-root "$PWD" --base-sha "$BASE_SHA" --phase base
+```
+
+该检查要求本地 `HEAD == BASE_SHA == origin/main`；失败即停止。既有修改归用户所有；目标文件重叠时停止，非重叠文件永不暂存。
 
 上游只允许 fetch 和读取 Git 对象。禁止 `pull/checkout/switch/reset/clean/stash` 及文件写入；其当前分支、detached HEAD 和脏工作树不阻塞 remote-ref 读取。
 
@@ -50,13 +59,13 @@ python3 .agents/skills/updating-aevatar-review-docs/scripts/prepare-update.py pr
 5. 创建失败或结果不明时按标题、路径和 SHA readback：唯一命中则复用，明确不存在才允许一次纠正后的创建，仍不明则停止；
 6. 唯一 issue 确认后，才写新章并更新 `PLAN.md`、`mkdocs.yml`、block index、source map、计数和必要索引。
 
-先按计划语义路径构造 `SELECT_ARGS+=(--changed-chapter "$path")`；新章再构造 `ISSUE_ARGS+=(--new-chapter-issue "$path=$url")`。运行：
+先按计划语义路径构造 `SELECT_ARGS+=(--changed-chapter "$path")`；新章再构造 `ISSUE_ARGS+=(--new-chapter-issue "$path=$url")`。从实际 Git diff 中逐个选择非章节的结构语义路径（导航、source map、索引或资源），构造 `STRUCTURAL_ARGS+=(--structural-path "$path")`。运行：
 
 ```bash
 python3 .agents/skills/updating-aevatar-review-docs/scripts/prepare-update.py select-review \
   --state .config/aevatar-doc-update/state.json --plan PLAN.md \
   --facts .superpowers/aevatar-doc-update/prepared.json --sample-size 6 \
-  "${SELECT_ARGS[@]}" "${ISSUE_ARGS[@]}" \
+  "${SELECT_ARGS[@]}" "${ISSUE_ARGS[@]}" "${STRUCTURAL_ARGS[@]}" \
   --output .superpowers/aevatar-doc-update/provisional.json
 ```
 
@@ -71,7 +80,7 @@ python3 .agents/skills/updating-aevatar-review-docs/scripts/prepare-update.py se
 
 以固定目标快照为当前事实，保留冻结 frontmatter。正文解释职责、边界、协议、状态、不变量和取舍；事实源入口不超过 3 条高价值路径与锚点。普通章节至少两张合规 Mermaid 图，适用时补最小示例，并区分 current、target、historical/removed。无法证明正当性时标记“设计待论证”并登记 TODO。
 
-写作后从实际 diff 重建 `SELECT_ARGS` 和 `ISSUE_ARGS`，再次以 `prepared.json` 为输入运行 `select-review`，输出 `final.json`。若语义范围扩大或 sample 改变，把新增范围交给同一 reviewer。随后让它核验全部 `semantic_changed_chapters`，并按章节返回 `blocking/non-blocking` findings。修复 blocking finding 后必须交回同一 reviewer 复核；reviewer 不可用就停止。作者自审不能替代独立复核。
+写作后从实际 diff 重建 `SELECT_ARGS`、`ISSUE_ARGS` 和 `STRUCTURAL_ARGS`，再次以 `prepared.json` 为输入运行 `select-review`，输出 `final.json`。`final.json.sealed_files` 必须覆盖全部语义章节、轮转 sample 和结构语义路径的当前 SHA-256。若范围扩大或 sample 改变，把新增范围交给同一 reviewer。随后让它核验全部 sealed path，并按路径返回 `pass` 或 findings。修复 blocking finding 后必须重新生成 `final.json` 并交回同一 reviewer 复核；reviewer 不可用就停止。作者自审不能替代独立复核。
 
 ## 5. 门禁、状态和发布
 
@@ -89,19 +98,68 @@ python3 scripts/check-mermaid.py
 mkdocs build --strict --clean
 ```
 
-任一命令失败即停止，不推进状态。全部通过且 reviewer 对 final facts 中每个语义章节和 sample 都为 pass 后，逐个构造 `REVIEW_ARGS+=(--reviewed-chapter "$path")`，运行：
+任一命令失败即停止，不推进状态。把事实写入仓库内忽略目录下两个 JSON；它们只记录可验证的工作流事实，不证明 reviewer 的密码学身份。两者的 `facts_sha256` 都必须等于 `final.json.facts_sha256`。
+
+Reviewer evidence 最小 schema（`results` 必须与 `sealed_files` 路径集合完全相等且全部为 `pass`）：
+
+```json
+{
+  "schema_version": 1,
+  "facts_sha256": "<final facts SHA-256>",
+  "reviewer": {
+    "task_id": "<non-empty task id>",
+    "model": "<explicit model>",
+    "fresh_context": true,
+    "read_only": true,
+    "independent": true
+  },
+  "results": {"01/01-example.md": "pass"},
+  "blocking_findings": []
+}
+```
+
+Gate evidence 最小 schema；五个必需 gate 不得缺失或重名，所有必需或附加 gate 的 `exit_code` 都必须是整数 `0`：
+
+```json
+{
+  "schema_version": 1,
+  "facts_sha256": "<final facts SHA-256>",
+  "gates": [
+    {"name": "check-md", "exit_code": 0},
+    {"name": "check-links", "exit_code": 0},
+    {"name": "check-drift", "exit_code": 0},
+    {"name": "check-mermaid", "exit_code": 0},
+    {"name": "mkdocs", "exit_code": 0}
+  ]
+}
+```
+
+证据保存为 `.superpowers/aevatar-doc-update/reviewer-evidence.json` 和 `gate-evidence.json` 后运行：
 
 ```bash
 python3 .agents/skills/updating-aevatar-review-docs/scripts/prepare-update.py commit-state \
   --state .config/aevatar-doc-update/state.json --plan PLAN.md \
   --facts .superpowers/aevatar-doc-update/final.json \
   --completed-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-  --gates-passed "${REVIEW_ARGS[@]}"
+  --review-evidence .superpowers/aevatar-doc-update/reviewer-evidence.json \
+  --gate-evidence .superpowers/aevatar-doc-update/gate-evidence.json
 ```
 
-只有 `full` 能推进 `synced_upstream_sha`；`topic` 只更新旧文轮转覆盖。任何失败都保留旧状态。
+`commit-state` 在稳定的仓库内 lock 上持有 `flock`，重验状态、证据和每个 sealed file 后才原子替换状态。任何文件在 final review 后变化都必须重新选择、复核并运行门禁。只有 `full` 能推进 `synced_upstream_sha`；`topic` 只更新旧文轮转覆盖。任何失败都保留旧状态。
 
-只用显式路径暂存本轮文档、导航、source map 和状态；检查 cached diff 后创建一个 `docs:` 提交。再次 `git fetch origin main`，只有 `origin/main` 仍等于 `BASE_SHA` 才执行 `git push origin HEAD:main`。随后用 `git ls-remote origin refs/heads/main` 确认远端 SHA 等于本地 HEAD。结果不明先 readback；远端已是目标即成功，明确未更新才允许一次诊断后的重试。禁止自动 merge、rebase、force-push 或顺带提交用户文件。
+把本轮文档、导航、source map 和状态逐个加入 `OWNED_ARGS+=(--owned-path "$path")`。只用这些显式路径暂存并检查 cached diff。紧邻提交前再次运行 `--phase base`，然后创建一个 `docs:` 提交。提交后和 push 前分别运行：
+
+```bash
+python3 .agents/skills/updating-aevatar-review-docs/scripts/prepare-update.py \
+  verify-publication --review-root "$PWD" --base-sha "$BASE_SHA" \
+  --phase commit "${OWNED_ARGS[@]}"
+DOC_SHA="$(python3 .agents/skills/updating-aevatar-review-docs/scripts/prepare-update.py \
+  verify-publication --review-root "$PWD" --base-sha "$BASE_SHA" \
+  --phase push "${OWNED_ARGS[@]}")"
+git push origin "$DOC_SHA:main"
+```
+
+`commit`/`push` 检查要求 `HEAD^ == BASE_SHA`、只有一个 parent，且完整 `BASE_SHA..HEAD` changed-file 集合与 owned path 集合完全相等；`push` 还要求远端 main 仍为 `BASE_SHA`，并返回已验证的固定 `DOC_SHA`。只 push 该 SHA，不能再次读取可能已推进的 `HEAD`。push 后用 `git ls-remote origin refs/heads/main` 确认远端 SHA 等于 `DOC_SHA`。结果不明先 readback；远端已是目标即成功，明确未更新才允许一次诊断后的重试。禁止自动 merge、rebase、force-push 或顺带提交用户文件。
 
 ## 快速检查
 
@@ -112,4 +170,6 @@ python3 .agents/skills/updating-aevatar-review-docs/scripts/prepare-update.py co
 | 上游工作树脏 | 不整理，继续读取 remote ref |
 | issue 结果不明 | readback，禁止盲目重试 |
 | reviewer 或 gate 失败 | 不推进状态、不提交、不推送 |
+| final review 后文件变化 | 重建 final facts、复核并重跑门禁 |
+| 本地 HEAD 在发布期间推进 | 保留结果，停止发布 |
 | 远端 main 推进 | 保留本地结果，停止发布 |

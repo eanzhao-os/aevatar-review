@@ -16,6 +16,7 @@
 
 # aevatar documentation update facts and pressure-test traces
 .superpowers/aevatar-doc-update/
+.config/aevatar-doc-update/.state.json.lock
 
 # mkdocs build output
 site/

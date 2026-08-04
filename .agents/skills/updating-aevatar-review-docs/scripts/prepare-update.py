@@ -2,11 +2,15 @@
 from __future__ import annotations
 
 import argparse
+import fcntl
 import hashlib
 import json
 import os
 import re
+import stat
 import subprocess
+import tempfile
+from contextlib import contextmanager
 from datetime import date, datetime
 from pathlib import Path, PurePosixPath
 
@@ -25,14 +29,22 @@ STATE_KEYS = {
     "synced_upstream_sha", "last_successful_update_at", "chapters",
 }
 CHAPTER_KEYS = {"review_count", "last_reviewed_sha", "last_reviewed_at", "result"}
+REQUIRED_GATES = {"check-md", "check-links", "check-drift", "check-mermaid", "mkdocs"}
 CANDIDATE_RULES = (
-    ("project", lambda p: p.suffix in {".csproj", ".slnf", ".slnx"}),
+    ("project", lambda p: p.suffix in {".csproj", ".sln", ".slnf", ".slnx"}),
     ("protocol", lambda p: p.suffix == ".proto"),
-    ("design", lambda p: p.match("docs/canon/*.md") or p.match("docs/adr/*.md")),
+    ("design", lambda p: p.suffix == ".md" and tuple(p.parts[:2]) in {
+        ("docs", "canon"), ("docs", "adr"),
+    }),
+    ("configuration", lambda p: p.name.lower().startswith("appsettings") and p.suffix == ".json"),
+    ("topology", lambda p: p.suffix in {".yaml", ".yml"} and re.search(
+        r"deploy|k8s|kubernetes|runtime[-_.]?topology|docker[-_.]?compose|helm|charts/",
+        p.as_posix(), re.I,
+    ) is not None),
     ("workflow", lambda p: p.suffix in {".yaml", ".yml"} and "workflow" in p.as_posix().lower()),
     ("component", lambda p: p.suffix == ".cs" and re.search(
-        r"Host|Endpoint|GAgent|ToolProvider|Connector|Primitive|Projection|Store|Authorization|Authentication|Configuration|Runtime",
-        p.name, re.I,
+        r"Host|Agent|GAgent|Runtime|Contract|Endpoint|ToolProvider|Connector|Workflow|Primitive|Persistence|Database|Store|Projection|Authorization|Authentication|Configuration",
+        p.as_posix(), re.I,
     ) is not None),
 )
 
@@ -118,11 +130,19 @@ def validate_state(value: object) -> dict:
             raise ValueError(f"invalid last_reviewed_at: {chapter}")
         if record["result"] not in (None, "pass"):
             raise ValueError(f"invalid result: {chapter}")
+        evidence = (reviewed_sha, reviewed_at, record["result"])
+        if count == 0 and evidence != (None, None, None):
+            raise ValueError(f"zero review_count must have null evidence: {chapter}")
+        if count > 0 and (
+            not valid_sha(reviewed_sha) or not valid_timestamp(reviewed_at)
+            or record["result"] != "pass"
+        ):
+            raise ValueError(f"positive review_count requires complete PASS evidence: {chapter}")
     return value
 
 
 def load_state(path: Path) -> dict:
-    return validate_state(json.loads(path.read_text(encoding="utf-8")))
+    return validate_state(load_json(path))
 
 
 def stable_rank(seed: str, chapter: str) -> str:
@@ -142,20 +162,69 @@ def stable_sample(
 
 def atomic_json(path: Path, value: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
-    temporary.write_text(
-        json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    descriptor, name = tempfile.mkstemp(
+        dir=path.parent, prefix=f".{path.name}.", suffix=".tmp"
     )
-    os.replace(temporary, path)
+    temporary = Path(name)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            json.dump(value, handle, ensure_ascii=False, indent=2)
+            handle.write("\n")
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def require_repository_path(root: Path, path: Path, name: str) -> Path:
+    root = root.resolve()
+    absolute = path.absolute()
+    resolved = absolute.resolve()
+    try:
+        relative = resolved.relative_to(root)
+    except ValueError as error:
+        raise ValueError(f"{name} must live under the repository root") from error
+    if not relative.parts or relative.parts[0] == ".git":
+        raise ValueError(f"invalid repository-local {name}")
+    lexical_root = next(
+        (candidate for candidate in absolute.parents if candidate.resolve() == root),
+        None,
+    )
+    if lexical_root is None:
+        raise ValueError(f"cannot locate repository root for {name}")
+    current = lexical_root
+    for part in absolute.relative_to(lexical_root).parts:
+        current /= part
+        if current.is_symlink():
+            raise ValueError(f"repository-local {name} cannot traverse symlinks")
+    return resolved
+
+
+@contextmanager
+def state_lock(path: Path):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lock_path = path.with_name(f".{path.name}.lock")
+    descriptor = os.open(
+        lock_path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600
+    )
+    if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+        os.close(descriptor)
+        raise ValueError("state lock must be a regular file")
+    with os.fdopen(descriptor, "a+b") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(lock, fcntl.LOCK_UN)
 
 
 def init_state(state: Path, plan: Path, frozen_sha: str, frozen_verified_at: str) -> None:
-    if state.exists():
-        raise ValueError(f"state already exists: {state}")
     if not valid_sha(frozen_sha):
         raise ValueError("frozen SHA must be 40 lowercase hexadecimal characters")
     if not valid_date(frozen_verified_at):
         raise ValueError("frozen verified date must be YYYY-MM-DD")
+    if plan.name != "PLAN.md" or plan.is_symlink():
+        raise ValueError("plan must be a regular PLAN.md")
+    require_repository_path(plan.resolve().parent, state, "state")
     chapters = {
         chapter: {
             "review_count": 0,
@@ -165,18 +234,34 @@ def init_state(state: Path, plan: Path, frozen_sha: str, frozen_verified_at: str
         }
         for chapter in chapter_rows(plan)
     }
-    atomic_json(state, {
-        "schema_version": 1,
-        "frozen_upstream_sha": frozen_sha,
-        "frozen_verified_at": frozen_verified_at,
-        "synced_upstream_sha": frozen_sha,
-        "last_successful_update_at": None,
-        "chapters": chapters,
-    })
+    with state_lock(state):
+        if state.exists():
+            raise ValueError(f"state already exists: {state}")
+        atomic_json(state, {
+            "schema_version": 1,
+            "frozen_upstream_sha": frozen_sha,
+            "frozen_verified_at": frozen_verified_at,
+            "synced_upstream_sha": frozen_sha,
+            "last_successful_update_at": None,
+            "chapters": chapters,
+        })
 
 
 def sha256_bytes(value: bytes) -> str:
     return hashlib.sha256(value).hexdigest()
+
+
+def no_duplicate_object(pairs: list[tuple[str, object]]) -> dict:
+    value = {}
+    for key, item in pairs:
+        if key in value:
+            raise ValueError(f"duplicate JSON key: {key}")
+        value[key] = item
+    return value
+
+
+def load_json(path: Path) -> object:
+    return json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=no_duplicate_object)
 
 
 def facts_sha256(value: dict) -> str:
@@ -196,7 +281,7 @@ def seal_facts(value: dict) -> dict:
 
 
 def load_facts(path: Path) -> dict:
-    value = json.loads(path.read_text(encoding="utf-8"))
+    value = load_json(path)
     if (
         not isinstance(value, dict)
         or not isinstance(value.get("facts_sha256"), str)
@@ -210,7 +295,9 @@ def load_facts(path: Path) -> dict:
 
 def state_bytes(path: Path) -> tuple[bytes, dict]:
     raw = path.read_bytes()
-    return raw, validate_state(json.loads(raw.decode("utf-8")))
+    return raw, validate_state(json.loads(
+        raw.decode("utf-8"), object_pairs_hook=no_duplicate_object
+    ))
 
 
 def run_command(args: list[object], ok: tuple[int, ...] = (0,)) -> subprocess.CompletedProcess[str]:
@@ -244,7 +331,7 @@ def source_entry(value: object, aliases: dict[str, str]) -> str:
 
 
 def load_source_map(path: Path) -> dict[str, tuple[str, ...]]:
-    value = json.loads(path.read_text(encoding="utf-8"))
+    value = load_json(path)
     if not isinstance(value, dict) or value.get("version") != 2:
         raise ValueError("invalid source-map version")
     alias_expansion = value.get("alias_expansion", {})
@@ -448,7 +535,11 @@ def prepare_update(
     snapshot_script = snapshot_script.resolve()
     snapshot_root = require_outside_upstream(snapshot_root, upstream, "snapshot root")
     output = require_distinct_output(
-        require_outside_upstream(output, upstream, "facts output"),
+        require_repository_path(
+            review_root,
+            require_outside_upstream(output, upstream, "facts output"),
+            "facts output",
+        ),
         state_path, map_path, snapshot_script, review_root / "PLAN.md",
     )
     require_outside_upstream(state_path, upstream, "state")
@@ -457,6 +548,9 @@ def prepare_update(
         if chapter not in plan_rows:
             raise ValueError(f"excluded chapter is not active: {chapter}")
     source_map = load_source_map(map_path)
+    inactive_owners = sorted(set(source_map) - set(plan_rows))
+    if inactive_owners:
+        raise ValueError(f"source-map owners are not active PLAN chapters: {inactive_owners}")
     raw_state, state = state_bytes(state_path)
 
     before = upstream_evidence(upstream)
@@ -508,6 +602,7 @@ def prepare_update(
         "mode": mode,
         "topic": topic,
         "state_sha256": sha256_bytes(raw_state),
+        "review_root": str(review_root),
         "upstream_repo": str(upstream),
         "frozen_sha": frozen_sha,
         "frozen_verified_at": state["frozen_verified_at"],
@@ -560,6 +655,54 @@ def facts_state(facts: dict, state_path: Path) -> tuple[bytes, dict]:
     return raw, state
 
 
+def facts_review_root(facts: dict) -> Path:
+    value = facts.get("review_root")
+    if not isinstance(value, str) or not Path(value).is_absolute():
+        raise ValueError("invalid review root in facts")
+    root = Path(value).resolve()
+    if not root.is_dir():
+        raise ValueError("review root does not exist")
+    return root
+
+
+def safe_review_file(root: Path, value: str, name: str) -> Path:
+    configured = PurePosixPath(value)
+    if (
+        not value or "\0" in value or configured.is_absolute()
+        or configured.as_posix() != value or any(part in {"", ".", ".."} for part in configured.parts)
+        or configured.parts[0] == ".git"
+    ):
+        raise ValueError(f"unsafe {name}: {value!r}")
+    path = root.joinpath(*configured.parts)
+    resolved = require_repository_path(root, path, name)
+    relative = resolved.relative_to(root)
+    if not relative.parts or relative.parts[0] == ".git":
+        raise ValueError(f"{name} cannot resolve into Git metadata: {value}")
+    if not path.is_file():
+        raise ValueError(f"{name} is not a regular file: {value}")
+    return path
+
+
+def changed_review_paths(root: Path) -> set[str]:
+    top = run_command(["git", "-C", root, "rev-parse", "--show-toplevel"]).stdout.strip()
+    if Path(top).resolve() != root:
+        raise ValueError("review root must be the Git worktree root")
+    tracked = run_command([
+        "git", "-C", root, "diff", "--name-only", "-z", "HEAD", "--",
+    ]).stdout.split("\0")
+    untracked = run_command([
+        "git", "-C", root, "ls-files", "--others", "--exclude-standard", "-z", "--",
+    ]).stdout.split("\0")
+    return {path for path in tracked + untracked if path}
+
+
+def sealed_review_files(root: Path, paths: list[str]) -> dict[str, str]:
+    return {
+        path: sha256_bytes(safe_review_file(root, path, "sealed path").read_bytes())
+        for path in sorted(paths)
+    }
+
+
 def unique_chapters(value: object, name: str, *, sort: bool = False) -> list[str]:
     if not isinstance(value, list) or any(
         not isinstance(path, str) or CHAPTER_RE.fullmatch(path) is None for path in value
@@ -585,10 +728,13 @@ def parse_issue_entries(entries: list[str]) -> dict[str, str]:
 
 def select_review(
     state_path: Path, plan: Path, facts_path: Path, sample_size: int,
-    changed: list[str], issue_entries: list[str], output: Path,
+    changed: list[str], issue_entries: list[str], structural_paths: list[str], output: Path,
 ) -> None:
     facts = load_facts(facts_path)
     _, state = facts_state(facts, state_path)
+    review_root = facts_review_root(facts)
+    if plan.resolve() != review_root / "PLAN.md":
+        raise ValueError("plan must be REVIEW_ROOT/PLAN.md")
     if not 0 <= sample_size <= 6:
         raise ValueError("sample size must be between zero and six")
     semantic = unique_chapters(changed, "changed chapter", sort=True)
@@ -609,15 +755,33 @@ def select_review(
         sorted(rows), state, set(protected) | set(semantic), sample_size,
         facts["target_sha"],
     )
+    if len(structural_paths) != len(set(structural_paths)):
+        raise ValueError("duplicate structural path")
+    structural = sorted(structural_paths)
+    for path in structural:
+        safe_review_file(review_root, path, "structural path")
+        if CHAPTER_RE.fullmatch(path) is not None:
+            raise ValueError(f"chapter must use --changed-chapter: {path}")
+    if not set(structural).issubset(changed_review_paths(review_root)):
+        raise ValueError("structural paths must be selected from the actual Git diff")
+    sealed = sealed_review_files(review_root, semantic + sample + structural)
     selected = dict(facts)
     selected.update({
         "semantic_changed_chapters": semantic,
         "new_chapter_issues": expected_issues,
         "review_sample": sample,
+        "structural_semantic_paths": structural,
+        "sealed_files": sealed,
         "selection_completed": True,
     })
     output = require_distinct_output(
-        require_outside_upstream(output, Path(facts["upstream_repo"]), "facts output"),
+        require_repository_path(
+            review_root,
+            require_outside_upstream(
+                output, Path(facts["upstream_repo"]), "facts output"
+            ),
+            "facts output",
+        ),
         state_path, plan, facts_path,
     )
     atomic_json(output, seal_facts(selected))
@@ -633,16 +797,161 @@ def empty_chapter_record() -> dict:
     }
 
 
+def load_evidence(path: Path, review_root: Path, name: str) -> dict:
+    resolved = require_repository_path(review_root, path, f"{name} evidence")
+    relative = resolved.relative_to(review_root.resolve())
+    if not relative.parts or relative.parts[0] == ".git":
+        raise ValueError(f"{name} evidence cannot live in Git metadata")
+    if not path.is_file():
+        raise ValueError(f"invalid {name} evidence path")
+    value = load_json(path)
+    if not isinstance(value, dict):
+        raise ValueError(f"invalid {name} evidence")
+    return value
+
+
+def validate_reviewer_evidence(value: dict, facts: dict, sealed: dict[str, str]) -> None:
+    if set(value) != {
+        "schema_version", "facts_sha256", "reviewer", "results", "blocking_findings"
+    } or type(value["schema_version"]) is not int or value["schema_version"] != 1 or (
+        value["facts_sha256"] != facts["facts_sha256"]
+    ):
+        raise ValueError("invalid reviewer evidence fields or facts binding")
+    reviewer = value["reviewer"]
+    if not isinstance(reviewer, dict) or set(reviewer) != {
+        "task_id", "model", "fresh_context", "read_only", "independent"
+    }:
+        raise ValueError("invalid reviewer identity")
+    if any(
+        not isinstance(reviewer[field], str) or not reviewer[field].strip()
+        for field in ("task_id", "model")
+    ) or any(reviewer[field] is not True for field in (
+        "fresh_context", "read_only", "independent"
+    )):
+        raise ValueError("reviewer must be explicit, fresh, read-only, and independent")
+    results = value["results"]
+    if not isinstance(results, dict) or set(results) != set(sealed) or any(
+        result != "pass" for result in results.values()
+    ):
+        raise ValueError("reviewer PASS coverage does not exactly match sealed files")
+    if value["blocking_findings"] != []:
+        raise ValueError("reviewer evidence has blocking findings")
+
+
+def validate_gate_evidence(value: dict, facts: dict) -> None:
+    if set(value) != {"schema_version", "facts_sha256", "gates"} or (
+        type(value["schema_version"]) is not int or value["schema_version"] != 1
+        or value["facts_sha256"] != facts["facts_sha256"] or not isinstance(value["gates"], list)
+    ):
+        raise ValueError("invalid gate evidence fields or facts binding")
+    names = []
+    for gate in value["gates"]:
+        if not isinstance(gate, dict) or set(gate) != {"name", "exit_code"}:
+            raise ValueError("invalid gate result")
+        name, exit_code = gate["name"], gate["exit_code"]
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError("invalid gate name")
+        if type(exit_code) is not int or exit_code != 0:
+            raise ValueError(f"gate did not exit zero: {name}")
+        names.append(name)
+    if len(names) != len(set(names)) or not REQUIRED_GATES.issubset(names):
+        raise ValueError("required gates are missing or duplicated")
+
+
+def safe_owned_path(value: str) -> str:
+    path = PurePosixPath(value)
+    if (
+        not value or "\0" in value or path.is_absolute() or path.as_posix() != value
+        or any(part in {"", ".", ".."} for part in path.parts) or path.parts[0] == ".git"
+    ):
+        raise ValueError(f"unsafe owned path: {value!r}")
+    return value
+
+
+def remote_main_sha(review_root: Path) -> str:
+    fields = run_command([
+        "git", "-C", review_root, "ls-remote", "--exit-code",
+        "origin", "refs/heads/main",
+    ]).stdout.split()
+    if len(fields) != 2 or fields[1] != "refs/heads/main" or not valid_sha(fields[0]):
+        raise ValueError("origin/main did not resolve to exactly one full SHA")
+    return fields[0]
+
+
+def verify_publication(
+    review_root: Path, base_sha: str, phase: str, owned_paths: list[str],
+) -> None:
+    review_root = review_root.resolve()
+    if not valid_sha(base_sha):
+        raise ValueError("base SHA must be 40 lowercase hexadecimal characters")
+    if phase not in {"base", "commit", "push"}:
+        raise ValueError("invalid publication phase")
+    top = run_command([
+        "git", "-C", review_root, "rev-parse", "--show-toplevel",
+    ]).stdout.strip()
+    if Path(top).resolve() != review_root:
+        raise ValueError("review root must be the Git worktree root")
+    if run_command([
+        "git", "-C", review_root, "branch", "--show-current",
+    ]).stdout.strip() != "main":
+        raise ValueError("publication requires main branch")
+    require_commit(review_root, base_sha, "base")
+    if len(owned_paths) != len(set(owned_paths)):
+        raise ValueError("duplicate owned path")
+    owned = {safe_owned_path(path) for path in owned_paths}
+    head = git(review_root, "rev-parse", "--verify", "HEAD^{commit}").stdout.strip()
+
+    if phase == "base":
+        if owned:
+            raise ValueError("base verification does not accept owned paths")
+        if head != base_sha or remote_main_sha(review_root) != base_sha:
+            raise ValueError("local HEAD and origin/main must equal BASE_SHA")
+        return
+
+    if not owned:
+        raise ValueError("commit verification requires explicit owned paths")
+    parents = git(
+        review_root, "rev-list", "--parents", "-n", "1", "HEAD"
+    ).stdout.split()
+    if len(parents) != 2 or parents != [head, base_sha]:
+        raise ValueError("documentation commit must have BASE_SHA as its only parent")
+    changed = {
+        path for path in git(
+            review_root, "diff", "--name-only", "--no-renames", "-z",
+            base_sha, head, "--",
+        ).stdout.split("\0") if path
+    }
+    if changed != owned:
+        raise ValueError("committed changed-file set does not equal owned paths")
+    if phase == "push" and remote_main_sha(review_root) != base_sha:
+        raise ValueError("origin/main changed before push")
+    print(head)
+
+
 def commit_state(
     state_path: Path, plan: Path, facts_path: Path, completed_at: str,
-    gates_passed: bool, reviewed: list[str],
+    review_evidence_path: Path, gate_evidence_path: Path,
+) -> None:
+    review_root = facts_review_root(load_facts(facts_path))
+    require_repository_path(review_root, state_path, "state")
+    with state_lock(state_path):
+        commit_state_locked(
+            state_path, plan, facts_path, completed_at,
+            review_evidence_path, gate_evidence_path,
+        )
+
+
+def commit_state_locked(
+    state_path: Path, plan: Path, facts_path: Path, completed_at: str,
+    review_evidence_path: Path, gate_evidence_path: Path,
 ) -> None:
     facts = load_facts(facts_path)
     raw_state, state = facts_state(facts, state_path)
+    review_root = facts_review_root(facts)
+    if plan.resolve() != review_root / "PLAN.md":
+        raise ValueError("plan must be REVIEW_ROOT/PLAN.md")
     if not valid_timestamp(completed_at):
         raise ValueError("completed-at must be a valid UTC Z timestamp")
-    if not gates_passed:
-        raise ValueError("all gates must pass before state commit")
     if facts.get("selection_completed") is not True:
         raise ValueError("review selection is incomplete")
     if facts.get("history_rewrite") is not False:
@@ -654,9 +963,22 @@ def commit_state(
     sample = unique_chapters(facts.get("review_sample"), "review sample")
     if set(semantic) & set(sample):
         raise ValueError("semantic changes and rotating sample overlap")
-    reviewed = unique_chapters(reviewed, "reviewed chapter")
-    if set(reviewed) != set(semantic) | set(sample):
-        raise ValueError("reviewed chapters do not exactly match required scope")
+    structural = facts.get("structural_semantic_paths")
+    sealed = facts.get("sealed_files")
+    if not isinstance(structural, list) or any(not isinstance(path, str) for path in structural):
+        raise ValueError("invalid structural semantic paths")
+    if len(structural) != len(set(structural)):
+        raise ValueError("duplicate structural semantic path")
+    expected_sealed = set(semantic) | set(sample) | set(structural)
+    if not isinstance(sealed, dict) or set(sealed) != expected_sealed or any(
+        not isinstance(digest, str) or DIGEST_RE.fullmatch(digest) is None
+        for digest in sealed.values()
+    ):
+        raise ValueError("sealed files do not exactly match review scope")
+    reviewer_evidence = load_evidence(review_evidence_path, review_root, "reviewer")
+    gate_evidence = load_evidence(gate_evidence_path, review_root, "gate")
+    validate_reviewer_evidence(reviewer_evidence, facts, sealed)
+    validate_gate_evidence(gate_evidence, facts)
 
     rows = chapter_rows(plan)
     if any(chapter not in rows for chapter in semantic + sample):
@@ -698,6 +1020,8 @@ def commit_state(
     }
     if state_path.read_bytes() != raw_state:
         raise ValueError("state changed during commit")
+    if sealed_review_files(review_root, list(sealed)) != sealed:
+        raise ValueError("sealed file changed after final selection")
     atomic_json(state_path, updated)
 
 
@@ -730,6 +1054,7 @@ def main() -> int:
     select.add_argument("--sample-size", type=int, default=6)
     select.add_argument("--changed-chapter", action="append", default=[])
     select.add_argument("--new-chapter-issue", action="append", default=[])
+    select.add_argument("--structural-path", action="append", default=[])
     select.add_argument("--output", required=True, type=Path)
 
     commit = commands.add_parser("commit-state")
@@ -737,8 +1062,14 @@ def main() -> int:
     commit.add_argument("--plan", required=True, type=Path)
     commit.add_argument("--facts", required=True, type=Path)
     commit.add_argument("--completed-at", required=True)
-    commit.add_argument("--gates-passed", action="store_true")
-    commit.add_argument("--reviewed-chapter", action="append", default=[])
+    commit.add_argument("--review-evidence", required=True, type=Path)
+    commit.add_argument("--gate-evidence", required=True, type=Path)
+
+    publication = commands.add_parser("verify-publication")
+    publication.add_argument("--review-root", required=True, type=Path)
+    publication.add_argument("--base-sha", required=True)
+    publication.add_argument("--phase", required=True, choices=("base", "commit", "push"))
+    publication.add_argument("--owned-path", action="append", default=[])
     args = parser.parse_args()
     try:
         if args.command == "init-state":
@@ -752,12 +1083,17 @@ def main() -> int:
         elif args.command == "select-review":
             select_review(
                 args.state, args.plan, args.facts, args.sample_size,
-                args.changed_chapter, args.new_chapter_issue, args.output,
+                args.changed_chapter, args.new_chapter_issue,
+                args.structural_path, args.output,
             )
-        else:
+        elif args.command == "commit-state":
             commit_state(
                 args.state, args.plan, args.facts, args.completed_at,
-                args.gates_passed, args.reviewed_chapter,
+                args.review_evidence, args.gate_evidence,
+            )
+        else:
+            verify_publication(
+                args.review_root, args.base_sha, args.phase, args.owned_path,
             )
     except (OSError, ValueError, TypeError, KeyError, json.JSONDecodeError) as error:
         parser.exit(1, f"prepare-update: ERROR: {error}\n")
