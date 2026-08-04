@@ -191,6 +191,7 @@ Channel 的 `empty_reply_retry` 是 run step 状态，保留 channel routing/con
 
 ## 边界与演进
 
+- **回执效果是 typed 事实，不是模型措辞**（2026-08-04 补充）：admitted executor 按 `GetCallSafety(argumentsJson)` 与 `SideEffectKind` 把 `AgentToolReceipt.effect` 冻结为 `ReadOnly`/`Mutating`（`Unspecified` 仅兼容、永不作为写成功证据）。Channel 面向用户声称外部写操作成功时，唯一充分证据是同一 turn 内精确匹配的 typed `AgentToolReceipt`（`Status=Success`、`Effect=Mutating`、`call_id`/tool/side effect/typed subject 全部对应）；probe、workflow run、read 或其他动作的成功回执都不能替代。对账后若 mutating receipt 为 `Error`/`ApprovalRequired`/`Denied`/`AuthorizationRequired`/`Unspecified`，必须用 deterministic receipt 文本替换模型成功叙述（streaming snapshot、reply、outbound intent、assistant history 同步替换），回执保持用户可见；read-only failure 只附加不替换；`ApprovalRequired` 仍表示等待审批，不能证明成功。`use_skill` 读写分离：省略 `mount_workflows` 是 read-only 加载，`mount_workflows=true` 是独立 mutating operation，只有匹配的 successful mutating receipt 能证明挂载成功（`e936fb9b5e8a`；`docs/canon/aevatar-channel-architecture.md` 5.6.4）。
 - SHADOW 不提交 turn authority、不生成 execution catalog；本章状态机只适用于 ENFORCED profile execution。
 - 当前 actor state 只保存一个 `agent_profile_turn_authority` slot，按 session sequence 让较新 incomplete turn 取代较旧 turn 的 authority；session completed 后 slot 不会立即清空，但 reducer 拒绝再给 completed session 写 authority。它不是每个历史 turn 的永久 authority map。
 - session 被 `MaxTrackedSessions` 裁剪后，相同 deterministic turnId 可能重新进入新执行；authority fence 不把 actor replay cache 变成永久 exactly-once 存储。
