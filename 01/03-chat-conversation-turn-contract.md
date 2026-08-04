@@ -142,7 +142,7 @@ accepted 之后、业务事件流之前，服务端先写一帧 `aevatar.chat.co
 
 ### 观察截止：accepted 不等于可观测（2026-08-04 补充）
 
-Workflow chat 被 accepted 后，首个 projection-backed 业务帧必须在 **30 秒**内到达（`WorkflowRunBehaviorOptions.AcceptedObservationTimeout`，默认 30s）；超时则 interaction 抛出 typed observation timeout（`CommandObservationTimeoutException`），external adapter 输出 `RUN_OBSERVATION_TIMEOUT` terminal error 并关闭 stream。`: keepalive` 只维持传输连接，**不表示业务进展、不延长 deadline**（`docs/adr/0015-agui-sse-projection-session-pipeline.md` 2026-08-03 update #3170）。
+Workflow chat 被 accepted 后，首个 projection-backed 业务帧必须在 **30 秒**内到达（`WorkflowRunBehaviorOptions.AcceptedObservationTimeout`，默认 30s）；超时则 interaction 抛出 typed observation timeout（`CommandObservationTimeoutException`），external adapter 输出 `RUN_OBSERVATION_TIMEOUT` terminal error 并关闭 stream。`keepalive` 只维持传输连接，**不表示业务进展、不延长 deadline**（`docs/adr/0015-agui-sse-projection-session-pipeline.md` 2026-08-03 update #3170）。
 
 ### 归档协议：turn 的幂等追加
 
