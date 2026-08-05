@@ -37,6 +37,12 @@ This is an interval job, not a daemon. `state = not running` is healthy when the
 zero and logs are recent. Distinguish four states: not installed, loaded and idle, currently
 running, and loaded with a failed last run.
 
+When asked to explain only how to check status, give exactly these four recipe parts: (1) the user
+`gui/$(id -u)` domain and label, (2) `launchctl print` for loaded/running state plus runs and last
+exit code, (3) latest stdout/stderr and `state.json` timestamps, (4) classify the evidence as not
+installed, loaded and idle, currently running, or loaded with a failed last run; list all four
+labels even when no live evidence is available.
+
 Query the user launchd domain before checking transient processes.
 
 Interpret log timestamps using the freshness guidance in `docs/upstream-sync.md`.
