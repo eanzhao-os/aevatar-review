@@ -96,7 +96,8 @@ upstream-sync 的 launchctl 状态是 not running，runs 大于 100，last exit 
 
 - [ ] **Step 6: 判定 RED 是否成立**
 
-满足以下任意一项即为可复现基线缺口，并记录 subagent 原话：
+前面任一可观察标准失败，或出现以下任意一项，都属于可复现基线缺口；记录 subagent
+原话，不得用预期答案替换实际结果：
 
 ```text
 - 把 not running 当成故障并建议重启
