@@ -9,6 +9,7 @@
 # consensus-loop skill-private runtime home (cache/logs/state/prompts/runs/worktrees)
 .refactor-loop/
 .worktrees/
+.superpowers/
 .config/consensus-rnd/host.env
 
 # upstream-sync runtime state (last processed sha + filed issue ledger)
