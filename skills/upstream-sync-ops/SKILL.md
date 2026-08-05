@@ -39,6 +39,8 @@ running, and loaded with a failed last run.
 
 Query the user launchd domain before checking transient processes.
 
+Interpret log timestamps using the freshness guidance in `docs/upstream-sync.md`.
+
 ## Reporting
 
 Report the resolved LaunchAgent label and domain, loaded/running state, run count, last exit code,
