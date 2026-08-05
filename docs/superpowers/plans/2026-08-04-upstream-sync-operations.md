@@ -20,6 +20,7 @@
 
 ## File Map
 
+- Modify: `.gitignore` - 本轮仅为 `.superpowers/` 下的 SDD ledger/report 目录追加忽略规则。
 - Modify: `docs/upstream-sync.md` - 唯一的人类安装、验收、运维和排障手册。
 - Create: `skills/upstream-sync-ops/SKILL.md` - agent 的触发条件、决策流程和安全边界。
 - Create: `skills/upstream-sync-ops/agents/openai.yaml` - skill 的 UI 名称、简介和默认提示词。
@@ -79,7 +80,7 @@
 [ ] host.env 只要求 AEVATAR_UPSTREAM_ROOT 与 GH_REPO_SLUG
 [ ] 不写死 ~/Code/aevatar-review
 [ ] 从模板生成 plist 后先运行 plutil -lint
-[ ] 使用 launchctl bootstrap/kickstart/print/bootout
+[ ] 使用 launchctl bootstrap/print/bootout；`kickstart` 只作为明确授权后的可选真实扫描
 [ ] 不把 consensus-loop 当成前置条件
 [ ] 说明普通同步可能创建真实 issue
 ```
@@ -141,6 +142,7 @@ upstream-sync 的 launchctl 状态是 not running，runs 大于 100，last exit 
 紧接着加入 Mermaid 流程：
 
 ```mermaid
+%%{init: {"maxTextSize": 100000, "flowchart": {"useMaxWidth": false, "nodeSpacing": 16, "rankSpacing": 48}, "themeVariables": {"fontSize": "10px"}}}%%
 flowchart LR
     L["launchd\n每 900 秒启动"] --> S["upstream-sync.sh\n单次扫描"]
     S --> U["aevatar origin/feature/integrate\n只读 fetch + diff"]
@@ -214,12 +216,14 @@ export CONSENSUS_RND_HOST_ENV="$REVIEW_ROOT/.config/consensus-rnd/host.env"
 bash scripts/upstream-sync.sh
 ```
 
-在普通模式前标明它会为命中的新变更创建真实 GitHub issue。加入下面的语义表，准确反映当前脚本：
+在普通模式前标明它会为命中的新变更创建真实 GitHub issue。dry-run 绝不改写真实的
+`.config/upstream-sync/state.json`；部分分支会更新一份私有临时副本，并在退出时丢弃。它仍可能在
+上游 checkout 中执行 `git fetch`，从而更新 Git 元数据。加入下面的语义表，准确反映当前脚本：
 
 | 模式 | 创建 issue | 影响状态 |
 |---|---:|---|
 | `--init` | 否 | 覆盖基线 SHA、运行时间和已建 issue 记录 |
-| `--dry-run` | 否 | 有候选 issue 时不推进 SHA；无候选的提前退出分支可能更新时间或推进 SHA |
+| `--dry-run` | 否 | 真实 `state.json` 不变；临时副本中的更新会在退出时丢弃 |
 | 默认模式 | 可能 | 扫描结束后推进 SHA，并记录成功创建的 issue |
 
 再加入警告：当前默认模式即使某个 `gh issue create` 失败，最后仍可能推进扫描 SHA；遇到 `WARN: 建 issue 失败` 时要立即保留日志并人工核对，不得用 `--init` 处理。
@@ -236,10 +240,11 @@ sed \
   "$REVIEW_ROOT/.config/upstream-sync/launchd.plist.template" > "$PLIST_PATH"
 plutil -lint "$PLIST_PATH"
 launchctl bootstrap "$LAUNCH_DOMAIN" "$PLIST_PATH"
-launchctl kickstart -k "$LAUNCH_DOMAIN/$LAUNCH_LABEL"
 ```
 
-说明路径中包含 `|` 或 `&` 时不要使用上述 `sed` 命令，应手动复制模板并替换路径后再运行 `plutil -lint`。重复安装遇到 `service already loaded` 时转到重载步骤。
+说明路径中包含 `|` 或 `&` 时不要使用上述 `sed` 命令，应手动复制模板并替换路径后再运行 `plutil -lint`。重复安装遇到 `service already loaded` 时转到重载步骤。加载成功后无需立即触发扫描。
+
+在安装示例后单独警告：`launchctl kickstart -k "$LAUNCH_DOMAIN/$LAUNCH_LABEL"` 会以默认模式运行一次真实扫描，可能创建真实 GitHub issue 并推进扫描 SHA；只有在操作者明确授权后才执行，它不是安装所必需的步骤。
 
 - [ ] **Step 6: 写验收步骤和状态判读**
 
@@ -277,8 +282,9 @@ plist 修改后的重载命令：
 launchctl bootout "$LAUNCH_DOMAIN" "$PLIST_PATH"
 plutil -lint "$PLIST_PATH"
 launchctl bootstrap "$LAUNCH_DOMAIN" "$PLIST_PATH"
-launchctl kickstart -k "$LAUNCH_DOMAIN/$LAUNCH_LABEL"
 ```
+
+说明重新加载后无需立即触发扫描。另列一个可选命令：`launchctl kickstart -k "$LAUNCH_DOMAIN/$LAUNCH_LABEL"` 会以默认模式运行一次真实扫描，可能创建真实 GitHub issue 并推进扫描 SHA；只有在操作者明确授权后才执行，它不是重载所必需的步骤。
 
 仅卸载调度、不删除运行状态：
 
@@ -287,7 +293,7 @@ launchctl bootout "$LAUNCH_DOMAIN" "$PLIST_PATH"
 rm "$PLIST_PATH"
 ```
 
-排障至少覆盖并给出具体检查命令：`gh auth status` 失败、上游 fetch 失败、`bootstrap failed: 5`、任务已加载但 `not running`、日志不更新、`WARN: 建 issue 失败`、重复 issue、未命中章节映射。删除现有 consensus-loop 节流旋钮和 claim 配置内容。
+排障至少覆盖并给出具体检查命令：`gh auth status` 失败、上游 fetch 失败、`bootstrap failed: 5`、任务已加载但 `not running`、日志不更新、`WARN: 建 issue 失败`、重复 issue、未命中章节映射。日志不更新时先做 `stat`、`launchctl print`、休眠和 plist/domain 的只读检查；如需真实扫描，必须另行获得明确授权后才可执行默认模式的 `kickstart`，并说明它可能创建 issue 和推进扫描 SHA。删除现有 consensus-loop 节流旋钮和 claim 配置内容。
 
 - [ ] **Step 8: 验证并提交手册**
 
@@ -520,7 +526,11 @@ git commit -m "docs: tighten upstream sync operations guidance"
 - [ ] **Step 1: 运行完整静态验证**
 
 ```bash
-bash scripts/check-md.sh
+FROZEN_SNAPSHOT="$(git rev-parse --git-path aevatar-frozen)"
+AEVATAR_SRC="$FROZEN_SNAPSHOT" bash scripts/check-md.sh --all
+python3 scripts/check-links.py --all
+bash scripts/check-drift.sh
+python3 scripts/check-mermaid.py
 if [ -d skills/upstream-sync-ops ]; then
   python3 /Users/zhaoyiqi/.codex/skills/.system/skill-creator/scripts/quick_validate.py \
     skills/upstream-sync-ops
@@ -533,6 +543,9 @@ Expected:
 
 ```text
 check-md: OK
+check-links: OK
+check-drift: OK
+check-mermaid: OK
 如果 Task 3 创建了 skill：Skill is valid!
 .config/upstream-sync/launchd.plist.template: OK
 git diff --check 无输出
@@ -552,7 +565,7 @@ rg -n 'DEFAULT_ISSUE_INTAKE|ACTIVE_DESIGN_CAP|CLAIM_COOLDOWN' "${VERIFY_PATHS[@]
 rg -n '/Users/zhaoyiqi|~/Code/aevatar-review' "${VERIFY_PATHS[@]}"
 ```
 
-Expected: 变更只涉及设计说明、实施计划、runbook 和 skill；两个 `rg` 命令均无匹配。设计说明中的本地事实不参与这两个扫描。
+Expected: 变更只涉及本轮 `.gitignore` 中的 SDD ledger/report 忽略规则、设计说明、实施计划、runbook 和 skill；两个 `rg` 命令均无匹配。设计说明中的本地事实不参与这两个扫描。
 
 - [ ] **Step 3: 检查没有意外修改运行态**
 

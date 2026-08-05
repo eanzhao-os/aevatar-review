@@ -83,7 +83,9 @@ jq '{last_processed_sha, last_run_at, filed_issue_count: (.filed_issues | length
 
 ## 手动验证
 
-先用 dry-run 检查扫描、差异和映射是否可用。它不会创建 GitHub issue：
+先用 dry-run 检查扫描、差异和映射是否可用。它不会创建 GitHub issue，也绝不改写真实的
+`.config/upstream-sync/state.json`；部分分支会更新一份私有临时副本，并在退出时丢弃。脚本仍可能
+在上游 checkout 中执行 `git fetch`，因此 Git 元数据可能更新：
 
 ```bash
 cd "$REVIEW_ROOT"
@@ -102,7 +104,7 @@ bash scripts/upstream-sync.sh
 | 模式 | 创建 issue | 影响状态 |
 |---|---:|---|
 | `--init` | 否 | 覆盖基线 SHA、运行时间和已建 issue 记录 |
-| `--dry-run` | 否 | 有候选 issue 时不推进 SHA；无候选的提前退出分支可能更新时间或推进 SHA |
+| `--dry-run` | 否 | 真实 `state.json` 不变；临时副本中的更新会在退出时丢弃 |
 | 默认模式 | 可能 | 扫描结束后推进 SHA，并记录成功创建的 issue |
 
 > [!WARNING]
@@ -123,12 +125,19 @@ sed \
   "$REVIEW_ROOT/.config/upstream-sync/launchd.plist.template" > "$PLIST_PATH"
 plutil -lint "$PLIST_PATH"
 launchctl bootstrap "$LAUNCH_DOMAIN" "$PLIST_PATH"
-launchctl kickstart -k "$LAUNCH_DOMAIN/$LAUNCH_LABEL"
 ```
 
 先 `plutil -lint` 是为了在加载前拦住损坏的 plist，避免把配置错误伪装成调度问题。若路径包含
 `|` 或 `&`，不要使用上述 `sed` 命令；应手动复制模板、替换路径后再运行 `plutil -lint`。
-重复安装收到 `service already loaded` 时，转到下面的「重载」步骤。
+重复安装收到 `service already loaded` 时，转到下面的「重载」步骤。加载成功后无需立即触发扫描。
+
+> [!WARNING]
+> 以下 `launchctl kickstart` 会以默认模式运行一次真实扫描，可能创建真实 GitHub issue 并推进扫描
+> SHA。只有在操作者明确授权这次真实扫描后才执行；它不是安装所必需的步骤。
+
+```bash
+launchctl kickstart -k "$LAUNCH_DOMAIN/$LAUNCH_LABEL"
+```
 
 ## 验收
 
@@ -159,12 +168,21 @@ gh issue list --repo "$GH_REPO_SLUG" --label upstream-sync --state all --limit 2
 
 ## 重载
 
-修改已安装的 plist 后，用相同的用户 domain 卸载、校验、重新加载并立即触发：
+修改已安装的 plist 后，用相同的用户 domain 卸载、校验并重新加载：
 
 ```bash
 launchctl bootout "$LAUNCH_DOMAIN" "$PLIST_PATH"
 plutil -lint "$PLIST_PATH"
 launchctl bootstrap "$LAUNCH_DOMAIN" "$PLIST_PATH"
+```
+
+重新加载后无需立即触发扫描。
+
+> [!WARNING]
+> 以下 `launchctl kickstart` 会以默认模式运行一次真实扫描，可能创建真实 GitHub issue 并推进扫描
+> SHA。只有在操作者明确授权这次真实扫描后才执行；它不是重载所必需的步骤。
+
+```bash
 launchctl kickstart -k "$LAUNCH_DOMAIN/$LAUNCH_LABEL"
 ```
 
@@ -186,7 +204,7 @@ rm "$PLIST_PATH"
 | 上游 fetch 失败 | 运行 `git -C "$UPSTREAM_ROOT" remote -v` 与 `git -C "$UPSTREAM_ROOT" fetch origin feature/integrate`；确认 `AEVATAR_UPSTREAM_ROOT` 指向同一 checkout，网络和 origin 凭据可用。 |
 | `bootstrap failed: 5` | 先运行 `plutil -lint "$PLIST_PATH"`；再用 `launchctl print "$LAUNCH_DOMAIN/$LAUNCH_LABEL"` 检查是否已加载。若已加载，按「重载」流程操作。 |
 | 任务已加载但 `not running` | 运行 `launchctl print "$LAUNCH_DOMAIN/$LAUNCH_LABEL"`、`tail -n 50 "$HOME/Library/Logs/aevatar-review-upstream-sync.log"`；无活动且 `last exit code = 0` 通常是单次任务已正常退出。 |
-| 日志不更新 | 运行 `stat -f '%N | modified=%Sm | size=%z' "$HOME/Library/Logs/aevatar-review-upstream-sync.log" "$HOME/Library/Logs/aevatar-review-upstream-sync.err.log"`，再运行 `launchctl kickstart -k "$LAUNCH_DOMAIN/$LAUNCH_LABEL"` 并复查 stderr；检查电脑是否休眠以及 plist 中的路径和 domain。 |
+| 日志不更新 | 先只读运行 `stat -f '%N | modified=%Sm | size=%z' "$HOME/Library/Logs/aevatar-review-upstream-sync.log" "$HOME/Library/Logs/aevatar-review-upstream-sync.err.log"`、`launchctl print "$LAUNCH_DOMAIN/$LAUNCH_LABEL"`，并检查电脑是否休眠以及 plist 中的路径和 domain。若这些检查后仍要执行真实扫描，必须先获得明确授权：`launchctl kickstart -k "$LAUNCH_DOMAIN/$LAUNCH_LABEL"` 会以默认模式运行，可能创建 GitHub issue 并推进扫描 SHA；授权后再单独执行它并复查 stderr。 |
 | `WARN: 建 issue 失败` | 保留 stdout、stderr 与当前 `state.json`，运行 `gh auth status`、`gh repo view "$GH_REPO_SLUG" --json viewerPermission,hasIssuesEnabled` 和 `gh issue list --repo "$GH_REPO_SLUG" --label upstream-sync --state all --limit 20` 人工核对；不要执行 `--init`。 |
 | 重复 issue | 运行 `gh issue list --repo "$GH_REPO_SLUG" --label upstream-sync --state all --limit 20` 与 `jq '.filed_issues' "$REVIEW_ROOT/.config/upstream-sync/state.json"`，确认是否有历史 state 被清空、手工重复运行或已有 open issue 去重未覆盖的情形。 |
 | 未命中章节映射 | 运行 `git -C "$UPSTREAM_ROOT" diff --name-only "$(jq -r .last_processed_sha "$REVIEW_ROOT/.config/upstream-sync/state.json")..origin/feature/integrate"`，再查看 `.config/upstream-sync/chapter-source-map.json` 是否覆盖变更路径；映射按目录前缀或精确文件匹配。 |
