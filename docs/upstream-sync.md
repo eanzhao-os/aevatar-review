@@ -1,220 +1,194 @@
-# upstream-sync watch loop —— 运维 runbook
+# upstream-sync macOS 安装与运维手册
 
-> 让 aevatar-review 文档实时跟踪 aevatar 上游 `feature/integrate` 的设计性变更。
-> 本文档是 host 工具 `scripts/upstream-sync.sh` 的唯一运维手册。
+> 本文档说明如何在任意 macOS 上安装、验证和维护
+> `scripts/upstream-sync.sh`。目标是每 15 分钟扫描 aevatar 上游
+> `feature/integrate`，并为受影响章节创建 GitHub issue。
 
-## 它做什么(一句话)
+`upstream-sync` 不是常驻进程。launchd 每 900 秒启动脚本一次，脚本完成 fetch、diff、
+映射和建 issue 后退出。因此空闲时看到 `state = not running` 通常是正常现象；是否健康要
+结合 `runs`、`last exit code` 和日志时间判断。
 
-每 15 分钟 `git fetch` 上游 → diff 出新变更文件 → 查「章节↔上游路径」映射表 → 为受影响的章节**自动建一个 GitHub issue**(零 `crnd:` label)→ consensus-loop 的常驻 controller 通过 default-issue-intake(Path A)自动 claim,走 design-consensus → 实现 → review-gate → merge。
+## 任务模型
 
-watch 脚本与 consensus-loop **只通过 GitHub issue 这个公共状态面耦合**,各自独立运行。
-
-```
-┌─────────────────────────────┐    gh issue create    ┌──────────────────────────────┐
-│ upstream-sync.sh            │ ────────────────────► │ aevatar-review GitHub issues  │
-│ (launchd, 15min)            │  零 crnd label         │ (label-free, 待 claim)        │
-│                             │                        │                               │
-│ 1. fetch upstream           │                        │ consensus-loop controller     │
-│ 2. diff <state>..HEAD       │ ◄──────────────────── │ (常驻 wakeup-runner daemon)   │
-│ 3. 反向索引匹配章节          │  poll gh issue list    │ → claim → consensus → merge   │
-│ 4. 过滤 test/CI/chore        │                        │                               │
-│ 5. 去重 + 建 issue           │                        │                               │
-│ 6. 更新 state sha           │                        │                               │
-└─────────────────────────────┘                        └──────────────────────────────┘
+```mermaid
+flowchart LR
+    L["launchd\n每 900 秒启动"] --> S["upstream-sync.sh\n单次扫描"]
+    S --> U["aevatar origin/feature/integrate\n只读 fetch + diff"]
+    S --> M["chapter-source-map.json\n匹配受影响章节"]
+    M --> G["GitHub Issues\n创建 upstream-sync issue"]
+    S --> X["state.json\n记录扫描位置"]
 ```
 
-## 文件清单
+本手册只覆盖同步脚本及其 LaunchAgent。脚本从上游仓库只读 fetch 与 diff，再按
+`.config/upstream-sync/chapter-source-map.json` 找到可能受影响的章节；运行状态仅保存于
+`.config/upstream-sync/state.json`。GitHub issue 是脚本的最终外部输出，不依赖或配置其他
+自动化服务。
 
-| 文件 | 用途 | 是否进 git |
-|---|---|---|
-| `scripts/upstream-sync.sh` | watch 脚本本体(单次扫描,幂等) | ✅ |
-| `.config/upstream-sync/chapter-source-map.json` | 章节↔上游路径映射表(host-owned 事实) | ✅ |
-| `.config/upstream-sync/state.json` | 运行时状态(上次处理到的 sha + 已建 issue 记录) | ❌(gitignore) |
-| `.config/consensus-rnd/host.env` | host 事实注入(含 `AEVATAR_UPSTREAM_ROOT` + `DEFAULT_ISSUE_INTAKE_AUTHOR_ALLOWLIST`) | ❌(gitignore,含本地路径) |
-| `~/Library/LaunchAgents/com.eanzhao.aevatar-review.upstream-sync.plist` | launchd 调度(**由你手动安装**) | ❌(用户级) |
+## 安装前检查
 
-## 首次启用(3 步)
-
-### 1. 确认 host.env 已含必需变量
-
-`.config/consensus-rnd/host.env` 应已含(本仓库已预置):
+先在本地 shell 中定义以下变量。`UPSTREAM_ROOT` 必须是 aevatar 的本地 checkout，且其
+`origin` 能访问 `feature/integrate`；`GH_REPO_SLUG` 填写实际的 GitHub 仓库。
 
 ```bash
-export DEFAULT_ISSUE_INTAKE_AUTHOR_ALLOWLIST="eanzhao"   # 否则 consensus-loop 会拒掉所有自建 issue
-export AEVATAR_UPSTREAM_ROOT="/Users/zhaoyiqi/Code/aevatar"  # 上游只读事实源
+REVIEW_ROOT="$(git rev-parse --show-toplevel)"
+UPSTREAM_ROOT="/absolute/path/to/aevatar"
+GH_REPO_SLUG="owner/aevatar-review"
+LAUNCH_LABEL="com.eanzhao.aevatar-review.upstream-sync"
+LAUNCH_DOMAIN="gui/$(id -u)"
+PLIST_PATH="$HOME/Library/LaunchAgents/$LAUNCH_LABEL.plist"
 ```
 
-**为什么 `DEFAULT_ISSUE_INTAKE_AUTHOR_ALLOWLIST` 必须设**:consensus-loop 的 default-issue-intake 默认空值会 fail-closed 拒掉**所有** issue(包括 maintainer 自建)。这是 skill 契约(`default_issue_intake_admission.py` 的 `author_not_allowlisted` 分支)。不设这一行,整个 loop 跑不通。
-
-### 2. 初始化基线(只做一次)
+执行依赖、网络和 GitHub 权限检查：
 
 ```bash
-cd ~/Code/aevatar-review
-export CONSENSUS_RND_HOST_ENV=.config/consensus-rnd/host.env
+test "$(uname -s)" = "Darwin"
+command -v git
+command -v gh
+command -v jq
+gh auth status
+git -C "$UPSTREAM_ROOT" rev-parse --is-inside-work-tree
+git -C "$UPSTREAM_ROOT" ls-remote --exit-code origin refs/heads/feature/integrate
+gh repo view "$GH_REPO_SLUG" --json nameWithOwner,viewerPermission,hasIssuesEnabled
+```
+
+前四项分别应确认当前是 macOS、并能找到 `git`、`gh`、`jq`；`gh auth status` 应显示有效登录。
+两条 Git 命令应分别输出 `true` 和目标分支的 ref；`gh repo view` 输出中的
+`hasIssuesEnabled` 必须为 `true`。操作者还需要足以创建 issue 并添加 `upstream-sync` label
+的仓库权限。这里不需要、也不应配置任何 issue intake 的作者白名单。
+
+## 首次初始化
+
+在 `$REVIEW_ROOT/.config/consensus-rnd/host.env` 中保存以下两项，并确保该文件不加入 Git：
+
+```bash
+export AEVATAR_UPSTREAM_ROOT="/absolute/path/to/aevatar"
+export GH_REPO_SLUG="owner/aevatar-review"
+```
+
+`--init` 会用当前上游 HEAD 覆盖基线并清空 `filed_issues`，只在首次启用或明确重建基线时使用，
+不创建 issue。执行初始化并检查结果：
+
+```bash
+cd "$REVIEW_ROOT"
+export CONSENSUS_RND_HOST_ENV="$REVIEW_ROOT/.config/consensus-rnd/host.env"
 bash scripts/upstream-sync.sh --init
+jq '{last_processed_sha, last_run_at, filed_issue_count: (.filed_issues | length)}' \
+  .config/upstream-sync/state.json
 ```
 
-这会把当前上游 `origin/feature/integrate` 的 HEAD 记为基线,**不建任何 issue**。之后所有新 commit 才会被检测。
+预期 `filed_issue_count` 为 `0`，并能看到当前上游 HEAD 对应的 `last_processed_sha` 与本次
+初始化时间。这样建立基线的理由是只从启用后的新变更开始创建待审查项，避免把既有历史一次性
+转为 issue。
 
-### 3.(可选)安装 launchd 调度
+## 手动验证
 
-见下文「launchd 安装」段。不装也能用——手动跑 `bash scripts/upstream-sync.sh` 即可。
-
-## 日常运维
-
-### 手动跑一次同步
+先用 dry-run 检查扫描、差异和映射是否可用。它不会创建 GitHub issue：
 
 ```bash
-cd ~/Code/aevatar-review
-export CONSENSUS_RND_HOST_ENV=.config/consensus-rnd/host.env
+cd "$REVIEW_ROOT"
+export CONSENSUS_RND_HOST_ENV="$REVIEW_ROOT/.config/consensus-rnd/host.env"
+bash scripts/upstream-sync.sh --dry-run
+```
+
+普通模式会为命中的新变更创建真实 GitHub issue：
+
+```bash
+cd "$REVIEW_ROOT"
+export CONSENSUS_RND_HOST_ENV="$REVIEW_ROOT/.config/consensus-rnd/host.env"
 bash scripts/upstream-sync.sh
 ```
 
-### 严格只读预览
+| 模式 | 创建 issue | 影响状态 |
+|---|---:|---|
+| `--init` | 否 | 覆盖基线 SHA、运行时间和已建 issue 记录 |
+| `--dry-run` | 否 | 有候选 issue 时不推进 SHA；无候选的提前退出分支可能更新时间或推进 SHA |
+| 默认模式 | 可能 | 扫描结束后推进 SHA，并记录成功创建的 issue |
+
+> [!WARNING]
+> 当前默认模式即使某个 `gh issue create` 失败，最后仍可能推进扫描 SHA。遇到
+> `WARN: 建 issue 失败` 时，应立即保留日志并人工核对，不得用 `--init` 处理；重建基线会清空
+> 已建 issue 记录，无法补回被跳过的扫描区间。
+
+## 安装 LaunchAgent
+
+使用当前 checkout 路径与当前用户的 `$HOME` 从模板生成用户级 plist；不要修改 Git 中的
+`.config/upstream-sync/launchd.plist.template`：
 
 ```bash
-bash scripts/upstream-sync.sh --dry-run
-bash scripts/upstream-sync.sh --init --dry-run
+mkdir -p "$HOME/Library/LaunchAgents" "$HOME/Library/Logs"
+sed \
+  -e "s|YOUR_HOME/Code/aevatar-review|$REVIEW_ROOT|g" \
+  -e "s|YOUR_HOME|$HOME|g" \
+  "$REVIEW_ROOT/.config/upstream-sync/launchd.plist.template" > "$PLIST_PATH"
+plutil -lint "$PLIST_PATH"
+launchctl bootstrap "$LAUNCH_DOMAIN" "$PLIST_PATH"
+launchctl kickstart -k "$LAUNCH_DOMAIN/$LAUNCH_LABEL"
 ```
 
-两种 dry-run 都可以 fetch 和执行 GitHub `issue list` 只读查询，但不会创建 label/issue，且 `.config/upstream-sync/state.json 保持不变`；没有 state 时也不会创建。只有去掉 `--dry-run` 后，脚本才推进基线或记录已建 issue。
+先 `plutil -lint` 是为了在加载前拦住损坏的 plist，避免把配置错误伪装成调度问题。若路径包含
+`|` 或 `&`，不要使用上述 `sed` 命令；应手动复制模板、替换路径后再运行 `plutil -lint`。
+重复安装收到 `service already loaded` 时，转到下面的「重载」步骤。
 
-### 看日志
+## 验收
 
-launchd 装好后,日志在:
+运行以下命令检查服务、日志、状态和 GitHub 输出：
+
 ```bash
-tail -f ~/Library/Logs/aevatar-review-upstream-sync.log
-tail -f ~/Library/Logs/aevatar-review-upstream-sync.err.log
+launchctl print "$LAUNCH_DOMAIN/$LAUNCH_LABEL"
+tail -n 50 "$HOME/Library/Logs/aevatar-review-upstream-sync.log"
+tail -n 50 "$HOME/Library/Logs/aevatar-review-upstream-sync.err.log"
+stat -f '%N | modified=%Sm | size=%z' -t '%Y-%m-%d %H:%M:%S %z' \
+  "$HOME/Library/Logs/aevatar-review-upstream-sync.log" \
+  "$HOME/Library/Logs/aevatar-review-upstream-sync.err.log"
+jq '{last_processed_sha, last_run_at, filed_issue_count: (.filed_issues | length)}' \
+  "$REVIEW_ROOT/.config/upstream-sync/state.json"
+gh issue list --repo "$GH_REPO_SLUG" --label upstream-sync --state all --limit 20
 ```
 
-### 看已建/待 claim 的 issue
+| 现象 | 结论 |
+|---|---|
+| `state = not running`、`last exit code = 0`、日志在一个间隔内更新 | 正常空闲 |
+| `state = running` | 本轮脚本正在执行 |
+| `last exit code != 0` | 最近一轮失败，查看 stderr |
+| `launchctl print` 找不到 service | 未加载或加载到错误 domain |
+| 日志超过两个间隔未更新 | 调度、休眠或配置可能异常 |
+
+`--dry-run` 不能证明 GitHub 写权限。真正的端到端成功标准是出现新的匹配上游变更后，日志记录
+`CREATED #...`，且 `gh issue list` 能看到对应 issue。
+
+## 重载
+
+修改已安装的 plist 后，用相同的用户 domain 卸载、校验、重新加载并立即触发：
 
 ```bash
-gh issue list --label upstream-sync --state open
+launchctl bootout "$LAUNCH_DOMAIN" "$PLIST_PATH"
+plutil -lint "$PLIST_PATH"
+launchctl bootstrap "$LAUNCH_DOMAIN" "$PLIST_PATH"
+launchctl kickstart -k "$LAUNCH_DOMAIN/$LAUNCH_LABEL"
 ```
-
-## 调映射表(最常见的调整)
-
-映射表是 `.config/upstream-sync/chapter-source-map.json`,**单点调整,无需改脚本**。当前只为 69 篇
-`current` / `mixed` 章节建立映射；`historical` / `target` 不自动从代码变更触发。
-
-### 误报太多(某章节被频繁触发,但实际不用改)
-
-收紧该章节的路径条目。例如仓库地图只需匹配结构性文件：
-
-```json
-"00/03-repository-map.md": [
-  "aevatar.slnx",
-  "docs/canon/module-placement-map.md"
-]
-```
-
-### 漏报(某章节该触发却没触发)
-
-在对应章节条目加上游路径前缀。例如某次 `src/Aevatar.AI.Projection/` 改了但没触发任何章节,检查 `04/*` 或 `05/*` 是否覆盖了它。
-
-### 匹配规则(脚本内置)
-
-- 条目以 `/` 结尾 → 上游文件**以此前缀开头**即命中(递归目录)
-- 条目带文件扩展名 → **精确文件**命中
-- 别名(纯 `NNNN-slug` 或 canon 关键字如 `architecture`)→ 先展开成 `docs/adr/NNNN-slug.md` / `docs/canon/<alias>.md` 再匹配
-
-## 调节流旋钮(在 host.env)
-
-consensus-loop 消化 issue 的速度受两个变量约束:
-
-| 变量 | 默认 | 含义 | 调大/调小 |
-|---|---|---|---|
-| `DEFAULT_ISSUE_INTAKE_CLAIM_COOLDOWN_SECONDS` | `3600` | 两次 claim 之间最小间隔 | 调小→消化更快,但 consensus 算力消耗上升 |
-| `DEFAULT_ISSUE_INTAKE_ACTIVE_DESIGN_CAP` | `3` | 同时处于 design-solving 的最大 issue 数 | 调大→并行度更高,但资源占用上升 |
-
-**典型场景**:一次上游 push 触发 5 个 issue。默认行为:第 1 个立即 claim,其余每小时放一个,直到 3 个同时在 design-solving 时 cap 顶住。对"文档同步"这个低频场景,**默认值通常够用**。
-
-## commit 过滤规则
-
-脚本会过滤掉这些前缀的 commit(不触发 issue),因为它们不改设计语义:
-
-```
-chore:  test:  ci:  style:  revert:  perf:
-```
-
-**不过滤**(会触发):`feat:` `fix:` `refactor:` `docs(canon/adr):` 等可能改变设计的 commit。
-注意 `docs(canon)` / `docs(adr)` 不过滤,因为 canon/adr 是事实源文档,改了就要看。
-
-## 边界(对齐 AGENTS.md 与 consensus-loop 契约)
-
-- **不改 `~/Code/aevatar` 任何文件**(AGENTS.md:只读事实源)
-- **不改 consensus-loop skill 目录**(FI-002:skill host-agnostic)
-- **issue 不预打 `crnd:` label**(skill 契约:预打会让 loop 跳过 `target_already_managed`)
-- **不绕过 cooldown/cap**(skill 契约:节流是设计,不是 bug)
-- **不自动装 launchd**(SKILL.md:OS 调度由 host operator 执行)
-- **`host.env` 不进 git**(含本地路径,FI-002)
-- **dry-run 零写入**：允许更新本地 remote-tracking Git 对象和执行 GitHub 只读查询；不写 state，不创建 GitHub 资源。
 
 ## 卸载
 
-```bash
-# 1. 卸 launchd(如装了)
-launchctl unload ~/Library/LaunchAgents/com.eanzhao.aevatar-review.upstream-sync.plist
-rm ~/Library/LaunchAgents/com.eanzhao.aevatar-review.upstream-sync.plist
-
-# 2. 关掉 consensus-loop 对 upstream-sync issue 的 claim(host.env)
-#    把 DEFAULT_ISSUE_INTAKE_ENABLE 改 false,或删除 DEFAULT_ISSUE_INTAKE_AUTHOR_ALLOWLIST
-
-# 3.(可选)删脚本与配置
-rm scripts/upstream-sync.sh
-rm -rf .config/upstream-sync/
-```
-
-## launchd 安装(可选)
-
-> **SKILL.md 边界**:consensus-loop skill / agent 不得写、装、删 launchd plist。下面的 plist 内容由你手动保存、手动 `launchctl load`。
-
-把以下内容存为 `~/Library/LaunchAgents/com.eanzhao.aevatar-review.upstream-sync.plist`(把 `YOUR_HOME` 换成你的家目录,可用 `echo $HOME` 取):
-
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>com.eanzhao.aevatar-review.upstream-sync</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>/bin/bash</string>
-        <string>YOUR_HOME/Code/aevatar-review/scripts/upstream-sync.sh</string>
-    </array>
-    <key>WorkingDirectory</key>
-    <string>YOUR_HOME/Code/aevatar-review</string>
-    <key>EnvironmentVariables</key>
-    <dict>
-        <key>CONSENSUS_RND_HOST_ENV</key>
-        <string>.config/consensus-rnd/host.env</string>
-        <key>HOME</key>
-        <string>YOUR_HOME</string>
-        <key>PATH</key>
-        <string>/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin</string>
-    </dict>
-    <key>StartInterval</key>
-    <integer>900</integer>
-    <key>StandardOutPath</key>
-    <string>YOUR_HOME/Library/Logs/aevatar-review-upstream-sync.log</string>
-    <key>StandardErrorPath</key>
-    <string>YOUR_HOME/Library/Logs/aevatar-review-upstream-sync.err.log</string>
-    <key>RunAtLoad</key>
-    <false/>
-</dict>
-</plist>
-```
-
-安装 + 立即触发一次测试:
+以下操作仅卸载调度，不删除运行状态；保留 `state.json` 可以在未来重新安装时继续从既有扫描
+位置开始：
 
 ```bash
-launchctl load ~/Library/LaunchAgents/com.eanzhao.aevatar-review.upstream-sync.plist
-# 立即手动跑一次(不等 15 分钟)
-launchctl start com.eanzhao.aevatar-review.upstream-sync
-# 看日志
-tail -f ~/Library/Logs/aevatar-review-upstream-sync.log
+launchctl bootout "$LAUNCH_DOMAIN" "$PLIST_PATH"
+rm "$PLIST_PATH"
 ```
 
-`StartInterval=900` = 每 15 分钟一次。嫌慢可改小(如 `300` = 5 分钟),但 fetch + diff 有成本,15 分钟是文档同步场景的合理默认。
+## 排障
+
+| 问题 | 检查与处理 |
+|---|---|
+| `gh auth status` 失败 | 运行 `gh auth status` 确认认证错误；按输出执行 `gh auth login`，再运行 `gh repo view "$GH_REPO_SLUG" --json viewerPermission,hasIssuesEnabled` 确认权限与 issue 功能。 |
+| 上游 fetch 失败 | 运行 `git -C "$UPSTREAM_ROOT" remote -v` 与 `git -C "$UPSTREAM_ROOT" fetch origin feature/integrate`；确认 `AEVATAR_UPSTREAM_ROOT` 指向同一 checkout，网络和 origin 凭据可用。 |
+| `bootstrap failed: 5` | 先运行 `plutil -lint "$PLIST_PATH"`；再用 `launchctl print "$LAUNCH_DOMAIN/$LAUNCH_LABEL"` 检查是否已加载。若已加载，按「重载」流程操作。 |
+| 任务已加载但 `not running` | 运行 `launchctl print "$LAUNCH_DOMAIN/$LAUNCH_LABEL"`、`tail -n 50 "$HOME/Library/Logs/aevatar-review-upstream-sync.log"`；无活动且 `last exit code = 0` 通常是单次任务已正常退出。 |
+| 日志不更新 | 运行 `stat -f '%N | modified=%Sm | size=%z' "$HOME/Library/Logs/aevatar-review-upstream-sync.log" "$HOME/Library/Logs/aevatar-review-upstream-sync.err.log"`，再运行 `launchctl kickstart -k "$LAUNCH_DOMAIN/$LAUNCH_LABEL"` 并复查 stderr；检查电脑是否休眠以及 plist 中的路径和 domain。 |
+| `WARN: 建 issue 失败` | 保留 stdout、stderr 与当前 `state.json`，运行 `gh auth status`、`gh repo view "$GH_REPO_SLUG" --json viewerPermission,hasIssuesEnabled` 和 `gh issue list --repo "$GH_REPO_SLUG" --label upstream-sync --state all --limit 20` 人工核对；不要执行 `--init`。 |
+| 重复 issue | 运行 `gh issue list --repo "$GH_REPO_SLUG" --label upstream-sync --state all --limit 20` 与 `jq '.filed_issues' "$REVIEW_ROOT/.config/upstream-sync/state.json"`，确认是否有历史 state 被清空、手工重复运行或已有 open issue 去重未覆盖的情形。 |
+| 未命中章节映射 | 运行 `git -C "$UPSTREAM_ROOT" diff --name-only "$(jq -r .last_processed_sha "$REVIEW_ROOT/.config/upstream-sync/state.json")..origin/feature/integrate"`，再查看 `.config/upstream-sync/chapter-source-map.json` 是否覆盖变更路径；映射按目录前缀或精确文件匹配。 |
+
+排障时优先保留日志和状态再采取操作，因为 `state.json` 记录了扫描进度。对写入失败、重复创建或漏报，
+先用现有 evidence 人工核对，再决定是否修正映射或恢复运行，避免以重建基线掩盖问题。
