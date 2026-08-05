@@ -11,6 +11,7 @@
 ## 任务模型
 
 ```mermaid
+%%{init: {"maxTextSize": 100000, "flowchart": {"useMaxWidth": false, "nodeSpacing": 12, "rankSpacing": 48}, "themeVariables": {"fontSize": "10px"}}}%%
 flowchart LR
     L["launchd\n每 900 秒启动"] --> S["upstream-sync.sh\n单次扫描"]
     S --> U["aevatar origin/feature/integrate\n只读 fetch + diff"]
@@ -21,8 +22,8 @@ flowchart LR
 
 本手册只覆盖同步脚本及其 LaunchAgent。脚本从上游仓库只读 fetch 与 diff，再按
 `.config/upstream-sync/chapter-source-map.json` 找到可能受影响的章节；运行状态仅保存于
-`.config/upstream-sync/state.json`。GitHub issue 是脚本的最终外部输出，不依赖或配置其他
-自动化服务。
+`.config/upstream-sync/state.json`。该文件是被 Git 忽略的运行时状态，不得添加到 Git。GitHub
+issue 是脚本的最终外部输出，不依赖或配置其他自动化服务。
 
 ## 安装前检查
 
