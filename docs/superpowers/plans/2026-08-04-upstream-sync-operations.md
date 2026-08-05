@@ -526,8 +526,10 @@ git commit -m "docs: tighten upstream sync operations guidance"
 - [ ] **Step 1: 运行完整静态验证**
 
 ```bash
-FROZEN_SNAPSHOT="$(git rev-parse --git-path aevatar-frozen)"
-AEVATAR_SRC="$FROZEN_SNAPSHOT" bash scripts/check-md.sh --all
+FROZEN_SHA=f02aa690bbebb9cabeac30a553d737486b0eb661
+UPSTREAM_REPO="${AEVATAR_UPSTREAM_REPO:-$HOME/Code/aevatar}"
+FROZEN_SNAPSHOT="$(bash scripts/materialize-frozen-upstream.sh --repo "$UPSTREAM_REPO" --sha "$FROZEN_SHA")"
+AEVATAR_SRC="$FROZEN_SNAPSHOT" AEVATAR_SRC2="$UPSTREAM_REPO" bash scripts/check-md.sh --all
 python3 scripts/check-links.py --all
 bash scripts/check-drift.sh
 python3 scripts/check-mermaid.py
@@ -542,6 +544,7 @@ git diff --check
 Expected:
 
 ```text
+冻结快照物化成功，并输出 f02aa690bbebb9cabeac30a553d737486b0eb661 对应的目录路径
 check-md: OK
 check-links: OK
 check-drift: OK
