@@ -107,7 +107,7 @@ sequenceDiagram
 这个时序刻意把 HTTP ACK 放在 actor 对账之前。调用方收到 202 后必须查询 run current-state/read model，不能把它显示成"审批完成"。pending 已清除且没有同键新 waiter 时，迟到 resume 是 no-op；迟到 timeout 在 pending 不存在或 lease 不匹配时也是 no-op。带完整键的迟到 signal 则可能进入短期 buffer，因此 callback producer 仍应为重试复用稳定 command identity，并以 run 状态判断是否真正生效。
 
 !!! warning "HEAD 漂移（2026-08-05 登记）"
-    同步目标之后的 HEAD（`origin/feature/integrate`）对 **tool approval resume** 从静默 no-op 收紧为显式拒绝：resume 的 typed approval identity（`executionId/toolCallId/approvalRequestId`）若与 run actor 当前持有的 pending 调用不再匹配，则保留 pending 并提交 `WorkflowToolApprovalResumeRejectedEvent`，run timeline 与 Observatory 以 `tool_approval_resume_rejected` 呈现（`c8f46a3c6` Reject invalid workflow approval resumes；`docs/canon/workflow-runtime.md`）。resume 请求把 `executionId/toolCallId/approvalRequestId` 放在顶层是无效别名，返回 `400 INVALID_TOOL_APPROVAL_RESUME_REQUEST`；`toolApproval` 内嵌时必须三字段齐备；不带 `toolApproval` 的 resume 仍走普通 human input / human approval 路径。上述"迟到 resume 是 no-op"仅适用于 human approval / human input；以 HEAD 为准。
+    同步目标之后的 HEAD（`origin/feature/integrate`，以 feature/integrate checkout 核验为准）对 **tool approval resume** 从静默 no-op 收紧为显式拒绝：resume 的 typed approval identity（`executionId/toolCallId/approvalRequestId`）若与 run actor 当前持有的 pending 调用不再匹配，则保留 pending 并提交 `WorkflowToolApprovalResumeRejectedEvent`，run timeline 与 Observatory 以 `tool_approval_resume_rejected` 呈现（`c8f46a3c6` Reject invalid workflow approval resumes；`docs/canon/workflow-runtime.md`）。resume 请求把 `executionId/toolCallId/approvalRequestId` 放在顶层是无效别名，返回 `400 INVALID_TOOL_APPROVAL_RESUME_REQUEST`；`toolApproval` 内嵌时必须三字段齐备；不带 `toolApproval` 的 resume 仍走普通 human input / human approval 路径。上述"迟到 resume 是 no-op"仅适用于 human approval / human input；以 HEAD 为准。
 
 ## 为什么是它，不是别的
 
