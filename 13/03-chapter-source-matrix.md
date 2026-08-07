@@ -215,7 +215,7 @@ chapter = Path("13/03-chapter-source-matrix.md").read_text()
 paths = re.findall(
     r"^- \[[ x]\] `([0-9]{2}/[0-9]{2}-[^`]+\.md)`", manifest, re.M
 )
-    # M-40 专题例外行(target,不计入 72 篇冻结书目):剔除后断言 72。
+#M-40 专题例外行(target,不计入 72 篇冻结书目)——剔除后断言 72。
 paths = [p for p in paths if p != "07/05-milestone-40-nyxid-assistant-support-contract.md"]
 assert len(paths) == len(set(paths)) == 72
 
