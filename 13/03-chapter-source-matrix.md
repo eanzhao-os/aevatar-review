@@ -6,7 +6,7 @@ verified_at: 2026-07-25
 
 # 章节—事实源矩阵：72 个阅读入口怎样回到冻结证据
 
-> 版本与结论：本章是 `current` 读者索引。它无损展开 72 篇实质章节的状态、1–3 条 spine source、E2–E6 高价值证据与统一核验日期；逐行事实源仍由迁移期章节事实源矩阵维护，本章不建立第二套分类。路径与行号都绑定 `f02aa690`，`historical` / `target` 行的索引证据不能被用来证明 current 行为。
+> 版本与结论：本章是 `current` 读者索引。它无损展开 72 篇实质章节的状态、1–3 条 spine source、E2–E6 高价值证据与统一核验日期；逐行事实源仍由迁移期章节事实源矩阵维护，本章不建立第二套分类。路径与行号都绑定 `f02aa690`，`historical` / `target` 行的索引证据不能被用来证明 current 行为。另注：`07/05-milestone-40-nyxid-assistant-support-contract.md` 是 milestone 40 专题例外行（`target`，未落地），不计入本章的 72 个阅读入口，也不参与下方自校验断言。
 
 ## 设计抽象与事实源
 
@@ -215,6 +215,8 @@ chapter = Path("13/03-chapter-source-matrix.md").read_text()
 paths = re.findall(
     r"^- \[[ x]\] `([0-9]{2}/[0-9]{2}-[^`]+\.md)`", manifest, re.M
 )
+    # M-40 专题例外行(target,不计入 72 篇冻结书目):剔除后断言 72。
+paths = [p for p in paths if p != "07/05-milestone-40-nyxid-assistant-support-contract.md"]
 assert len(paths) == len(set(paths)) == 72
 
 reader_rows = {}
@@ -274,7 +276,7 @@ PY
 
 | 论断 | 证据 |
 |---|---|
-| 72 个唯一目标路径与 status | [目标章节清单](../migration/2026-07-25-target-chapters.md) |
+| 72 个唯一目标路径与 status（另有 07/05 M-40 专题例外行不计入） | [目标章节清单](../migration/2026-07-25-target-chapters.md) |
 | 每章 spine、E2–E6 与 resolved 状态 | [实施事实源矩阵](../migration/2026-07-25-source-matrix.md) |
 | 证据等级与合法表述 | [00/02](../00/02-version-evidence-and-status.md) |
 | current / history / operation / target 分层 | [12/01](../12/01-evolution-method-and-timeline.md) |
