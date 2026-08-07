@@ -18,6 +18,7 @@ status: index
 | 2 | [02](02-nyxid-chat-actor-model-and-progress.md) | `current` | NyxIdChat Actor 模型与已提交进度 |
 | 3 | [03](03-agent-profile-and-immutable-binding.md) | `current` | Agent Profile 与不可变会话绑定 |
 | 4 | [04](04-turn-authority-tool-catalog-and-retry.md) | `current` | Turn 权威、工具目录与重试 |
+| 5 | [05](05-milestone-40-nyxid-assistant-support-contract.md) | `target` | M-40 专题：NyxID Assistant Support Contract v1（未落地登记，不影响 01-04 的 current 结论） |
 
 ## 状态图例
 

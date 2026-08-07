@@ -6,7 +6,7 @@
 >
 > 实施顺序与逐行 `status`：`docs/superpowers/plans/2026-07-25-aevatar-review-restructure.md` Tasks 5–18 主题表
 >
-> 本清单只列 72 篇**实质章节**。14 个 block `index.md` 由 Task 19 统一改写，不计入本清单。
+> 本清单只列 72 篇**实质章节**。14 个 block `index.md` 由 Task 19 统一改写，不计入本清单。`07/05` 是 milestone 40 专题登记（`target`，未落地），同样不计入 72 篇；其行内 `issue:` 按例外填 milestone URL（见"行格式"）。
 
 ## 行格式
 
@@ -16,7 +16,7 @@
 
 - `- [ ]` → 章节尚未完成；`- [x]` → 章节已有独立提交且已通过独立 review。
 - `status` 取值只允许 `current` / `mixed` / `historical` / `target`，与该章 frontmatter 必须一致。
-- `issue` 在 Task 1 Step 9 之后必须是精确单路径 issue 的 URL；`pending` 只允许出现在远端 issue 创建之前。
+- `issue` 在 Task 1 Step 9 之后必须是精确单路径 issue 的 URL；`pending` 只允许出现在远端 issue 创建之前。**例外**：专题登记行（`07/05-milestone-40-nyxid-assistant-support-contract.md`）由用户直接要求的 milestone 专题产生，无对应 aevatar-review issue，`issue:` 按例外填 milestone URL。
 
 ## `00` 导读与基线（3）
 
@@ -81,6 +81,7 @@
 - [x] `07/02-nyxid-chat-actor-model-and-progress.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/204
 - [x] `07/03-agent-profile-and-immutable-binding.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/205
 - [x] `07/04-turn-authority-tool-catalog-and-retry.md` — status:current — issue:https://github.com/eanzhao-os/aevatar-review/issues/206
+- [x] `07/05-milestone-40-nyxid-assistant-support-contract.md` — status:target — issue:https://github.com/aevatarAI/aevatar/milestone/40
 
 ## `08` Ingress、Channel、文件与语音（5）
 

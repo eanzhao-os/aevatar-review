@@ -156,6 +156,7 @@ nav:
       - "02 NyxIdChat Actor 模型与已提交进度": 07/02-nyxid-chat-actor-model-and-progress.md
       - "03 Agent Profile 与不可变会话绑定": 07/03-agent-profile-and-immutable-binding.md
       - "04 Turn 权威、工具目录与重试": 07/04-turn-authority-tool-catalog-and-retry.md
+      - "05 M-40 专题：NyxID Assistant Support Contract v1（未落地登记）": 07/05-milestone-40-nyxid-assistant-support-contract.md
   - "08 Ingress、Channel、文件与语音":
       - "导读": 08/index.md
       - "01 Ingress 规范化与路由：先固定身份，再选择执行意图": 08/01-ingress-normalization-and-routing.md

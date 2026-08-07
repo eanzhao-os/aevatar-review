@@ -2,6 +2,8 @@
 
 > 当前权威书目：`00–13` 共 14 个 block、72 篇实质章节；全部章节已完成。
 >
+> `07/05` 为 milestone 40 专题登记（`target`，未落地），不计入上述 72 篇。
+>
 > 上游事实基线：`f02aa690bbebb9cabeac30a553d737486b0eb661`；核验日期：`2026-07-25`。
 
 ## 实施原则
@@ -77,6 +79,7 @@
 - [x] [07/02-nyxid-chat-actor-model-and-progress.md](07/02-nyxid-chat-actor-model-and-progress.md) — `current` — NyxIdChat Actor 模型与已提交进度 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/204)
 - [x] [07/03-agent-profile-and-immutable-binding.md](07/03-agent-profile-and-immutable-binding.md) — `current` — Agent Profile 与不可变会话绑定 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/205)
 - [x] [07/04-turn-authority-tool-catalog-and-retry.md](07/04-turn-authority-tool-catalog-and-retry.md) — `current` — Turn 权威、工具目录与重试 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/206)
+- [x] [07/05-milestone-40-nyxid-assistant-support-contract.md](07/05-milestone-40-nyxid-assistant-support-contract.md) — `target` — M-40 专题：NyxID Assistant Support Contract v1（未落地登记，不计入冻结书目） — [issue](https://github.com/aevatarAI/aevatar/milestone/40)
 
 ### `08` Ingress、Channel、文件与语音（5）
 
