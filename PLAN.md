@@ -73,7 +73,7 @@
 - [x] [06/04-studio-commands-acks-and-readmodels.md](06/04-studio-commands-acks-and-readmodels.md) — `current` — Studio Command、ACK 与 Read Model：受理不是提交，查询不是修复 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/201)
 - [x] [06/05-work-orders-and-durable-intent.md](06/05-work-orders-and-durable-intent.md) — `current` — WorkOrder：耐久授权意图，不是通用任务队列 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/202)
 
-### `07` Conversation、NyxIdChat 与 Agent Profile（4）
+### `07` Conversation、NyxIdChat 与 Agent Profile（4 + 专题 1）
 
 - [x] [07/01-conversation-turn-and-chat-history.md](07/01-conversation-turn-and-chat-history.md) — `current` — Conversation、Turn 与耐久聊天历史 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/203)
 - [x] [07/02-nyxid-chat-actor-model-and-progress.md](07/02-nyxid-chat-actor-model-and-progress.md) — `current` — NyxIdChat Actor 模型与已提交进度 — [issue](https://github.com/eanzhao-os/aevatar-review/issues/204)

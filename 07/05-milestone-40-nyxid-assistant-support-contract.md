@@ -6,7 +6,7 @@ verified_at: 2026-07-25
 
 # Milestone 40 专题：NyxID Assistant Support Contract v1
 
-> 版本与结论：本章是 **milestone 40（NyxID Assistant Support Contract v1）专题登记表**，状态 `target`——它描述的是 2026-08-07 创建、30 个 issue 全部 open、0 个 closed 的进行中里程碑（[milestone/40](https://github.com/aevatarAI/aevatar/milestone/40)），不是冻结基线 `f02aa690` 中的 shipped 事实，也**不是**路线承诺。事实来源为 milestone 描述、30 个 GitHub issue 正文与支持契约 spec Draft v3.2（gist `f45febb057a7182dab2495d4c739d2bb8d7026f5`，2026-08-06，`verified-static` 抓取），并按 2026-08-07 的 issue 状态逐条核验。在 milestone 落地前，[07/01](01-conversation-turn-and-chat-history.md) 与 [07/02](02-nyxid-chat-actor-model-and-progress.md) 等 `current` 章节**保持原样**；本篇只做登记与导读，落地后按 [边界与演进](#边界与演进) 的清单回填。
+> 版本与结论：本章是 **milestone 40（NyxID Assistant Support Contract v1）专题登记表**，状态 `target`——它描述的是 2026-08-07 创建、30 个 issue 全部 open、0 个 closed 的进行中里程碑（[milestone/40](https://github.com/aevatarAI/aevatar/milestone/40)），不是冻结基线 `f02aa690` 中的 shipped 事实，也**不是**路线承诺。事实来源为 milestone 描述、30 个 GitHub issue 正文与支持契约 spec Draft v3.2（gist `f45febb057a7182dab2495d4c739d2bb8d7026f5`，2026-08-06，`verified-static` 抓取），并按 2026-08-07 的 issue 状态逐条核验。正文引用的 `agents/...` 源码路径以本地工作树 HEAD 为准（00/02 正文同步例外：双基准任一命中即通过），与 07/01–04 等 `current` 章节的冻结基线引用并存。在 milestone 落地前，[07/01](01-conversation-turn-and-chat-history.md) 与 [07/02](02-nyxid-chat-actor-model-and-progress.md) 等 `current` 章节**保持原样**；本篇只做登记与导读，落地后按 [边界与演进](#边界与演进) 的清单回填。
 >
 > 一句话：milestone 40 要在**一条** actor-owned `/api/chat` 主线上交付 NyxID Assistant Support Contract v1，让每个受支持的 CLI 意图都有明确且诚实的对话结局——`execute`、browser action、local command handoff 或 `decline`——并在 backend-console Studio 发布五个用例（UC1a/UC1b/UC2/UC3/UC4）的完整体验。它**不**声称所有 CLI 操作都能在聊天里执行。
 
@@ -151,7 +151,7 @@ stateDiagram-v2
 ## 技术细节 C：plan gate、verify 与 stall（§7.5、§7.7、§7.8）
 
 - **Plan gate 是 derived 而非 chosen**：计划里含 registry 风险 ∈ {grant, destructive} 的 action、或 effect-capable 且 NyxID 审批会 gate 的 tool、或估算超阈值 → `confirm`（首步是 pending-input 步骤，复用 `ask_user`/`input.resolve` 机制，`allowFreeText: true`）；全读计划 → `auto`，直接开跑。**gate 是计划期 UX 通道，不是授权边界**——审批门在 effect 步骤执行时照常升起（`#3302`/`#3311`）。
-- **Verify 阶段**：含至少一个 effect-capable 步骤的任务**必须**以验证步骤收尾——`source.kind: postcondition`（或可用的 tool read），其成功是承诺效果存在的 typed 证据；验证跑不了 → 诚实 `blocked/uncertain`，绝不乐观成功（`#3305`，直接针对 `#3182`/`#3211` 的"无回执声称成功"）。
+- **Verify 阶段**：含至少一个 effect-capable 步骤的任务**必须**以验证步骤收尾——`source.kind: postcondition`（或可用的 tool read），其成功是承诺效果存在的 typed 证据；验证跑不了 → 诚实 `blocked/uncertain`，绝不乐观成功（`#3305`，直接针对 milestone 之外的前序 issue `#3182`/`#3211` 的"无回执声称成功"）。
 - **进度与 stall**：running 步骤每 30 s 发一次 `step.changed`（substep/status）；120 s 无产出 → 前端展示 stalled，并只提供 actor 计算的 `availableActions`（`#3306`）。transport keepalive 不算进度。
 - **复合 scoping 问询**（§0.2）："一次问完、一条消息、绝不滴灌"不需要新 wire——actor 把全部缺口写进一个 prose 问题，用户一条 free-text `input.resolve` 回答（`#3307`）；渲染器不得把它画成表单。
 
