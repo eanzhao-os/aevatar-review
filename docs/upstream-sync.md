@@ -104,7 +104,7 @@ bash scripts/upstream-sync.sh
 | 模式 | 创建 issue | 影响状态 |
 |---|---:|---|
 | `--init` | 否 | 覆盖基线 SHA、运行时间和已建 issue 记录 |
-| `--dry-run` | 否 | 真实 `state.json` 不变；临时副本中的更新会在退出时丢弃 |
+| `--dry-run` | 否 | state.json 保持不变；临时副本中的更新会在退出时丢弃 |
 | 默认模式 | 可能 | 扫描结束后推进 SHA，并记录成功创建的 issue |
 
 > [!WARNING]
