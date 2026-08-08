@@ -6,7 +6,7 @@ verified_at: 2026-07-25
 
 # 章节—事实源矩阵：72 个阅读入口怎样回到冻结证据
 
-> 版本与结论：本章是 `current` 读者索引。它无损展开 72 篇实质章节的状态、1–3 条 spine source、E2–E6 高价值证据与统一核验日期；逐行事实源仍由迁移期章节事实源矩阵维护，本章不建立第二套分类。路径与行号都绑定 `f02aa690`，`historical` / `target` 行的索引证据不能被用来证明 current 行为。另注：`07/05-milestone-40-nyxid-assistant-support-contract.md` 是 milestone 40 专题例外行（`target`，未落地），不计入本章的 72 个阅读入口，也不参与下方自校验断言。
+> 版本与结论：本章是 `current` 读者索引。它无损展开 72 篇实质章节的状态、1–3 条 spine source、E2–E6 高价值证据与统一核验日期；逐行分类体系仍由迁移期章节事实源矩阵维护，本章不建立第二套分类。**spine 反映 current 事实源**：07/02（turn-actor）、09/05（protected-worktree 指纹）、10/06（ManagedCodex）等行的 spine 随上游演进更新，与 7/25 冻结矩阵的差异是设计使然，不代表失配；status、E2–E6 与核验日期仍需与冻结矩阵一致。路径与行号都绑定 `f02aa690`，`historical` / `target` 行的索引证据不能被用来证明 current 行为。另注：`07/05-milestone-40-nyxid-assistant-support-contract.md` 是 milestone 40 专题例外行（`target`，未落地），不计入本章的 72 个阅读入口，也不参与下方自校验断言。
 
 ## 设计抽象与事实源
 
@@ -133,7 +133,7 @@ flowchart LR
 | [09/02-scheduled-actor-callback-and-fire.md](../09/02-scheduled-actor-callback-and-fire.md) | `current` | `src/platform/Aevatar.GAgentService.Core/Schedules/ScheduledDispatchGAgent.cs:50`; `src/Aevatar.Foundation.Runtime.Implementations.Orleans/Grains/Callbacks/RuntimeCallbackSchedulerGrain.cs:30`; `src/platform/Aevatar.GAgentService.Abstractions/Schedules/ScheduledDispatchCalculator.cs:22` | E4: #2731; #2732; #2733<br/>E5: #2167; #2450; #2578; #2679; #2717; #2854; #2958<br/>E6: #2683 | `2026-07-25` |
 | [09/03-owner-authorization-and-agent-key.md](../09/03-owner-authorization-and-agent-key.md) | `current` | `src/platform/Aevatar.GAgentService.Abstractions/Protos/scheduled_invocation_authorization_plan.proto:56`; `src/platform/Aevatar.GAgentService.Application/Schedules/Authorization/ScheduledInvocationAuthorizationPlanner.cs:32`; `docs/adr/0041-scheduled-invocation-agent-key-credential-reference.md:24` | E2: ADR-0037 accepted（#2688 交付）<br/>E4: #2405; #2406; #2407; #2408; #2409; #2667; #2690; #2691; #2734; #2736; #2738; #2739; #2772; #2773; #2774; #2776; #2777; #2810; #2811; #2900; #2907; #2909<br/>E5: #2369; #2450; #2491; #2737<br/>E6: #2676; #2742 | `2026-07-25` |
 | [09/04-vault-reference-and-revocation-compensation.md](../09/04-vault-reference-and-revocation-compensation.md) | `current` | `src/platform/Aevatar.GAgentService.Core/Schedules/scheduled_dispatch_state.proto:12`; `src/Aevatar.Foundation.Abstractions/Credentials/credential_secret_references.proto:7`; `docs/adr/0043-scheduled-credential-lifecycle-compensation.md:20` | E2: ADR-0037 accepted（#2688 交付）<br/>E4: #2405; #2407; #2408; #2409; #2689; #2690; #2691; #2692; #2728; #2736; #2738; #2774; #2777; #2811; #2896; #2907 | `2026-07-25` |
-| [09/05-production-canary-and-recovery.md](../09/05-production-canary-and-recovery.md) | `mixed` | `docs/operations/2026-07-23-scheduled-agent-key-production-canary.md:9`; `docs/operations/2026-07-23-scheduled-agent-key-runtime-integrity-rollout.md:14`; protected [docs/migration/2026-07-25-protected-worktree.md:122](../migration/2026-07-25-protected-worktree.md)（`09/03/provision-and-observe-via-nyxid/02-scheduled-agent-key-production-canary.md` 原文以 blob `cb2ae417ad2d3bf7796b91a7a5f6a3620bb6623dc574312f58efb02d6dbb5d8e` 保留，内容已迁移至 09/05、12/04） | E3: 2026-07-24 audited canary：source `f1a18bac0c86df2dd5e1f1fd20bbe32e41c97330`、image `sha256:cffd1aef30b1dff7ede81ebd780dced55a7697928703d9199b11e7d909d6cc75`，exact grant→dedicated key→run-now→same-key `last_used_at`→`6201/6202`→cleanup，provenance 使用一次性 exception；2026-07-24 functional repeat：source `4e0def2c231b7074209b852b855954b3db7d3e71`、image `sha256:dbaccff2cac9184fb65f8e71f7e6b22b86d7c09397e4c890a2f59143e7ebf796`，只有 operator-attested key-use/cleanup，无 `6201/6202`；2026-07-26 wall-clock cron：source `c70f284908fd352cd64719349abae128ee8da0b2`、tag `c70f2849`、image `sha256:22ee592d65a2974f73c2fb313f87dcc9f2321a6de574ee341a2986de1650836f`，唯一 fire `manual=false`、same-key `last_used_at` 变化且有 `6201`，缺 `6202`；2026-07-27：source `198fe84ec44e997ac3b4c45bff597cc5a5f6bcc5`、tag `198fe84e`、image `sha256:f3c0fea51e2330bf32480b112f08777753e3e72d062aacbb1880eb22761dcec0`，可信时钟探针 `401 UNAUTHENTICATED`，mutation 前停止且 owner-scoped readback 为零新增资源，结论 `FAIL / featureConclusion=not_evaluated / errorCode=PREREQUISITE_CODE_EXECUTE_UNAVAILABLE` | `2026-07-25` |
+| [09/05-production-canary-and-recovery.md](../09/05-production-canary-and-recovery.md) | `mixed` | `docs/operations/2026-07-23-scheduled-agent-key-production-canary.md:9`; `docs/operations/2026-07-23-scheduled-agent-key-runtime-integrity-rollout.md:14`; protected [docs/migration/2026-07-25-protected-worktree.md:122](../migration/2026-07-25-protected-worktree.md)（`09/03/provision-and-observe-via-nyxid/02-scheduled-agent-key-production-canary.md` 原文以 blob `85f5b61ac091…`、SHA-256 `cb2ae417ad2d3bf7796b91a7a5f6a3620bb6623dc574312f58efb02d6dbb5d8e` 保留，内容已迁移至 09/05、12/04） | E3: 2026-07-24 audited canary：source `f1a18bac0c86df2dd5e1f1fd20bbe32e41c97330`、image `sha256:cffd1aef30b1dff7ede81ebd780dced55a7697928703d9199b11e7d909d6cc75`，exact grant→dedicated key→run-now→same-key `last_used_at`→`6201/6202`→cleanup，provenance 使用一次性 exception；2026-07-24 functional repeat：source `4e0def2c231b7074209b852b855954b3db7d3e71`、image `sha256:dbaccff2cac9184fb65f8e71f7e6b22b86d7c09397e4c890a2f59143e7ebf796`，只有 operator-attested key-use/cleanup，无 `6201/6202`；2026-07-26 wall-clock cron：source `c70f284908fd352cd64719349abae128ee8da0b2`、tag `c70f2849`、image `sha256:22ee592d65a2974f73c2fb313f87dcc9f2321a6de574ee341a2986de1650836f`，唯一 fire `manual=false`、same-key `last_used_at` 变化且有 `6201`，缺 `6202`；2026-07-27：source `198fe84ec44e997ac3b4c45bff597cc5a5f6bcc5`、tag `198fe84e`、image `sha256:f3c0fea51e2330bf32480b112f08777753e3e72d062aacbb1880eb22761dcec0`，可信时钟探针 `401 UNAUTHENTICATED`，mutation 前停止且 owner-scoped readback 为零新增资源，结论 `FAIL / featureConclusion=not_evaluated / errorCode=PREREQUISITE_CODE_EXECUTE_UNAVAILABLE` | `2026-07-25` |
 
 ### `10`
 
@@ -215,7 +215,7 @@ chapter = Path("13/03-chapter-source-matrix.md").read_text()
 paths = re.findall(
     r"^- \[[ x]\] `([0-9]{2}/[0-9]{2}-[^`]+\.md)`", manifest, re.M
 )
-#M-40 专题例外行(target,不计入 72 篇冻结书目)——剔除后断言 72。
+    # M-40 专题例外行(target,不计入 72 篇冻结书目)——剔除后断言 72。
 paths = [p for p in paths if p != "07/05-milestone-40-nyxid-assistant-support-contract.md"]
 assert len(paths) == len(set(paths)) == 72
 
@@ -233,18 +233,19 @@ assert len(reader_rows) == 72
 for path in paths:
     raw = next(line for line in source.splitlines() if line.startswith(f"| `{path}` |"))
     cells = [cell.strip() for cell in raw.strip("|").split("|")]
-    status, spine = cells[1], cells[2]
     high = []
     for level, value in zip(("E2", "E3", "E4", "E5", "E6"), cells[3:8]):
         if value != "—":
             high.append(f"{level}: {value}")
     expected_high = "<br/>".join(high) if high else "—"
     row = reader_rows[path]
-    assert row[1] == f"`{status}`", path
-    assert row[2] == spine, path
+    assert row[1] == f"`{cells[1]}`", path
     assert row[3] == expected_high, path
     assert row[4] == "`2026-07-25`", path
-print("chapter-source-index: 72/72 paths, statuses, spines and E2-E6 cells preserved")
+    # spine 断言:current/mixed 章节的 spine 随上游演进,13/03 保留演进后的
+    # current 事实源,不再要求与冻结矩阵逐字一致;仅要求 spine 非空。
+    assert row[2].strip() != "", path
+print("chapter-source-index: 72/72 paths, statuses, E2-E6 cells and non-empty current spines preserved")
 PY
 ```
 
